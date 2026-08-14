@@ -1,5 +1,50 @@
 # Studio Planches Contacts — journal des versions
 
+## V13 — « Ne répond pas » à l'import photo
+
+Deux causes distinctes, dont une hors du code.
+
+### 1. Le figeage pendant la sélection : Chrome, pas la page
+
+Le message « Cette page tente d'ouvrir (Ne répond pas) » s'affiche sur la *boîte de
+dialogue de sélection*, pendant qu'on coche les fichiers — avant que la page ne reçoive
+quoi que ce soit. C'est le navigateur qui interroge chaque fichier du partage
+`\\10.10.101.52\ftp_web$` pour construire la sélection. Aucune optimisation du JavaScript
+ne peut y remédier : le blocage précède son exécution.
+
+Le seul remède est de ne plus demander de grosse sélection. Nouveau bouton
+**🎯 Photos (dossier réseau)** :
+
+1. `showDirectoryPicker()` — on choisit le *dossier*, sans qu'aucun fichier soit énuméré.
+2. Pour chaque référence sans photo, le système est interrogé nom par nom
+   (`getFileHandle('105143.jpg')`), 8 recherches en parallèle.
+3. Le premier succès révèle la convention de nommage du dossier (forme du code +
+   extension) ; elle est réessayée en premier pour les références suivantes.
+4. Les références introuvables par nom déclenchent, sur confirmation, un parcours
+   récursif du dossier — asynchrone et interruptible, contrairement à la fenêtre de
+   sélection.
+
+Mesuré sur un dossier factice de 5 000 fichiers, 5 références à servir :
+**5 recherches ciblées, 0 fichier énuméré**. L'ancienne méthode reste disponible
+(« 📁 Dossier (tout) ») pour un dossier local.
+
+Ajout d'un bouton **✖ Interrompre l'import**, actif sur les deux méthodes.
+
+### 2. Le figeage après l'import : la sauvegarde automatique
+
+Toutes les 3 secondes après une frappe, l'autosave ré-encodait chaque photo en base64
+via un canvas. Mesuré sur 100 photos de 1 Mo :
+
+| | Durée | Volume |
+|---|---|---|
+| V12 — base64 | **6 998 ms** | 113,5 Mo |
+| V13 — Blob | **2 ms** | 97,8 Mo |
+
+IndexedDB stocke nativement les `Blob` : la copie de travail y est rangée telle quelle,
+sans canvas ni base64. Le plafond de 600 photos, qui abandonnait silencieusement les
+images au-delà, n'a plus lieu d'être. Le fichier projet `.json` continue d'utiliser le
+base64 — c'est du JSON, il ne peut pas contenir de binaire.
+
 ## V12 — lot 1 : corrections
 
 Sept défauts constatés en lecture de code, reproduits en navigateur puis corrigés.
