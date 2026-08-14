@@ -1,0 +1,221 @@
+/* ============================================================
+   base-print.css — Socle chaîne graphique pour PLV/ILV
+   ------------------------------------------------------------
+   Unités : tout en mm. Ne jamais utiliser px pour la mise en page.
+   Conversion CSS de référence : 1mm = 3.7795px (96 dpi).
+   ============================================================ */
+
+/* --- 1. Réglages de page ---------------------------------------------
+   Le bloc @page est INJECTÉ PAR DOCUMENT (voir references/formats-plv.md).
+   Modèle à recopier en tête du HTML, format A3 portrait avec 3mm de fond perdu :
+
+   @page {
+     size: 297mm 420mm;      // format ROGNÉ
+     margin: 0;
+     bleed: 3mm;             // WeasyPrint / Prince uniquement
+     marks: crop cross;      // WeasyPrint / Prince uniquement
+   }
+
+   Chrome ignore `bleed` et `marks`. Pour un rendu Chrome avec fond perdu,
+   déclarer la page au format FOND PERDU INCLUS et utiliser .crop-marks :
+
+   @page { size: 303mm 426mm; margin: 0; }   // 297+6 x 420+6
+   -------------------------------------------------------------------- */
+
+:root {
+  /* Fond perdu : 3mm standard, 5mm pour bâche/grand format */
+  --bleed: 3mm;
+  /* Zone de sécurité : aucun texte ni élément vital au-delà */
+  --safe: 5mm;
+
+  /* Palette — RGB pour l'écran, cible CMJN en commentaire pour l'imprimeur.
+     Ces valeurs RGB sont choisies pour rester stables en conversion Fogra39.
+     Remplacer par la charte de l'enseigne. */
+  --promo-rouge:   #D6122B;  /* CMJN cible : 0 / 100 / 85 / 5  */
+  --promo-jaune:   #FFD100;  /* CMJN cible : 0 / 12 / 100 / 0  */
+  --noir-texte:    #1A1A1A;  /* CMJN cible : 0 / 0 / 0 / 100 (noir 100%K) */
+  --gris-mention:  #5A5A5A;  /* CMJN cible : 0 / 0 / 0 / 70   */
+  --blanc:         #FFFFFF;
+
+  /* Échelle typographique — calée sur le recul de lecture.
+     Règle : 1mm de hauteur de capitale se lit à ~2,5m.
+     Voir references/chaine-graphique.md, table "Recul de lecture". */
+  --t-accroche: 60mm;
+  --t-prix:     45mm;
+  --t-courant:  12mm;
+  --t-mention:   4mm;
+}
+
+/* --- 2. Impératifs d'impression -------------------------------------- */
+
+* {
+  box-sizing: border-box;
+  /* SANS CETTE LIGNE LES APLATS DE COULEUR NE S'IMPRIMENT PAS. */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--blanc);
+  color: var(--noir-texte);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Pas de lissage sous-pixel : nuit à la netteté du texte vectoriel */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- 3. Structure d'un support --------------------------------------- */
+
+/* .support = une page physique. Un support par page, break systématique. */
+.support {
+  position: relative;
+  overflow: hidden;
+  break-after: page;
+  page-break-after: always;   /* héritage, pour les vieux moteurs */
+  background: var(--blanc);
+}
+.support:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+
+/* .fond = l'aplat ou l'image de fond, DÉBORDE dans le fond perdu.
+   Toujours l'étendre de --bleed sur les 4 côtés. */
+.fond {
+  position: absolute;
+  top: calc(-1 * var(--bleed));
+  left: calc(-1 * var(--bleed));
+  width: calc(100% + 2 * var(--bleed));
+  height: calc(100% + 2 * var(--bleed));
+  z-index: 0;
+}
+
+/* .zone-sure = le conteneur du contenu vital. Rien de lisible en dehors. */
+.zone-sure {
+  position: relative;
+  z-index: 1;
+  width: calc(100% - 2 * var(--safe));
+  height: calc(100% - 2 * var(--safe));
+  margin: var(--safe);
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- 4. Repères de coupe (fallback Chrome) ---------------------------
+   À activer uniquement si la page est déclarée FOND PERDU INCLUS.
+   Trace 8 traits de 4mm à l'aplomb du format rogné. */
+.crop-marks::before,
+.crop-marks::after {
+  content: "";
+  position: absolute;
+  inset: var(--bleed);
+  pointer-events: none;
+  z-index: 99;
+}
+.crop-marks::before {
+  border-left: 0.25mm solid #000;
+  border-right: 0.25mm solid #000;
+  /* masque la partie centrale : ne laisse que les amorces en coin */
+  -webkit-mask: linear-gradient(to bottom, #000 0 4mm, transparent 4mm calc(100% - 4mm), #000 calc(100% - 4mm) 100%);
+          mask: linear-gradient(to bottom, #000 0 4mm, transparent 4mm calc(100% - 4mm), #000 calc(100% - 4mm) 100%);
+}
+.crop-marks::after {
+  border-top: 0.25mm solid #000;
+  border-bottom: 0.25mm solid #000;
+  -webkit-mask: linear-gradient(to right, #000 0 4mm, transparent 4mm calc(100% - 4mm), #000 calc(100% - 4mm) 100%);
+          mask: linear-gradient(to right, #000 0 4mm, transparent 4mm calc(100% - 4mm), #000 calc(100% - 4mm) 100%);
+}
+
+/* --- 5. Blocs typographiques ----------------------------------------- */
+
+.accroche {
+  font-size: var(--t-accroche);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  margin: 0;
+  /* Jamais de césure sur une accroche */
+  hyphens: none;
+  overflow-wrap: normal;
+}
+
+.prix {
+  font-size: var(--t-prix);
+  line-height: 0.9;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+.prix .devise { font-size: 0.5em; vertical-align: super; }
+.prix .cents  { font-size: 0.55em; vertical-align: super; }
+
+.prix-barre {
+  font-size: calc(var(--t-prix) * 0.35);
+  color: var(--gris-mention);
+  text-decoration: line-through;
+  text-decoration-thickness: 0.08em;
+  font-weight: 600;
+}
+
+.remise {
+  display: inline-block;
+  background: var(--promo-rouge);
+  color: var(--blanc);
+  font-weight: 900;
+  font-size: calc(var(--t-prix) * 0.45);
+  padding: 0.1em 0.25em;
+  line-height: 1;
+}
+
+.mention {
+  font-size: var(--t-mention);
+  line-height: 1.25;
+  color: var(--gris-mention);
+  margin-top: auto;   /* colle les mentions légales en bas du support */
+}
+
+/* --- 6. Images ------------------------------------------------------- */
+/* Contrainte : une image doit faire au minimum
+   largeur_mm x 11,81 pixels pour atteindre 300 dpi.
+   scripts/preflight.py vérifie ce point automatiquement. */
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  image-rendering: auto;
+}
+.produit-photo {
+  object-fit: contain;
+  /* Le détourage doit être fait en amont (PNG alpha), pas en CSS */
+}
+
+/* --- 7. Anti-pièges -------------------------------------------------- */
+/* Jamais de rupture à l'intérieur d'un bloc prix ou d'une mention légale */
+.prix, .prix-bloc, .mention, .remise { break-inside: avoid; }
+
+/* Trait de 0.25mm minimum : en dessous, le filet disparaît à l'impression */
+hr, .filet { border: none; border-top: 0.25mm solid var(--noir-texte); margin: 2mm 0; }
+
+/* --- 8. Aperçu écran (neutralisé à l'impression) --------------------- */
+@media screen {
+  body {
+    background: #6E6E6E;
+    padding: 10mm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10mm;
+  }
+  .support {
+    box-shadow: 0 0 0 0.25mm #FFF, 0 4mm 12mm rgba(0,0,0,.45);
+  }
+  /* Matérialise la zone de sécurité à l'écran, invisible à l'impression */
+  .zone-sure { outline: 0.25mm dashed rgba(0,180,255,.6); }
+}
+@media print {
+  body { background: none; padding: 0; display: block; }
+  .support { box-shadow: none; }
+  .zone-sure { outline: none; }
+}

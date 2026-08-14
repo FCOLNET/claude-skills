@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Affiche TDG A1 — modèle</title>
+<link rel="stylesheet" href="base-print.css">
+<style>
+  /* ---- Format : A1 tête de gondole, recul de lecture 5 m ----
+     Page déclarée FOND PERDU INCLUS pour Chromium : 594+6 x 841+6.
+     Sous WeasyPrint, remplacer par :
+       @page { size: 594mm 841mm; bleed: 3mm; marks: crop cross; }
+     et retirer la classe .crop-marks du .support.                        */
+  @page { size: 600mm 847mm; margin: 0; }
+
+  .support { width: 600mm; height: 847mm; }
+
+  /* Recul 5 m → capitale 43 mm → font-size ≈ 61 mm */
+  :root {
+    --t-accroche: 61mm;
+    --t-prix: 50mm;
+    --t-courant: 14mm;
+    --t-mention: 5mm;
+  }
+
+  .fond { background: var(--promo-rouge); }
+
+  .zone-sure { padding: 20mm; align-items: center; text-align: center; }
+
+  .accroche { color: var(--blanc); margin-bottom: 12mm; }
+
+  .produit-photo {
+    width: 320mm;
+    height: 320mm;
+    margin: 0 auto 14mm;
+  }
+
+  .designation {
+    font-size: var(--t-courant);
+    font-weight: 600;
+    color: var(--blanc);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8mm;
+  }
+
+  .prix-bloc {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10mm;
+    background: var(--promo-jaune);
+    padding: 8mm 16mm;
+  }
+  .prix { color: var(--noir-texte); }
+
+  .mention { color: var(--blanc); text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="support crop-marks">
+  <div class="fond"></div>
+
+  <div class="zone-sure">
+    <h1 class="accroche">Offre<br>du mois</h1>
+
+    <!-- Image de calage à remplacer par le visuel réel.
+         data-print-width alimente le contrôle de résolution du pré-vol.
+         320 mm à 150 dpi → 1890 px minimum. -->
+    <img class="produit-photo"
+         src="placeholder-produit.png"
+         data-print-width="320mm"
+         alt="">
+
+    <p class="designation">Désignation produit — contenance</p>
+
+    <div class="prix-bloc">
+      <span class="prix-barre">24,90 €</span>
+      <span class="prix">17<span class="cents">,90</span><span class="devise">€</span></span>
+      <span class="remise">−28 %</span>
+    </div>
+
+    <p class="mention">
+      Offre valable du 01/06 au 14/06/2026 dans la limite des stocks disponibles.
+      Prix de référence : prix le plus bas pratiqué au cours des 30 derniers jours
+      dans ce point de vente. Photo non contractuelle.
+    </p>
+  </div>
+</div>
+
+</body>
+</html>
