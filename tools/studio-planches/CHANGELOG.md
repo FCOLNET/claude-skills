@@ -1,5 +1,54 @@
 # Studio Planches Contacts — journal des versions
 
+## V14 — reconnaissance du nommage : code article ou réf. fournisseur
+
+La V13 ne savait aller chercher un fichier que par son code article. Trois défauts
+l'empêchaient de faire de même avec un dossier nommé par référence fournisseur.
+
+### 1. La référence brute n'était pas conservée
+
+À l'import de la base articles, seule la forme normalisée était gardée
+(`normFourn` : majuscules, séparateurs supprimés). `ABC-789` devenait la clé `ABC789`.
+Cette forme sert à *reconnaître* un nom déjà lu, mais elle ne permet pas de *demander*
+un fichier au système : sur le partage, le fichier s'appelle `ABC-789.jpg`.
+La référence telle qu'écrite est désormais conservée (`REF_FOURN_RAW`), persistée et
+embarquée dans les fichiers projet. Elle sert aussi à l'export Excel, plus lisible.
+
+### 2. Une réf. contenant `/` ne pouvait jamais correspondre
+
+`normFourn` ne retirait que les espaces, points, tirets et soulignés. Une référence
+`AXE-GD1/25` donnait la clé `AXEGD1/25` — or la barre oblique est interdite dans un nom
+de fichier Windows, donc aucune photo ne pouvait porter ce nom. Toutes les références
+contenant `/`, `#`, `+` ou une parenthèse étaient invisibles à l'appariement, y compris
+dans l'ancien import de masse. La normalisation retire maintenant tout caractère non
+alphanumérique. Les bases déjà en mémoire sont ré-indexées au chargement, sans
+manipulation.
+
+### 3. Aucune reconnaissance de la convention du dossier
+
+L'import ciblé essaie désormais, sur les cinq premières références seulement, toutes les
+formes de nom possibles : code article, variantes de zéros, référence fournisseur et ses
+écritures usuelles (`AXE-GD1/25`, `AXE GD1 25`, `AXE_GD1_25`, `AXEGD125`). Le premier
+fichier trouvé fixe la convention — forme **et** extension — et les références suivantes
+ne l'essaient plus qu'elle. La convention détectée est affichée à l'écran.
+
+Si aucune forme ne correspond, l'outil ne s'acharne pas référence par référence sur le
+partage : il propose directement le parcours du dossier, qui reconnaît les noms
+approchants.
+
+Mesuré sur des dossiers factices, 5 références à servir :
+
+| Dossier | Recherches | Fichiers parcourus |
+|---|---|---|
+| nommé par code article (5 000 fichiers) | 6 | 0 |
+| nommé par réf. fournisseur (3 005 fichiers) | 31 | 0 |
+| réf. fournisseur écrite avec d'autres séparateurs | 54 | 0 |
+
+**À faire une fois** : recharger la base articles en renseignant la colonne
+« Réf. fournisseur ». Les bases déjà mémorisées continuent de fonctionner pour le
+parcours, mais la recherche ciblée par référence fournisseur a besoin de l'écriture
+d'origine, qui n'était pas conservée avant la V14.
+
 ## V13 — « Ne répond pas » à l'import photo
 
 Deux causes distinctes, dont une hors du code.

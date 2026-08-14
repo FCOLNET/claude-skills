@@ -1,0 +1,1984 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio Planches Contacts — NPC (V14)</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:#F5F3F0; color:#1A1A1A; padding-bottom:80px; }
+  .header { background:linear-gradient(135deg,#0D1B2A,#1B4332); color:#fff; padding:24px; text-align:center; }
+  .header h1 { font-family:'Playfair Display',serif; font-size:1.6rem; }
+  .header h1 em { color:#C8A951; }
+  .header p { color:rgba(255,255,255,.55); font-size:.8rem; margin-top:4px; }
+  .step-nav { display:flex; justify-content:center; gap:0; margin:20px auto; max-width:600px; }
+  .step-pill { flex:1; text-align:center; padding:10px 6px; font-size:.75rem; font-weight:700; color:#999; border-bottom:3px solid #DDD; }
+  .step-pill.active { color:#8B1A2B; border-color:#8B1A2B; }
+  .step-pill.done { color:#1B4332; border-color:#1B4332; }
+  .panel { max-width:900px; margin:0 auto; padding:0 16px; }
+  .choice-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-top:10px; }
+  .choice { background:#fff; border:2px solid #E5E0D8; border-radius:16px; padding:28px 24px; cursor:pointer; transition:all .15s; text-align:center; }
+  .choice:hover { border-color:#C8A951; transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.08); }
+  .choice .ico { font-size:2.2rem; margin-bottom:10px; }
+  .choice h3 { font-family:'Playfair Display',serif; font-size:1.1rem; margin-bottom:8px; }
+  .choice p { font-size:.8rem; color:#777; }
+  .formbox { background:#fff; border-radius:16px; padding:24px; margin-top:16px; box-shadow:0 2px 12px rgba(0,0,0,.05); }
+  .formbox label { display:block; font-size:.8rem; font-weight:700; margin:12px 0 4px; }
+  .formbox input[type=number], .formbox input[type=text], .formbox select { width:100%; padding:9px 12px; border:1px solid #ccc; border-radius:8px; font-size:.9rem; font-family:'DM Sans',sans-serif; }
+  .maprow { display:grid; grid-template-columns:130px 1fr; gap:10px; align-items:center; margin-top:8px; }
+  .btn { display:inline-flex; align-items:center; gap:8px; border:none; font-weight:700; padding:12px 24px; border-radius:50px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:.9rem; transition:transform .15s; }
+  .btn:hover { transform:translateY(-1px); }
+  .btn.red { background:linear-gradient(135deg,#8B1A2B,#B02A3C); color:#fff; box-shadow:0 4px 16px rgba(139,26,43,.3); }
+  .btn.green { background:linear-gradient(135deg,#1B4332,#2D6A4F); color:#fff; }
+  .btn.blue { background:linear-gradient(135deg,#0369A1,#0077B6); color:#fff; }
+  .btn.gold { background:#C8A951; color:#1A1A1A; }
+  .btn.ghost { background:#fff; border:1px solid #ccc; color:#444; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btnrow { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin:18px 0 6px; }
+  .subhint { text-align:center; color:#888; font-size:.78rem; margin-top:6px; padding:0 12px; }
+  .stats { text-align:center; font-size:.9rem; color:#555; margin:14px 0; }
+  .stats b.ok { color:#065F46; font-size:1.05rem; } .stats b.ko { color:#991B1B; }
+  .pdfprog { text-align:center; font-size:.75rem; color:#8B1A2B; }
+  .planche { max-width:1200px; margin:24px auto; padding:0 16px; }
+  .planche-header { display:flex; align-items:center; gap:12px; border-left:5px solid #8B1A2B; padding:8px 14px; background:#fff; border-radius:0 10px 10px 0; box-shadow:0 1px 8px rgba(0,0,0,.05); flex-wrap:wrap; }
+  .planche-header h2 { font-size:1rem; font-weight:700; flex-grow:1; }
+  .add-card-btn { padding:6px 14px !important; font-size:.72rem !important; }
+  .planche-header h2[contenteditable]:focus { outline:2px solid #C8A951; border-radius:4px; }
+  .count { font-size:.75rem; color:#888; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-top:12px; }
+  .card { background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 8px rgba(0,0,0,.06); position:relative; }
+  .del-card { position:absolute; top:5px; right:5px; z-index:6; width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,.5); color:#fff; font-size:.8rem; line-height:1; cursor:pointer; opacity:0; transition:opacity .15s, background .15s; display:flex; align-items:center; justify-content:center; }
+  .card:hover .del-card { opacity:1; }
+  .del-card:hover { background:#8B1A2B; }
+  .card.missing { outline:2px dashed #E8B4B4; }
+  .card.dragover { outline:3px solid #C8A951; }
+  .photo-slot { aspect-ratio:1; background:#FAF8F5; display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer; }
+  .prod-img { width:100%; height:100%; object-fit:contain; display:none; }
+  .ph-fallback { position:absolute; inset:0; background:repeating-linear-gradient(45deg,#F1EDE7,#F1EDE7 10px,#EAE5DD 10px,#EAE5DD 20px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; }
+  .photo-code { font-weight:700; font-size:.95rem; color:#7A7265; letter-spacing:1px; }
+  .photo-file { font-size:.58rem; color:#A39B8D; font-weight:600; }
+  .card.missing .photo-file { color:#B4453F; }
+  .ph-edit { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.55); color:#fff; font-size:.58rem; padding:3px 8px; border-radius:12px; opacity:0; transition:opacity .15s; }
+  .photo-slot:hover .ph-edit { opacity:1; }
+  .card-body { padding:8px 9px 9px; }
+  .card-code { font-size:.62rem; color:#999; font-family:monospace; }
+  .card-code[contenteditable]:focus, .card-lib[contenteditable]:focus, .card-prix[contenteditable]:focus { outline:2px solid #C8A951; border-radius:3px; }
+  .manual-flag { color:#B45309; font-weight:700; }
+  .card-lib { font-size:.68rem; font-weight:500; line-height:1.25; min-height:2.2em; }
+  .card-prix { font-weight:700; font-size:.8rem; color:#8B1A2B; margin-top:4px; }
+  .price-row { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; margin-top:4px; }
+  .card-prix-init { font-size:.68rem; color:#999; text-decoration:line-through; text-decoration-color:#B02A3C; font-weight:600; }
+  .card-prix-init:empty { display:none; }
+  .card-prix-init[contenteditable]:focus, .card-remise[contenteditable]:focus { outline:2px solid #C8A951; border-radius:3px; }
+  .card-remise { display:inline-block; background:#8B1A2B; color:#fff; font-size:.6rem; font-weight:700; padding:2px 6px; border-radius:10px; margin-top:3px; line-height:1.1; }
+  .card-remise:empty, .card-remise.hidden { display:none; }
+  .promo-toggle { display:flex; align-items:center; gap:6px; }
+  .promo-toggle label { font-size:.75rem; font-weight:700; color:#444; }
+  .promo-toggle select { padding:6px 10px; border:1px solid #ccc; border-radius:8px; font-size:.78rem; font-family:'DM Sans',sans-serif; background:#fff; }
+  .hidden { display:none !important; }
+  .topbar-mini { position:sticky; top:0; z-index:50; background:rgba(245,243,240,.95); backdrop-filter:blur(6px); padding:8px; border-bottom:1px solid #E5E0D8; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .topbar-mini .btn { padding:8px 16px; font-size:.78rem; }
+  @media print {
+    body { background:#fff; }
+    .header,.step-nav,.topbar-mini,.stats,.subhint,.pdfprog { display:none !important; }
+    .ph-edit { display:none; }
+    .planche { page-break-after:always; }
+    .card { box-shadow:none; border:1px solid #ddd; }
+  }
+</style></head><body>
+
+<div class="header">
+  <h1>Studio <em>Planches Contacts</em></h1>
+  <p>Configure · Importe · Exporte — réutilisable pour chaque catalogue</p>
+</div>
+
+<div style="text-align:center;margin:14px auto 0">
+  <button class="btn green" id="refBtnHome">📚 Charger / mettre à jour la base articles</button>
+  <div class="subhint" id="refStatus">Aucune base chargée pour l'instant — recommandé avant de commencer.</div>
+</div>
+<div class="step-nav">
+  <div class="step-pill active" id="pill1">1 · Structure</div>
+  <div class="step-pill" id="pill2">2 · Photos</div>
+  <div class="step-pill" id="pill3">3 · Exports</div>
+</div>
+
+<!-- ============ ÉTAPE 1 : STRUCTURE ============ -->
+<div class="panel" id="step1">
+  <div class="choice-grid">
+    <div class="choice" id="chooseExcel">
+      <div class="ico">📊</div>
+      <h3>Téléverser mon fichier Excel</h3>
+      <p>Un fichier avec tes colonnes (page, code, libellé, prix…). L'appli détecte les colonnes et construit les planches automatiquement.</p>
+    </div>
+    <div class="choice" id="chooseManual">
+      <div class="ico">✏️</div>
+      <h3>Définir à la main</h3>
+      <p>Choisis le nombre de pages et de produits par page. Tu rempliras les codes et photos toi-même sur les cartes.</p>
+    </div>
+  </div>
+  <input type="file" id="excelInput" accept=".xlsx,.xls,.csv" style="display:none">
+
+  <div class="formbox hidden" id="mapBox">
+    <b>🧭 Correspondance des colonnes détectées</b>
+    <div class="maprow"><span>Feuille</span><select id="mapSheet"></select></div>
+    <div class="maprow"><span>Page / planche</span><select id="mapPage"></select></div>
+    <div class="maprow"><span>Code article *</span><select id="mapCode"></select></div>
+    <div class="maprow"><span>Libellé</span><select id="mapLib"></select></div>
+    <div class="maprow"><span>Prix (normal)</span><select id="mapPrix"></select></div>
+    <div class="maprow"><span>Prix initial (barré)</span><select id="mapPrixInit"></select></div>
+    <div class="maprow"><span>Prix soldé / promo</span><select id="mapPrixPromo"></select></div>
+    <div class="maprow"><span>Remise</span><select id="mapRemise"></select></div>
+    <div class="btnrow"><button class="btn red" id="buildFromExcel">Construire les planches →</button></div>
+    <p class="subhint">* seul le code est obligatoire. Sans colonne page, tout va sur une planche unique.</p>
+  </div>
+
+  <div class="formbox hidden" id="manualBox">
+    <b>✏️ Structure manuelle</b>
+    <label>Nombre de pages / planches</label>
+    <input type="number" id="manPages" value="12" min="1" max="60">
+    <label>Produits par page</label>
+    <input type="number" id="manPerPage" value="9" min="1" max="30">
+    <label>Préfixe du nom de page</label>
+    <input type="text" id="manPrefix" value="Page">
+    <div class="btnrow"><button class="btn red" id="buildManual">Construire les planches →</button></div>
+  </div>
+</div>
+
+<!-- ============ ÉTAPES 2-3 : BUILDER ============ -->
+<div id="builder" class="hidden">
+  <div class="topbar-mini">
+    <button class="btn ghost" id="backBtn">↩ Structure</button>
+    <button class="btn green" id="saveProj" title="Sauvegarder le projet dans un fichier (.json) pour reprendre plus tard">💾 Sauvegarder</button>
+    <button class="btn ghost" id="openProj" title="Ouvrir un projet sauvegardé (.json)">📂 Ouvrir projet</button>
+    <button class="btn ghost" id="refBtn" title="Charger un Excel code→libellé→prix pour l'auto-remplissage">📚 Référentiel</button>
+    <button class="btn red" id="pickTargetedBtn" title="Recommandé sur un dossier réseau : choisit le dossier, puis va chercher UNIQUEMENT les photos des références de tes planches">🎯 Photos (dossier réseau)</button>
+    <button class="btn ghost" id="pickBtn" title="Ancienne méthode : charge tout le contenu du dossier (lent sur un partage réseau)">📁 Dossier (tout)</button>
+    <button class="btn ghost" id="pickFilesBtn" title="Sélection manuelle de fichiers">🖼 Images</button>
+    <button class="btn gold" id="makePdf">📄 PDF</button>
+    <button class="btn green" id="makeFolder">🗂 Dossier prod HD</button>
+    <button class="btn blue" id="makeHtml">📤 Export HTML</button>
+    <button class="btn green" id="makeXlsx" title="Exporter le catalogue final en Excel (une ligne par produit)">📊 Excel</button>
+    <button class="btn ghost" id="makeZip">📦 Zip</button>
+    <button class="btn ghost" id="exportMissing">📋 Manquants</button>
+    <button class="btn ghost" onclick="window.print()">🖨</button>
+    <div class="promo-toggle">
+      <label for="remiseFormat">🏷 Remise</label>
+      <select id="remiseFormat">
+        <option value="pct">En %</option>
+        <option value="val">En valeur (F)</option>
+        <option value="both">Les deux</option>
+        <option value="none">Masquer</option>
+      </select>
+    </div>
+  </div>
+  <div class="stats" id="stats">📷 <b class="ok" id="okCount">0</b> / <span id="totalCount">0</span> · <b class="ko" id="koCount"></b> · <span id="baseState" style="font-weight:700"></span></div>
+  <div id="baseWarn" class="hidden" style="margin:8px 0;padding:10px 14px;background:#FFF3CD;border:1px solid #E0A800;border-left:5px solid #B00020;border-radius:6px;color:#5C4200;font-size:.85rem">
+    ⚠️ <b>Aucune base articles chargée.</b> Les vignettes ne pourront pas récupérer désignation et prix automatiquement.
+    <button class="btn gold" id="baseWarnBtn" style="padding:5px 14px;margin-left:10px">📚 Charger la base</button>
+  </div>
+  <div class="pdfprog" id="pdfProg"></div>
+  <div style="text-align:center"><button class="btn ghost hidden" id="cancelImport" style="padding:6px 18px;font-size:.75rem">✖ Interrompre l'import</button></div>
+  <p class="subhint">📚 <b>Base articles</b> : charge l'export complet de ta base (tous rayons) — stockage illimité, mémorisé entre sessions. Recharge le même export pour mettre les prix à jour → toute photo posée remplit automatiquement code, libellé et prix (mémorisé pour les prochaines sessions).<br>Fenêtre "dossier" = n'affiche QUE les dossiers (normal, clique "Sélectionner" même si ça semble vide). Clic sur une photo = la remplacer. Codes, libellés, prix et titres de pages sont éditables directement (clic sur le texte).</p>
+  <div id="planches"></div>
+</div>
+
+<input type="file" id="refInput" accept=".xlsx,.xls,.csv" style="display:none">
+<div id="refModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px">
+  <div class="formbox" style="max-width:460px;width:100%">
+    <b>📚 Base articles entreprise — correspondance des colonnes</b>
+    <div class="maprow"><span>Feuille</span><select id="refSheet"></select></div>
+    <div class="maprow"><span>Code article *</span><select id="refCode"></select></div>
+    <div class="maprow"><span>Réf. fournisseur</span><select id="refFourn"></select></div>
+    <div class="maprow"><span>Libellé</span><select id="refLib"></select></div>
+    <div class="maprow"><span>Prix</span><select id="refPrix"></select></div>
+    <div class="btnrow">
+      <button class="btn ghost" id="refCancel">Annuler</button>
+      <button class="btn red" id="refApply">Activer l'auto-remplissage</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="projInput" accept=".json,application/json" style="display:none">
+<input type="file" id="dirInput" webkitdirectory directory multiple style="display:none">
+<input type="file" id="singleInput" accept="image/*" style="display:none">
+<input type="file" id="multiInput" accept="image/*" multiple style="display:none">
+
+<script>
+let PAGES = [];            // [{pg, codes:[...]}]
+let PRODUCTS = {};         // code -> {lib, prix}
+const matchedFiles = {};
+const manualSet = new Set();
+let currentEditCode = null;
+let currentEditCard = null;   // la vignette précise sur laquelle on remplace la photo
+let wbGlobal = null;
+let AUTOSAVE_SUSPENDED = false;   // true pendant un import de masse (voir ingestFiles)
+// ===== CACHE LOCAL DES PHOTOS (V10) =====
+// Quand les photos sont sur un partage réseau (\\serveur\dossier), le navigateur ne copie
+// RIEN à la sélection : il garde une simple référence et RELIT le fichier sur le réseau à
+// chaque usage (affichage, scroll, PDF, sauvegarde). D'où une lenteur énorme.
+// Ici on lit chaque photo UNE SEULE FOIS, on en fabrique une version allégée gardée en
+// mémoire, et tout le reste de l'outil travaille sur cette copie locale.
+const localBlobs = {};            // code -> Blob JPEG (≈1200px) détaché du réseau : COPIE DE TRAVAIL
+const CACHE_MAX_DIM = 1200;       // largeur/hauteur max de la copie de travail (V11 : 1600→1200, ~2x moins de RAM)
+// V12 — RÈGLE : matchedFiles garde TOUJOURS le fichier d'origine pleine résolution.
+//   matchedFiles[code] = photo HD d'origine  -> exports imprimeur (dossier prod HD, zip)
+//   localBlobs[code]   = copie allégée 1200px -> affichage, PDF, HTML, sauvegarde projet
+// V11 écrasait matchedFiles par la copie 1200px pour "libérer la mémoire" : un objet File
+// n'est qu'une référence disque/réseau (quelques octets en RAM), mais le dossier prod
+// livrait alors des vignettes 1200px à l'imprimeur. Corrigé.
+function workFile(code){ return localBlobs[code] || matchedFiles[code]; }
+// Codes dont la photo provient d'un projet rouvert (.json) : ce sont des images
+// ré-encodées à ~1600px, ce n'est PAS du HD imprimeur. On le signale à l'export.
+const restoredPhotos = new Set();
+function isHD(code){ return !!matchedFiles[code] && !restoredPhotos.has(code); }
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+// Échappement HTML : les libellés viennent d'Excel et contiennent régulièrement des
+// caractères qui cassent le markup ('TV 55" LED', 'LOT <2M>', 'BLACK & DECKER').
+// esc  -> pour du contenu texte ; escA -> pour une valeur d'attribut.
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escA(s){ return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// Un même article peut figurer sur PLUSIEURS planches : toujours viser TOUTES ses
+// vignettes, jamais la première trouvée (querySelector renvoyait une seule carte,
+// les suivantes restaient vides).
+function cardsOf(code){
+  if (code===null||code===undefined||code==='') return [];
+  return document.querySelectorAll(`.card[data-code="${CSS.escape(code)}"]`);
+}
+
+// ---------- TÉLÉCHARGEMENT UNIVERSEL (marche même en iframe / clic auto bloqué) ----------
+// Affiche un overlay avec un gros lien cliquable. Tente aussi le téléchargement auto.
+function showDownload(blob, filename, label){
+  const url = URL.createObjectURL(blob);
+  const sizeMB = (blob.size/1048576);
+  const sizeTxt = sizeMB >= 1 ? sizeMB.toFixed(1)+' Mo' : Math.max(1,Math.round(blob.size/1024))+' Ko';
+  // tentative de téléchargement auto (peut être bloquée silencieusement — on ne compte pas dessus)
+  try{ const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); }catch(e){}
+  // overlay avec lien cliquable garanti
+  let ov=document.getElementById('dlOverlay');
+  if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.id='dlOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(13,27,42,.72);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px;max-width:440px;width:100%;padding:28px 26px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:inherit';
+  box.innerHTML =
+    '<div style="font-size:2.4rem;line-height:1;margin-bottom:8px">✅</div>'
+    +'<div style="font-family:\'Playfair Display\',serif;font-size:1.15rem;font-weight:700;color:#1B4332;margin-bottom:4px">'+(label||'Fichier prêt')+'</div>'
+    +'<div style="font-size:.82rem;color:#8B1A2B;font-weight:600;word-break:break-all;margin-bottom:2px">'+filename+'</div>'
+    +'<div style="font-size:.72rem;color:#999;margin-bottom:18px">'+sizeTxt+'</div>';
+  const dl=document.createElement('a');
+  dl.href=url; dl.download=filename;
+  dl.textContent='⬇  Télécharger le fichier';
+  dl.style.cssText='display:block;background:linear-gradient(135deg,#8B1A2B,#B02A3C);color:#fff;text-decoration:none;font-weight:700;font-size:.95rem;padding:14px 20px;border-radius:12px;margin-bottom:10px;box-shadow:0 4px 14px rgba(139,26,43,.35)';
+  const openBtn=document.createElement('a');
+  openBtn.href=url; openBtn.target='_blank'; openBtn.rel='noopener';
+  openBtn.textContent='↗  Ouvrir dans un nouvel onglet';
+  openBtn.style.cssText='display:block;background:#F0EDE8;color:#1B4332;text-decoration:none;font-weight:600;font-size:.82rem;padding:11px 20px;border-radius:12px;margin-bottom:14px';
+  const hint=document.createElement('div');
+  hint.style.cssText='font-size:.7rem;color:#aaa;line-height:1.4;margin-bottom:14px';
+  hint.innerHTML='Astuce : si le clic « Télécharger » ne fait rien, fais un <b>clic droit → « Enregistrer le lien sous… »</b> sur le bouton rouge.';
+  const close=document.createElement('button');
+  close.textContent='Fermer';
+  close.style.cssText='background:none;border:1px solid #ddd;color:#666;font-size:.78rem;padding:8px 22px;border-radius:20px;cursor:pointer';
+  close.onclick=()=>{ ov.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); };
+  box.appendChild(dl); box.appendChild(openBtn); box.appendChild(hint); box.appendChild(close);
+  ov.appendChild(box);
+  ov.addEventListener('click',e=>{ if(e.target===ov){ ov.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); } });
+  document.body.appendChild(ov);
+}
+function baseName(n){const d=n.lastIndexOf('.');return (d>0?n.slice(0,d):n).trim();}
+// retire UNIQUEMENT un suffixe de duplication de type Windows en fin de nom :
+// " (1)", "(2)", " - Copie", " - Copie (2)", " copy"…  — on NE touche PAS aux "-789"/"_123"
+// car ce sont des parties légitimes des références (ex. code fournisseur "ABC-789").
+function stripDupSuffix(b){
+  let s=String(b).trim();
+  s=s.replace(/\s*[-–]?\s*(copie|copy)(\s*\(?\s*\d+\s*\)?)?$/i,'');   // "… - Copie", "… copy 2"
+  s=s.replace(/\s*\(\s*\d+\s*\)\s*$/,'');                            // "… (1)", "…(2)"
+  return s.trim();
+}
+// n° de duplication pour le tri (0 = sans parenthèse / prioritaire).
+// Ne considère QUE la forme parenthésée " (n)" pour éviter de confondre avec un vrai code "-789".
+function dupIndex(b){
+  const m=String(b).match(/\(\s*(\d+)\s*\)\s*$/);
+  if (m) return parseInt(m[1],10);
+  if (/\b(copie|copy)\b/i.test(String(b))) return 1;                 // "…- Copie" = doublon, priorité basse
+  return 0;
+}
+function candidates(b){const o=new Set([b]);if(/^\d+$/.test(b)){o.add(b.padStart(6,'0'));o.add(String(parseInt(b,10)).padStart(6,'0'));}return [...o];}
+function normCode(v){
+  if (v===null||v===undefined) return '';
+  let s = String(v).trim();
+  if (/^\d+(\.0+)?$/.test(s)) s = String(parseInt(s,10)).padStart(6,'0');
+  return s;
+}
+function safeName(s){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9 _.-]/g,'').trim().replace(/ +/g,'_').slice(0,60);}
+function setPill(n){['pill1','pill2','pill3'].forEach((p,i)=>{$(p).className='step-pill'+(i+1<n?' done':(i+1===n?' active':''));});}
+
+// ---------- étape 1 : choix ----------
+$('chooseExcel').addEventListener('click',()=>$('excelInput').click());
+$('chooseManual').addEventListener('click',()=>{$('manualBox').classList.remove('hidden');$('mapBox').classList.add('hidden');});
+
+$('excelInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; if(!f) return;
+  const data = await f.arrayBuffer();
+  wbGlobal = XLSX.read(data);
+  const sheetSel = $('mapSheet');
+  sheetSel.innerHTML = wbGlobal.SheetNames.map(n=>`<option>${n}</option>`).join('');
+  sheetSel.onchange = fillMapping;
+  fillMapping();
+  $('mapBox').classList.remove('hidden');
+  $('manualBox').classList.add('hidden');
+});
+
+function fillMapping(){
+  const ws = wbGlobal.Sheets[$('mapSheet').value];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  // trouver la ligne d'entêtes : première ligne avec >= 2 cellules texte
+  let hdrIdx = rows.findIndex(r => r.filter(c=>String(c).trim()).length >= 2);
+  if (hdrIdx<0) hdrIdx = 0;
+  const headers = rows[hdrIdx].map((h,i)=>String(h).trim()||('Colonne '+(i+1)));
+  window._rows = rows.slice(hdrIdx+1);
+  window._headers = headers;
+  const opts = ['<option value="-1">— aucune —</option>'].concat(headers.map((h,i)=>`<option value="${i}">${h}</option>`)).join('');
+  const guess = (names) => { for (const n of names){ const i = headers.findIndex(h=>h.toLowerCase()===n); if(i>=0) return i; } for (const n of names){ const i = headers.findIndex(h=>h.toLowerCase().includes(n)); if(i>=0) return i; } return -1; };
+  $('mapPage').innerHTML = opts; $('mapPage').value = guess(['page','planche','pg']);
+  $('mapCode').innerHTML = opts; $('mapCode').value = Math.max(0, guess(['code','ref','article']));
+  $('mapLib').innerHTML = opts;  $('mapLib').value = guess(['libel','design','produit','nom']);
+  $('mapPrix').innerHTML = opts; $('mapPrix').value = guess(['prix_vente','prix de vente','pv','tarif','prix']);
+  $('mapPrixInit').innerHTML = opts;  $('mapPrixInit').value = guess(['prix initial','prix_initial','prix barre','prix barré','ancien prix','prix avant','prix normal','avant remise']);
+  $('mapPrixPromo').innerHTML = opts; $('mapPrixPromo').value = guess(['prix solde','prix soldé','prix promo','solde','promo','prix remise','apres remise','après remise','nouveau prix']);
+  $('mapRemise').innerHTML = opts;    $('mapRemise').value = guess(['remise','reduction','réduction','rabais','discount','ristourne']);
+}
+
+function fmtPrix(v){
+  if (v===null||v===undefined) return '';
+  let s=String(v).trim();
+  if (s===''||s==='0') return '';
+  // déjà formaté (contient une lettre / symbole) → on garde tel quel
+  if (/[a-zA-Z€$£]/.test(s)) return s;
+  const n=Number(s.replace(/\s|\u202f|\u00a0/g,'').replace(',','.'));
+  if (!isFinite(n)) return s;
+  return n.toLocaleString('fr-FR').replace(/\u202f|\u00a0/g,' ')+' F';
+}
+function numFromPrix(v){
+  if (v===null||v===undefined) return NaN;
+  const n=Number(String(v).replace(/[^\d.,-]/g,'').replace(/\s|\u202f|\u00a0/g,'').replace(',','.'));
+  return isFinite(n)?n:NaN;
+}
+
+// V12 — vide entièrement l'espace de travail (planches, produits, photos, copies locales)
+// et libère les URL blob des images affichées (sinon fuite mémoire à chaque reconstruction).
+function resetWorkspace(){
+  document.querySelectorAll('.prod-img').forEach(img=>{
+    if (img.dataset.blobUrl){ try{ URL.revokeObjectURL(img.dataset.blobUrl); }catch(e){} }
+  });
+  PAGES=[]; PRODUCTS={};
+  for (const k of Object.keys(matchedFiles)) delete matchedFiles[k];
+  for (const k of Object.keys(localBlobs)) delete localBlobs[k];
+  manualSet.clear();
+  restoredPhotos.clear();
+}
+
+$('buildFromExcel').addEventListener('click', () => {
+  const iP=+$('mapPage').value, iC=+$('mapCode').value, iL=+$('mapLib').value, iX=+$('mapPrix').value;
+  const iPi=+$('mapPrixInit').value, iPp=+$('mapPrixPromo').value, iR=+$('mapRemise').value;
+  if (iC<0) { alert('Choisis la colonne du code article.'); return; }
+  // V12 — remise à zéro complète avant reconstruction.
+  // Sans ça, les produits, photos et copies locales du catalogue précédent survivaient et
+  // ressortaient sur les codes identiques du nouvel import (prix périmés en planche).
+  if (allCodes().length && !confirm(
+      'Reconstruire les planches à partir de ce fichier ?\n\n'
+      +'Les planches actuelles ('+allCodes().length+' réf.) et les photos déjà posées seront remplacées.\n'
+      +'Pense à 💾 Sauvegarder avant si tu veux pouvoir y revenir.')) return;
+  resetWorkspace();
+  const map = new Map();
+  for (const r of window._rows) {
+    const code = normCode(r[iC]); if(!code) continue;
+    const page = iP>=0 ? (String(r[iP]).trim()||'Sélection') : 'Sélection';
+    if (!map.has(page)) map.set(page, []);
+    map.get(page).push(code);
+    PRODUCTS[code] = {
+      lib: iL>=0 ? String(r[iL]).slice(0,60) : '',
+      // V12 : même formatage que la base articles ("2 490 F"), sinon deux formats de prix
+      // cohabitaient sur une même planche selon l'origine de la donnée.
+      prix: iX>=0 ? fmtPrix(r[iX]) : '',
+      prixInit: iPi>=0 ? fmtPrix(r[iPi]) : '',
+      prixPromo: iPp>=0 ? fmtPrix(r[iPp]) : '',
+      remise: iR>=0 ? String(r[iR]).trim() : ''
+    };
+  }
+  PAGES = [...map.entries()].map(([pg,codes])=>({pg, codes}));
+  if (!PAGES.length) { alert('Aucune ligne exploitable trouvée.'); return; }
+  renderBuilder();
+});
+
+$('buildManual').addEventListener('click', () => {
+  const n=+$('manPages').value, m=+$('manPerPage').value, pref=$('manPrefix').value||'Page';
+  if (allCodes().length && !confirm(
+      'Repartir d\'une structure vierge ?\n\n'
+      +'Les planches actuelles ('+allCodes().length+' réf.) et les photos déjà posées seront perdues.')) return;
+  resetWorkspace();
+  let k=1;
+  for (let p=1;p<=n;p++){
+    const codes=[];
+    for (let j=0;j<m;j++){ const c='SLOT'+String(k++).padStart(4,'0'); codes.push(c); PRODUCTS[c]={lib:'',prix:'',prixInit:'',prixPromo:'',remise:''}; }
+    PAGES.push({pg: pref+' '+p, codes});
+  }
+  renderBuilder();
+});
+
+// ---------- rendu builder ----------
+// construit UNE carte (vignette) et branche ses événements
+function buildCard(sec, code, grid){
+  const p=PRODUCTS[code]||{lib:'',prix:''};
+  const card=document.createElement('div');
+  card.className='card missing'; card.dataset.code=code;
+  // planche d'appartenance : indispensable quand le MÊME code figure sur plusieurs
+  // planches (sinon une recherche dans PAGES retombe toujours sur la première).
+  card._sec = sec;
+  card.innerHTML=`
+    <button class="del-card" title="Supprimer cette vignette">✕</button>
+    <div class="photo-slot" title="Clic : choisir une photo">
+      <img class="prod-img" alt="${escA(code)}">
+      <div class="ph-fallback"><span class="photo-code">${esc(code.startsWith('SLOT')?'—':code)}</span><span class="photo-file">clique pour choisir</span></div>
+      <div class="ph-edit">📷 changer</div>
+    </div>
+    <div class="card-body">
+      <div class="card-code" contenteditable>${esc(code.startsWith('SLOT')?'':code)}</div>
+      <div class="card-lib" contenteditable>${esc(p.lib||'')}</div>
+      <div class="price-row">
+        <span class="card-prix-init" contenteditable data-role="prixInit">${esc(p.prixInit||'')}</span>
+        <span class="card-prix" contenteditable data-role="prix">${esc(p.prixPromo||p.prix||'')}</span>
+      </div>
+      <span class="card-remise" contenteditable data-role="remise" data-raw="${escA(p.remise||'')}"></span>
+    </div>`;
+  // édition code -> résout (article OU réf fournisseur) + auto-remplissage base
+  card.querySelector('.card-code').addEventListener('blur', e=>{
+    const saisi=e.target.textContent.trim();
+    if (!saisi) return;
+    // résout la saisie : code article en base (avec variantes de zéros), sinon réf fournisseur,
+    // sinon code brut normalisé.
+    let nc=resolveToBase(saisi) || normCode(saisi);
+    if (nc && nc!==card.dataset.code){
+      const old=card.dataset.code;
+      // éviter un doublon dans la même planche
+      const dup=sec.codes.indexOf(nc); if (dup>=0 && sec.codes[dup]!==old){ sec.codes.splice(dup,1); }
+      const idx=sec.codes.indexOf(old); if(idx>=0) sec.codes[idx]=nc;
+      PRODUCTS[nc]=PRODUCTS[old]||{lib:'',prix:'',prixInit:'',prixPromo:'',remise:''};
+      if (matchedFiles[old]) matchedFiles[nc]=matchedFiles[old];
+      if (localBlobs[old])   localBlobs[nc]=localBlobs[old];
+      if (restoredPhotos.has(old)) restoredPhotos.add(nc);
+      // l'ancien code peut encore servir sur une autre planche : ne rien détruire dans ce cas
+      if (!allCodes().includes(old)){
+        delete PRODUCTS[old]; delete matchedFiles[old]; delete localBlobs[old];
+        manualSet.delete(old); restoredPhotos.delete(old);
+      }
+      card.dataset.code=nc;
+    }
+    // remplit code affiché + désignation + prix depuis la base (écrase : nouvelle saisie = nouvel article)
+    fillCardFromBase(card, card.dataset.code, true);
+    refreshStats();
+  });
+  card.querySelector('.card-lib').addEventListener('blur', e=>{ (PRODUCTS[card.dataset.code]||(PRODUCTS[card.dataset.code]={})).lib=e.target.textContent.trim(); });
+  card.querySelector('.card-prix').addEventListener('blur', e=>{
+    const p=(PRODUCTS[card.dataset.code]||(PRODUCTS[card.dataset.code]={}));
+    const v=e.target.textContent.trim();
+    if (p.prixInit) p.prixPromo=v; else p.prix=v;
+    renderRemise(card);
+  });
+  card.querySelector('.card-prix-init').addEventListener('blur', e=>{
+    (PRODUCTS[card.dataset.code]||(PRODUCTS[card.dataset.code]={})).prixInit=e.target.textContent.trim();
+    renderRemise(card);
+  });
+  card.querySelector('.card-remise').addEventListener('blur', e=>{
+    const el=e.target; el.dataset.raw=el.textContent.trim(); el.dataset.manual='1';
+    (PRODUCTS[card.dataset.code]||(PRODUCTS[card.dataset.code]={})).remise=el.textContent.trim();
+  });
+  card.querySelector('.photo-slot').addEventListener('click', ()=>{ currentEditCode=card.dataset.code; currentEditCard=card; $('singleInput').click(); });
+  card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('dragover');});
+  card.addEventListener('dragleave',()=>card.classList.remove('dragover'));
+  card.addEventListener('drop',e=>{
+    e.preventDefault();e.stopPropagation();card.classList.remove('dragover');
+    const f=[...e.dataTransfer.files].find(f=>/image\//.test(f.type));
+    if (f) setCardImage(card.dataset.code,f,true,false,card);
+  });
+  // suppression de la vignette
+  card.querySelector('.del-card').addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    const cc=card.dataset.code;
+    const rempli = !!matchedFiles[cc] || (!cc.startsWith('SLOT'));
+    if (rempli && !confirm('Supprimer cette vignette'+(cc.startsWith('SLOT')?'':' ('+cc+')')+' ?')) return;
+    const idx=sec.codes.indexOf(cc); if(idx>=0) sec.codes.splice(idx,1);
+    // ne purger produit + photo que si l'article ne figure plus sur aucune planche
+    if (!allCodes().includes(cc)){
+      delete PRODUCTS[cc]; delete matchedFiles[cc]; delete localBlobs[cc];
+      manualSet.delete(cc); restoredPhotos.delete(cc);
+    }
+    const sectionEl=card.closest('.planche');
+    card.remove();
+    if (sectionEl){ const cnt=sectionEl.querySelector('.count'); if(cnt) cnt.textContent=sec.codes.length+' réf.'; }
+    refreshStats();
+  });
+  // Touche Entrée = valider (déclenche le blur) sur tous les champs éditables de la carte
+  card.querySelectorAll('[contenteditable]').forEach(el=>{
+    el.addEventListener('keydown', ev=>{
+      if (ev.key==='Enter'){ ev.preventDefault(); el.blur(); }
+    });
+  });
+  grid.appendChild(card);
+  renderRemise(card);
+  return card;
+}
+
+function renderBuilder(){
+  $('step1').classList.add('hidden');
+  $('builder').classList.remove('hidden');
+  setPill(2);
+  const cont=$('planches');
+  // libère les URL blob des vignettes qu'on s'apprête à détruire (fuite mémoire sinon)
+  cont.querySelectorAll('.prod-img').forEach(img=>{
+    if (img.dataset.blobUrl){ try{ URL.revokeObjectURL(img.dataset.blobUrl); }catch(e){} }
+  });
+  cont.innerHTML='';
+  for (const sec of PAGES){
+    const sc=document.createElement('section'); sc.className='planche';
+    sc.innerHTML=`<div class="planche-header"><h2 contenteditable data-pg="${escA(sec.pg)}">${esc(sec.pg)}</h2><span class="count">${sec.codes.length} réf.</span><button class="btn gold add-card-btn" title="Ajouter une vignette vide à cette planche">➕ Vignette</button></div><div class="grid"></div>`;
+    const grid=sc.querySelector('.grid');
+    sc.querySelector('h2').addEventListener('input', e=>{ sec.pg=e.target.textContent.trim(); });
+    sc.querySelector('h2').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); ev.target.blur(); } });
+    sc.querySelector('.add-card-btn').addEventListener('click', ()=>{ addEmptyCard(sec, sc); });
+    for (const code of sec.codes){ buildCard(sec, code, grid); }
+    cont.appendChild(sc);
+  }
+  $('totalCount').textContent=allCodes().length;
+  refreshStats();
+}
+
+// ajoute une vignette vide à la planche donnée
+let _slotSeq = 100000;
+function addEmptyCard(sec, sectionEl){
+  const code='SLOT'+String(_slotSeq++).padStart(4,'0');
+  sec.codes.push(code);
+  PRODUCTS[code]={lib:'',prix:'',prixInit:'',prixPromo:'',remise:''};
+  const grid=sectionEl.querySelector('.grid');
+  const card=buildCard(sec, code, grid);
+  sectionEl.querySelector('.count').textContent=sec.codes.length+' réf.';
+  refreshStats();
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+  // focus direct sur le champ code pour saisir un article, ou clic photo
+  const codeEl=card.querySelector('.card-code'); codeEl.focus();
+}
+
+// ---------- remise / prix barré ----------
+// Interprète la valeur brute de remise : "-30%", "30", "1500", "1 500 F" …
+function parseRemise(raw, prixInitNum, prixPromoNum){
+  const out={pct:null, val:null};
+  const s=String(raw||'').trim();
+  if (s){
+    const isPct=/%/.test(s);
+    const n=Number(s.replace(/[^\d.,-]/g,'').replace(/\s|\u202f|\u00a0/g,'').replace(',','.'));
+    if (isFinite(n) && n!==0){
+      if (isPct){ out.pct=Math.abs(n); }
+      else if (n>0 && n<=100 && !/f|F|€|xpf/i.test(s)){ out.pct=Math.abs(n); } // petit nombre sans devise → % probable
+      else { out.val=Math.abs(n); }
+    }
+  }
+  // compléter par calcul si on a les deux prix
+  if (isFinite(prixInitNum) && isFinite(prixPromoNum) && prixInitNum>prixPromoNum){
+    const dv=prixInitNum-prixPromoNum;
+    if (out.val===null) out.val=dv;
+    if (out.pct===null) out.pct=Math.round(dv/prixInitNum*100);
+  }
+  return out;
+}
+function fmtRemiseText(rem, fmt){
+  if (fmt==='none') return '';
+  const pctTxt = rem.pct!==null ? '-'+Math.round(rem.pct)+'\u00a0%' : '';
+  const valTxt = rem.val!==null ? '-'+Math.round(rem.val).toLocaleString('fr-FR').replace(/\u202f|\u00a0/g,' ')+'\u00a0F' : '';
+  if (fmt==='pct')  return pctTxt || valTxt;
+  if (fmt==='val')  return valTxt || pctTxt;
+  // both
+  if (pctTxt && valTxt) return pctTxt+' ('+valTxt+')';
+  return pctTxt || valTxt;
+}
+function renderRemise(card){
+  const el=card.querySelector('.card-remise'); if(!el) return;
+  const initEl=card.querySelector('.card-prix-init');
+  const promoEl=card.querySelector('.card-prix');
+  const hasInit = initEl && initEl.textContent.trim()!=='';
+  // le prix barré ne s'affiche que s'il est renseigné (déjà géré par :empty en CSS)
+  const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
+  const rem=parseRemise(
+    el.dataset.raw||'',
+    numFromPrix(hasInit?initEl.textContent:''),
+    numFromPrix(promoEl?promoEl.textContent:'')
+  );
+  const txt = hasInit ? fmtRemiseText(rem, fmt) : (el.dataset.raw && el.dataset.manual ? fmtRemiseText(rem, fmt) : '');
+  el.textContent = txt;
+  el.classList.toggle('hidden', !txt);
+}
+function renderAllRemises(){ document.querySelectorAll('.card').forEach(renderRemise); }
+$('backBtn').addEventListener('click',()=>{ $('builder').classList.add('hidden'); $('step1').classList.remove('hidden'); setPill(1); });
+$('remiseFormat').addEventListener('change', renderAllRemises);
+
+// ---------- référentiel produits ----------
+let REF = {};              // code -> {lib, prix}
+let REF_FOURN = {};        // ref fournisseur (normalisée) -> code article
+// V14 — la référence fournisseur TELLE QU'ÉCRITE dans la base (code article -> [réfs brutes]).
+// REF_FOURN ne garde que la forme normalisée ("ABC-789/2" -> "ABC7892") : parfaite pour
+// reconnaître un nom de fichier déjà lu, inutilisable pour DEMANDER un fichier au système,
+// puisque le fichier s'appelle "ABC-789.jpg" et non "ABC7892.jpg".
+let REF_FOURN_RAW = {};
+let REF_META = {date:null};
+// normalisation "douce" du code fournisseur : gardé tel quel mais insensible casse/espaces/tirets pour le matching
+// V14 : on retire TOUT caractère non alphanumérique, pas seulement espaces/points/tirets.
+// Une réf. comme "AXE-GD1/25" donnait la clé "AXEGD1/25" : elle ne pouvait correspondre à
+// aucun nom de fichier, la barre oblique étant interdite dans un nom sous Windows.
+// Le fichier s'appelle "AXE-GD1 25.jpg" ou "AXEGD125.jpg" — d'où la normalisation totale.
+function normFourn(v){
+  if (v===null||v===undefined) return '';
+  return String(v).trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+// Ré-indexe une base mémorisée avec l'ancienne normalisation (sessions antérieures à la V14).
+// Les réfs brutes, quand on les a, font foi ; sinon on renormalise l'ancienne clé.
+function reindexFourn(){
+  const out={};
+  for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){
+    for (const raw of (arr||[])){ const k=normFourn(raw); if(k) out[k]=c; }
+  }
+  for (const [k,c] of Object.entries(REF_FOURN||{})){
+    const nk=normFourn(k); if (nk && !(nk in out)) out[nk]=c;
+  }
+  REF_FOURN=out;
+}
+let refWb = null;
+function refCount(){ return Object.keys(REF).length; }
+function updateRefBtn(){
+  const d = REF_META.date ? ' · maj '+REF_META.date : '';
+  const label = refCount() ? '📚 Base ('+refCount().toLocaleString('fr-FR')+d+')' : '📚 Charger la base articles';
+  $('refBtn').textContent = label;
+  $('refBtnHome').textContent = refCount() ? label : '📚 Charger / mettre à jour la base articles';
+  $('refStatus').textContent = refCount()
+    ? '✅ '+refCount().toLocaleString('fr-FR')+' articles en mémoire'+(REF_META.date?' · dernière mise à jour : '+REF_META.date:'')
+    : 'Aucune base chargée pour l\'instant — recommandé avant de commencer.';
+  const bs=$('baseState'), bw=$('baseWarn');
+  if (bs){
+    bs.textContent = refCount() ? '📚 base OK ('+refCount().toLocaleString('fr-FR')+')' : '⚠️ base non chargée';
+    bs.style.color = refCount() ? '#1B4332' : '#B00020';
+  }
+  if (bw) bw.classList.toggle('hidden', refCount()>0);
+}
+
+// --- IndexedDB : stockage illimité pour la base articles complète ---
+function idb(){ return new Promise((res,rej)=>{
+  const rq=indexedDB.open('studioPlanches',1);
+  rq.onupgradeneeded=()=>{ rq.result.createObjectStore('kv'); };
+  rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);
+});}
+async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{
+  const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k);
+  tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
+});}
+async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{
+  const rq=db.transaction('kv').objectStore('kv').get(k);
+  rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);
+});}
+(async ()=>{
+  try{
+    REF = (await idbGet('refProduits')) || {};
+    REF_FOURN = (await idbGet('refFourn')) || {};
+    REF_FOURN_RAW = (await idbGet('refFournRaw')) || {};
+    if (Object.keys(REF_FOURN).length){
+      reindexFourn();                          // migration silencieuse vers la normalisation V14
+      try{ await idbSet('refFourn', REF_FOURN); }catch(e){}
+    }
+    REF_META = (await idbGet('refMeta')) || {date:null};
+    // migration depuis l'ancienne version localStorage
+    if (!refCount() && localStorage.getItem('refProduits')){
+      REF = JSON.parse(localStorage.getItem('refProduits'));
+      await idbSet('refProduits', REF);
+      localStorage.removeItem('refProduits');
+    }
+  }catch(e){ console.warn('IndexedDB indisponible', e); }
+  updateRefBtn();
+  document.querySelectorAll('.card').forEach(c=>applyRefToCard(c.dataset.code));
+})();
+
+$('refBtn').addEventListener('click',()=>$('refInput').click());
+$('refBtnHome').addEventListener('click',()=>$('refInput').click());
+if ($('baseWarnBtn')) $('baseWarnBtn').addEventListener('click',()=>$('refInput').click());
+$('refInput').addEventListener('change', async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  refWb = XLSX.read(await f.arrayBuffer());
+  const sel=$('refSheet');
+  sel.innerHTML=refWb.SheetNames.map(n=>`<option>${n}</option>`).join('');
+  sel.onchange=fillRefMap; fillRefMap();
+  $('refModal').classList.remove('hidden');
+  $('refInput').value='';
+});
+function fillRefMap(){
+  const ws=refWb.Sheets[$('refSheet').value];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  let hi=rows.findIndex(r=>r.filter(c=>String(c).trim()).length>=2); if(hi<0)hi=0;
+  const headers=rows[hi].map((x,i)=>String(x).trim()||('Colonne '+(i+1)));
+  window._refRows=rows.slice(hi+1); window._refHeaders=headers;
+  const opts=['<option value="-1">— aucune —</option>'].concat(headers.map((x,i)=>`<option value="${i}">${x}</option>`)).join('');
+  const guess=n=>{ for (const s of n){ const i=headers.findIndex(x=>x.toLowerCase()===s); if(i>=0) return i; } for (const s of n){ const i=headers.findIndex(x=>x.toLowerCase().includes(s)); if(i>=0) return i; } return -1; };
+  $('refCode').innerHTML=opts; $('refCode').value=Math.max(0,guess(['code','ref','article']));
+  $('refFourn').innerHTML=opts; $('refFourn').value=guess(['reference fournisseur','ref fournisseur','ref_fourn','reference','référence','code fournisseur','fournisseur','ref']);
+  $('refLib').innerHTML=opts;  $('refLib').value=guess(['libel','design','produit','nom']);
+  $('refPrix').innerHTML=opts; $('refPrix').value=guess(['prix_vente','prix de vente','pv','tarif','prix']);
+}
+$('refCancel').addEventListener('click',()=>$('refModal').classList.add('hidden'));
+$('refApply').addEventListener('click', async ()=>{
+  const iC=+$('refCode').value,iL=+$('refLib').value,iX=+$('refPrix').value,iF=+$('refFourn').value;
+  if(iC<0){alert('Choisis la colonne code.');return;}
+  let nNew=0, nUpd=0, nFourn=0;
+  for (const r of window._refRows){
+    const c=normCode(r[iC]); if(!c) continue;
+    // prix robuste : gère les nombres bruts ET les prix déjà formatés ("2 490", "2 490 F", "2490,00"…)
+    const prix = iX>=0 ? fmtPrix(r[iX]) : '';
+    const rec = {lib: iL>=0?String(r[iL]).slice(0,60):'', prix};
+    if (REF[c]) nUpd++; else nNew++;
+    REF[c]=rec;   // mise à jour : le nouveau fichier fait foi (prix actualisés)
+    // index code fournisseur -> code article (pour le matching photo de repli)
+    if (iF>=0){
+      const fRaw=String(r[iF]).trim();
+      const fKey=normFourn(fRaw);
+      if (fKey){
+        REF_FOURN[fKey]=c; nFourn++;
+        // on conserve aussi l'écriture d'origine, seule utilisable pour aller
+        // chercher un fichier par son nom sur le partage
+        const arr=REF_FOURN_RAW[c]||(REF_FOURN_RAW[c]=[]);
+        if (!arr.includes(fRaw)) arr.push(fRaw);
+      }
+    }
+  }
+  REF_META.date = new Date().toLocaleDateString('fr-FR');
+  try{
+    await idbSet('refProduits', REF);
+    await idbSet('refFourn', REF_FOURN);
+    await idbSet('refFournRaw', REF_FOURN_RAW);
+    await idbSet('refMeta', REF_META);
+  }catch(e){ alert('Attention : sauvegarde impossible ('+e.message+'). La base reste active pour cette session.'); }
+  $('refModal').classList.add('hidden');
+  updateRefBtn();
+  // remplit les vignettes vides + met à jour les pastilles "hors base"
+  document.querySelectorAll('.card').forEach(card=>{ fillCardFromBase(card, card.dataset.code, false); });
+  alert('Base articles à jour ✅\n'+nNew.toLocaleString('fr-FR')+' nouveaux · '+nUpd.toLocaleString('fr-FR')+' mis à jour'+(iF>=0?'\n'+nFourn.toLocaleString('fr-FR')+' réf. fournisseur indexées':'')+'\nTotal : '+refCount().toLocaleString('fr-FR')+' articles\n\nPour les mises à jour : recharge simplement le nouvel export — les prix seront actualisés, tes planches en cours ne bougent pas.');
+});
+// ---------- résolution robuste d'un code saisi / d'un nom de fichier vers la base ----------
+// Essaie, dans l'ordre : code article exact, variantes numériques (zéros non significatifs),
+// puis réf. fournisseur. Renvoie le code article de la base, ou '' si introuvable.
+function resolveToBase(saisi){
+  if (saisi===null||saisi===undefined) return '';
+  const s=String(saisi).trim();
+  if (!s) return '';
+  const tries=new Set();
+  tries.add(s);
+  tries.add(s.toUpperCase());
+  tries.add(normCode(s));
+  const digits=s.replace(/\D/g,'');
+  if (digits){
+    const n=String(parseInt(digits,10));
+    tries.add(digits); tries.add(n);
+    for (let w=4; w<=10; w++) tries.add(n.padStart(w,'0'));
+  }
+  for (const t of tries){ if (REF[t]) return t; }
+  // réf. fournisseur -> code article
+  const viaF=REF_FOURN[normFourn(s)];
+  if (viaF && REF[viaF]) return viaF;
+  if (viaF) return viaF;
+  return '';
+}
+// signale visuellement une vignette dont l'article n'est pas retrouvé en base
+function flagCard(card, kind){
+  if (!card) return;
+  let b=card.querySelector('.base-flag');
+  if (!kind){ if(b) b.remove(); card.classList.remove('nobase'); return; }
+  if (!b){
+    b=document.createElement('div');
+    b.className='base-flag';
+    b.style.cssText='position:absolute;top:6px;left:6px;z-index:5;background:#B00020;color:#fff;font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.02em;pointer-events:none';
+    // .card est déjà position:relative en CSS -> pas de getComputedStyle (reflow forcé sur chaque carte)
+    card.appendChild(b);
+  }
+  b.textContent = kind==='nobase' ? '⚠ BASE NON CHARGÉE' : '⚠ HORS BASE';
+  b.title = kind==='nobase'
+    ? "Aucune base articles n'est chargée : impossible de récupérer désignation et prix."
+    : "Ce code n'existe pas dans la base articles chargée.";
+  card.classList.add('nobase');
+}
+function applyRefToCard(code){
+  const info=REF[code]; if(!info) return;
+  cardsOf(code).forEach(card=>{
+    const libEl=card.querySelector('.card-lib'), prixEl=card.querySelector('.card-prix');
+    if (libEl && !libEl.textContent.trim() && info.lib){ libEl.textContent=info.lib; (PRODUCTS[code]||(PRODUCTS[code]={})).lib=info.lib; }
+    if (prixEl && !prixEl.textContent.trim() && info.prix){ prixEl.textContent=info.prix; (PRODUCTS[code]||(PRODUCTS[code]={})).prix=info.prix; }
+  });
+}
+
+// ---------- photos ----------
+function allCodes(){ return PAGES.flatMap(s=>s.codes); }
+// déduit le code article à partir d'un nom de fichier (essaie code article, puis réf. fournisseur)
+function deriveCodeFromFile(fileName){
+  const clean=stripDupSuffix(baseName(fileName));
+  // 1+2) code article en base (variantes de zéros incluses) puis réf. fournisseur
+  const viaBase=resolveToBase(clean);
+  if (viaBase) return viaBase;
+  // 3) code article présent dans les planches en cours (même sans base chargée)
+  const codeSet=new Set(allCodes());
+  for (const cand of candidates(clean)){
+    const c=normCode(cand);
+    if (codeSet.has(c)) return c;
+  }
+  // 4) dernier recours : code brut nettoyé
+  return normCode(clean);
+}
+// remplit une carte (code affiché + désignation + prix) depuis la base articles, de façon fiable.
+// Si force=true, écrase les valeurs existantes (cas "nouvelle photo/nouveau code").
+function fillCardFromBase(card, code, force){
+  const info=REF[code];
+  const libEl=card.querySelector('.card-lib');
+  const prixEl=card.querySelector('.card-prix');
+  const initEl=card.querySelector('.card-prix-init');
+  PRODUCTS[code]=PRODUCTS[code]||{lib:'',prix:'',prixInit:'',prixPromo:'',remise:''};
+  // code affiché
+  if (card.querySelector('.card-code')) card.querySelector('.card-code').textContent = code.startsWith('SLOT')?'':code;
+  if (card.querySelector('.photo-code')) card.querySelector('.photo-code').textContent = code.startsWith('SLOT')?'—':code;
+  if (!info){
+    // ⚠️ CORRECTIF : article inconnu de la base.
+    // En mode "force" (nouvelle photo glissée / nouveau code saisi) on NE DOIT PAS
+    // laisser la désignation et le prix de l'ANCIEN article : risque d'erreur prix en catalogue.
+    if (force){
+      if (libEl){ libEl.textContent=''; }
+      if (prixEl){ prixEl.textContent=''; }
+      if (initEl){ initEl.textContent=''; }
+      const remEl=card.querySelector('.card-remise');
+      if (remEl){ remEl.textContent=''; remEl.dataset.raw=''; delete remEl.dataset.manual; remEl.classList.add('hidden'); }
+      PRODUCTS[code]={lib:'',prix:'',prixInit:'',prixPromo:'',remise:''};
+      renderRemise(card);
+    }
+    flagCard(card, refCount() ? 'unknown' : 'nobase');
+    return false;
+  }
+  flagCard(card, null);
+  // désignation
+  if (info.lib && (force || !libEl.textContent.trim())){ libEl.textContent=info.lib; PRODUCTS[code].lib=info.lib; }
+  // prix : va dans .card-prix tant qu'aucun prix barré (promo) n'est saisi
+  const hasInit = initEl && initEl.textContent.trim()!=='';
+  if (info.prix && !hasInit && (force || !prixEl.textContent.trim())){
+    prixEl.textContent=info.prix; PRODUCTS[code].prix=info.prix;
+  } else if (info.prix){ PRODUCTS[code].prix=info.prix; }
+  renderRemise(card);
+  return true;
+}
+
+function setCardImage(code,file,manual,bulk,cardEl){
+  // cardEl = la vignette précisément visée (clic / drop). Sans elle on retombe sur la
+  // première du code, ce qui est faux dès qu'un article figure sur plusieurs planches.
+  const card=cardEl||cardsOf(code)[0];
+  if (!card) return;
+  // Chargement MANUEL d'une photo (clic sur la vignette ou glisser-déposer) :
+  // nouvelle photo = nouvel article -> on déduit le code du fichier et on écrase les données.
+  if (manual){
+    const derived=deriveCodeFromFile(file.name);
+    if (derived && !/^SLOT/.test(derived) && derived!==code){
+      const sec=card._sec||PAGES.find(s=>s.codes.includes(code));
+      if (sec){
+        // éviter un doublon dans la même planche
+        const dup=sec.codes.indexOf(derived);
+        if (dup>=0 && sec.codes[dup]!==code){ sec.codes.splice(dup,1); }
+        const idx=sec.codes.indexOf(code); if(idx>=0) sec.codes[idx]=derived;
+      }
+      // l'ancien code peut rester utilisé par une AUTRE planche : on ne jette sa photo
+      // et sa fiche produit que s'il ne sert plus nulle part.
+      if (!allCodes().includes(code)){
+        if (matchedFiles[code]){ delete matchedFiles[code]; }
+        if (localBlobs[code]){ delete localBlobs[code]; }
+        manualSet.delete(code);
+        restoredPhotos.delete(code);
+        delete PRODUCTS[code];
+      }
+      PRODUCTS[derived]=PRODUCTS[derived]||{lib:'',prix:'',prixInit:'',prixPromo:'',remise:''};
+      card.dataset.code=derived;
+      code=derived;
+    }
+    // remplit code + désignation + prix depuis la base (écrase : nouvelle photo = nouvel article)
+    fillCardFromBase(card, code, true);
+  }
+  matchedFiles[code]=file;
+  restoredPhotos.delete(code);   // photo fraîche = vraie HD disponible
+  if (manual) manualSet.add(code);
+  // photo posée à la main : on en fait aussi une copie locale (souvent depuis le réseau)
+  if (manual){
+    cachePhotoLocally(code, file).then(()=>showCardPhoto(code));
+  }
+  showCardPhoto(code);
+  applyRefToCard(code);   // auto-remplissage libellé + prix depuis le référentiel (ne remplit que le vide)
+  if (!bulk) refreshStats();   // en import de masse, refreshStats() est appelé une seule fois à la fin
+}
+
+// Affiche la photo d'une carte en utilisant EN PRIORITÉ la copie locale (pas le fichier réseau).
+function showCardPhoto(code){
+  const cards=cardsOf(code);
+  if (!cards.length) return;
+  const src=workFile(code);
+  if (!src) return;
+  // une seule URL blob pour toutes les vignettes du même article (produit repris
+  // sur plusieurs planches) : un seul objet en mémoire, une seule révocation.
+  let u;
+  try{ u=URL.createObjectURL(src); }
+  catch(e){ console.warn('photo illisible pour '+code, e); return; }   // ne bloque pas le reste de l'import
+  let used=false;
+  cards.forEach(card=>{
+    const img=card.querySelector('.prod-img');
+    // libère l'ancien blob : sans ça, chaque photo remplacée restait en mémoire
+    if (img.dataset.blobUrl && img.dataset.blobUrl!==u){ try{ URL.revokeObjectURL(img.dataset.blobUrl); }catch(e){} }
+    img.dataset.blobUrl=u; used=true;
+    img.loading='lazy';           // le navigateur ne décode que ce qui est visible
+    img.decoding='async';
+    img.src=u; img.style.display='block';
+    card.querySelector('.ph-fallback').style.display='none';
+    card.classList.remove('missing');
+  });
+  if (!used){ try{ URL.revokeObjectURL(u); }catch(e){} }
+}
+function refreshStats(){
+  const codes=allCodes();
+  let ok=0; const missing=[];
+  codes.forEach(c=>{ if(matchedFiles[c]) ok++; else missing.push(c); });
+  $('okCount').textContent=ok;
+  $('koCount').textContent=(codes.length-ok)+' manquantes';
+  $('totalCount').textContent=codes.length;
+  window._missing=missing;
+  setPill(ok>0?3:2);
+}
+// ============ IMPORT PHOTOS EN MASSE (V9) ============
+// Ancienne version : boucle synchrone O(n x codes) + refreshStats() a CHAQUE fichier
+// + autosave qui re-encodait toutes les photos en base64 -> onglet qui plante au-dela
+// de quelques centaines d'images. Ici : index de correspondance pre-calcule (1 passe),
+// traitement par lots asynchrones, stats en fin de course, autosave suspendu.
+let _ingestBusy=false;
+
+// Construit un index { cle -> code article } a partir des codes presents dans les planches.
+// Chaque code est indexe sous toutes ses variantes (brut, normalise, sans zeros, etc.)
+// pour pouvoir resoudre un nom de fichier en O(1).
+function buildMatchIndex(){
+  const idx=new Map();
+  const put=(k,c)=>{ if(k && !idx.has(k)) idx.set(k,c); };
+  for (const c of allCodes()){
+    if (String(c).startsWith('SLOT')) continue;
+    put(String(c), c);
+    put(String(c).toUpperCase(), c);
+    put(normCode(c), c);
+    const digits=String(c).replace(/\D/g,'');
+    if (digits){
+      put(digits, c);
+      put(String(parseInt(digits,10)), c);
+    }
+  }
+  // reperage par reference fournisseur : on ne garde que celles qui pointent
+  // vers un code effectivement present dans les planches
+  const present=new Set(allCodes());
+  for (const [fKey,art] of Object.entries(REF_FOURN||{})){
+    if (present.has(art)) put('F#'+fKey, art);
+  }
+  return idx;
+}
+
+// Resout un nom de fichier vers un code de planche via l'index. Aucune boucle sur les codes.
+function lookupCode(idx, clean){
+  const tries=[clean, clean.toUpperCase(), normCode(clean)];
+  const digits=clean.replace(/\D/g,'');
+  if (digits){ tries.push(digits, String(parseInt(digits,10))); }
+  for (const t of tries){ const c=idx.get(t); if(c) return {code:c, viaFourn:false}; }
+  const vf=idx.get('F#'+normFourn(clean));
+  if (vf) return {code:vf, viaFourn:true};
+  return null;
+}
+
+// Affiche la progression dans la zone #pdfProg (deja presente dans la page)
+function ingestProgress(txt){ const p=$('pdfProg'); if(p) p.textContent=txt||''; }
+
+// Lit UNE fois le fichier (éventuellement réseau) et en fabrique une copie locale allégée.
+// C'est LA correction pour les photos sur \\serveur\partage : après cet appel, plus aucune
+// lecture réseau n'est nécessaire pour cette photo.
+async function cachePhotoLocally(code, file){
+  try{
+    // On lit le fichier UNE SEULE FOIS (crucial sur un partage réseau) : on récupère les
+    // octets en mémoire, puis on décode depuis ces octets — plus aucun accès au réseau.
+    let bmp, blobSrc=file;
+    try{ blobSrc=new Blob([await file.arrayBuffer()], {type:file.type||'image/jpeg'}); }
+    catch(e){ /* si la lecture directe échoue, on retombe sur le fichier d'origine */ }
+    try{
+      const probe=await createImageBitmap(blobSrc);
+      const s=Math.min(1, CACHE_MAX_DIM/Math.max(probe.width,probe.height));
+      if (s<1){
+        const tw=Math.round(probe.width*s), th=Math.round(probe.height*s);
+        probe.close();
+        bmp=await createImageBitmap(blobSrc,{resizeWidth:tw,resizeHeight:th,resizeQuality:'high'});
+      } else bmp=probe;
+    }catch(e){ bmp=await createImageBitmap(blobSrc); }
+    // ⚠️ canvas PROPRE à cet appel : cette fonction tourne en parallèle (6 photos à la fois).
+    // Un canvas partagé serait écrasé par un autre appel entre le drawImage et le toBlob
+    // -> photos mélangées d'une vignette à l'autre.
+    const useOff = typeof OffscreenCanvas!=='undefined';
+    const cv = useOff ? new OffscreenCanvas(bmp.width,bmp.height) : document.createElement('canvas');
+    if (!useOff){ cv.width=bmp.width; cv.height=bmp.height; }
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,bmp.width,bmp.height);
+    ctx.drawImage(bmp,0,0); bmp.close();
+    const blob = useOff
+      ? await cv.convertToBlob({type:'image/jpeg',quality:0.85})
+      : await new Promise(res=>cv.toBlob(res,'image/jpeg',0.85));
+    if (blob){
+      blob.name = file.name;            // on conserve le nom pour les exports (zip, dossier HD)
+      localBlobs[code]=blob;
+      return blob;
+    }
+  }catch(e){ /* on gardera le fichier d'origine */ }
+  return null;
+}
+
+async function ingestFiles(list){
+  if (_ingestBusy){ alert('Un import est deja en cours, patiente quelques secondes.'); return; }
+  const files=[...list].filter(f=>/\.(jpe?g|png|webp)$/i.test(f.name));
+  if (!files.length) return;
+  _ingestBusy=true;
+  _importCancel=false; setImportUI(true);
+  AUTOSAVE_SUSPENDED=true;          // pas d'autosave pendant l'import : c'est ce qui faisait planter
+  ingestProgress('📥 Lecture de '+files.length.toLocaleString('fr-FR')+' fichier(s)…');
+  await new Promise(r=>setTimeout(r,0));   // laisse le navigateur peindre le message
+
+  try{
+    // tri : pour une meme reference, priorite a la photo sans (n), puis au plus petit numero
+    files.sort((a,b)=>{
+      const ba=stripDupSuffix(baseName(a.name)).toLowerCase();
+      const bb=stripDupSuffix(baseName(b.name)).toLowerCase();
+      if (ba!==bb) return ba<bb?-1:1;
+      const da=dupIndex(baseName(a.name)), db=dupIndex(baseName(b.name));
+      if (da!==db) return da-db;
+      return a.name<b.name?-1:1;
+    });
+
+    const idx=buildMatchIndex();
+    let added=0, byFourn=0, done=0;
+    const BATCH=40;   // nb de fichiers traites avant de rendre la main au navigateur
+
+    // PHASE 1 : appariement (rapide, aucune lecture du contenu des fichiers)
+    const toCache=[];
+    for (let i=0;i<files.length && !_importCancel;i+=BATCH){
+      const slice=files.slice(i,i+BATCH);
+      for (const f of slice){
+        done++;
+        const clean=stripDupSuffix(baseName(f.name));
+        const hit=lookupCode(idx, clean);
+        if (hit && !matchedFiles[hit.code]){
+          matchedFiles[hit.code]=f;      // on retient l'association, l'affichage vient en phase 2
+          applyRefToCard(hit.code);      // désignation + prix depuis la base (ne remplit que le vide)
+          toCache.push(hit.code);
+          added++;
+          if (hit.viaFourn) byFourn++;
+        }
+      }
+      ingestProgress('🔍 Recherche des correspondances… '+done.toLocaleString('fr-FR')+' / '+files.length.toLocaleString('fr-FR')+' · '+added+' trouvée(s)');
+      await new Promise(r=>setTimeout(r,0));
+    }
+
+    // PHASE 2 : on lit chaque photo retenue UNE SEULE FOIS et on en garde une copie locale.
+    // Indispensable quand les photos sont sur un partage réseau : sans ça, chaque affichage,
+    // chaque scroll, chaque export relit le fichier à travers le réseau.
+    // V12 : on GARDE le File d'origine dans matchedFiles (simple référence disque/réseau) —
+    // c'est lui qui part au dossier prod HD ; l'affichage passe par la copie locale.
+    await cacheAndShow(toCache);
+
+    refreshStats();   // UNE seule fois, en fin d'import
+    ingestProgress('✅ '+added.toLocaleString('fr-FR')+' photo(s) associée(s) sur '+files.length.toLocaleString('fr-FR')+' lue(s)'+(byFourn?' · dont '+byFourn+' via code fournisseur':''));
+    setTimeout(()=>ingestProgress(''), 8000);
+
+    if (files.length && !added && Object.keys(matchedFiles).length===0){
+      alert(files.length+" images lues, aucune correspondance.\nNoms lus : "+files.slice(0,5).map(f=>f.name).join(', ')+"\nCodes attendus : "+allCodes().slice(0,5).join(', ')+(Object.keys(REF_FOURN).length?'':"\n\n💡 Astuce : charge la base articles avec la colonne 'Réf. fournisseur' pour retrouver aussi les photos nommées par code fournisseur."));
+    }
+  } finally {
+    _ingestBusy=false;
+    _importCancel=false; setImportUI(false);
+    AUTOSAVE_SUSPENDED=false;
+    scheduleAutosave();   // une seule sauvegarde, apres coup
+  }
+}
+// ============ IMPORT CIBLÉ (V13) ============
+// POURQUOI : sur un partage réseau (\\serveur\ftp_web$), ouvrir la fenêtre de sélection et
+// cocher des milliers de fichiers fige Chrome AVANT que la page reçoive quoi que ce soit —
+// c'est le navigateur qui interroge chaque fichier du partage pour construire la sélection
+// ("Cette page tente d'ouvrir (Ne répond pas)"). Aucun code de la page ne peut y remédier.
+// SOLUTION : on ne choisit que le DOSSIER (aucune énumération), puis on demande au système
+// les seules photos dont les planches ont besoin, nom par nom.
+// 72 références = 72 recherches ciblées, au lieu de 20 000 fichiers lus pour rien.
+const PHOTO_EXTS = ['.jpg','.JPG','.jpeg','.png','.PNG','.webp','.JPEG','.WEBP'];
+let _importCancel = false;
+
+function setImportUI(active){
+  const b=$('cancelImport'); if(!b) return;
+  b.classList.toggle('hidden', !active);
+}
+$('cancelImport').addEventListener('click',()=>{ _importCancel=true; ingestProgress('⏹ Interruption en cours…'); });
+
+// code article -> réfs fournisseur utilisables comme nom de fichier.
+// On privilégie l'écriture d'origine (REF_FOURN_RAW) ; la forme normalisée ne sert que
+// de repli pour les bases chargées avant la V14, où le brut n'était pas conservé.
+function fournByCode(){
+  const m={};
+  for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) m[c]=arr.slice(); }
+  for (const [fKey,art] of Object.entries(REF_FOURN||{})){
+    if (!m[art]) m[art]=[fKey];
+  }
+  return m;
+}
+// variantes d'écriture d'une réf. fournisseur : les séparateurs sont la première
+// source d'écart entre la base ("ABC-789") et le nom de fichier ("ABC 789", "ABC_789")
+// La base écrit "AXE-GD1/25" ; le fichier peut s'appeler "AXE GD1 25", "AXE_GD1_25",
+// "AXE-GD1-25" ou "AXEGD125". Chaque variante porte une étiquette distincte : le premier
+// succès fixe non seulement « c'est une réf. fournisseur » mais AUSSI la façon exacte de
+// l'écrire, si bien que les références suivantes sont trouvées du premier coup.
+function fournVariants(raw){
+  const s=String(raw||'').trim();
+  if (!s) return [];
+  const seen=new Set(); const out=[];
+  const add=(kind,v)=>{ if(v && !seen.has(v)){ seen.add(v); out.push({kind,value:v}); } };
+  add('fournBrut', s);
+  add('fournSansSep', s.replace(/[\s._/\\-]+/g,''));
+  add('fournTiret',  s.replace(/[\s._/\\-]+/g,'-'));
+  add('fournEspace', s.replace(/[\s._/\\-]+/g,' '));
+  add('fournSouligne', s.replace(/[\s._/\\-]+/g,'_'));
+  add('fournAlnum',  s.replace(/[^A-Za-z0-9]+/g,''));
+  return out;
+}
+// formes de nom plausibles pour un code article, de la plus probable à la moins probable
+function nameBases(code, fournMap){
+  const seen=new Set(); const out=[];
+  const add=(kind,v)=>{ v=String(v||''); if(v && !seen.has(v)){ seen.add(v); out.push({kind,value:v}); } };
+  add('code', code);
+  const digits=String(code).replace(/\D/g,'');
+  if (digits){
+    const n=String(parseInt(digits,10));
+    add('digits', digits);
+    add('nozero', n);
+    for (let w=4; w<=8; w++) add('pad'+w, n.padStart(w,'0'));
+  }
+  for (const f of (fournMap[code]||[])) for (const v of fournVariants(f)) add(v.kind, v.value);
+  return out;
+}
+// libellé lisible de la convention détectée, pour le message à l'écran
+function conventionLabel(kind, ext){
+  const k = /^fourn/.test(kind||'') ? 'référence fournisseur'
+          : kind==='code'  ? 'code article'
+          : 'code article (variante numérique)';
+  return k+' + '+(ext||'?');
+}
+// Le premier succès révèle la convention de nommage du dossier (forme + extension) :
+// on la réessaie en premier pour les références suivantes -> 1 recherche au lieu de ~40.
+let _prefBase=null, _prefExt=null;
+function candidateNames(code, fournMap){
+  let bases=nameBases(code, fournMap);
+  if (_prefBase) bases=[...bases.filter(b=>b.kind===_prefBase), ...bases.filter(b=>b.kind!==_prefBase)];
+  const exts=_prefExt ? [_prefExt, ...PHOTO_EXTS.filter(e=>e!==_prefExt)] : PHOTO_EXTS;
+  const out=[];
+  for (const b of bases) for (const e of exts) out.push({name:b.value+e, kind:b.kind, ext:e});
+  return out;
+}
+
+// Parcours du dossier (et sous-dossiers) — repli pour les références non trouvées par nom.
+// Asynchrone et interruptible : contrairement à la fenêtre de sélection, ne fige pas l'onglet.
+async function scanDirectory(dirHandle, wantedCodes){
+  const idx=buildMatchIndex();
+  const want=new Set(wantedCodes);
+  let seen=0, hits=0;
+  async function walk(handle, depth){
+    if (depth>4 || _importCancel || !want.size) return;
+    for await (const entry of handle.values()){
+      if (_importCancel || !want.size) return;
+      if (entry.kind==='directory'){ await walk(entry, depth+1); continue; }
+      if (!/\.(jpe?g|png|webp)$/i.test(entry.name)) continue;
+      seen++;
+      const hit=lookupCode(idx, stripDupSuffix(baseName(entry.name)));
+      if (hit && want.has(hit.code) && !matchedFiles[hit.code]){
+        try{
+          matchedFiles[hit.code]=await entry.getFile();
+          restoredPhotos.delete(hit.code);
+          want.delete(hit.code); hits++;
+        }catch(e){}
+      }
+      if (seen%40===0){
+        ingestProgress('🔎 Parcours du dossier… '+seen.toLocaleString('fr-FR')+' fichier(s) · '+hits+' photo(s) retrouvée(s)');
+        await new Promise(r=>setTimeout(r,0));
+      }
+    }
+  }
+  await walk(dirHandle, 0);
+  return hits;
+}
+
+// Fabrique la copie de travail des photos trouvées et les affiche (phase commune aux 2 imports)
+async function cacheAndShow(codes){
+  const CONC=2;
+  let cached=0, cursor=0;
+  async function worker(){
+    while (cursor < codes.length && !_importCancel){
+      const code=codes[cursor++];
+      await cachePhotoLocally(code, matchedFiles[code]);
+      showCardPhoto(code);
+      applyRefToCard(code);
+      cached++;
+      ingestProgress('📥 Préparation des photos… '+cached+' / '+codes.length);
+      await new Promise(r=>setTimeout(r,0));   // rend la main au navigateur à chaque photo
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(CONC,codes.length)}, worker));
+  return cached;
+}
+
+// Cherche, sur un échantillon de références, quelle forme de nom existe réellement dans
+// le dossier. Renvoie {kind, ext} dès le premier fichier trouvé, sinon null.
+async function detectConvention(dir, sample, fournMap){
+  for (const code of sample){
+    if (_importCancel) return null;
+    for (const cand of candidateNames(code, fournMap)){
+      if (_importCancel) return null;
+      try{
+        await dir.getFileHandle(cand.name);
+        return {kind:cand.kind, ext:cand.ext, code};
+      }catch(e){ /* NotFoundError : candidat suivant */ }
+    }
+    await new Promise(r=>setTimeout(r,0));   // l'onglet reste réactif pendant la reconnaissance
+  }
+  return null;
+}
+
+async function targetedImport(){
+  if (!window.showDirectoryPicker){
+    alert("Ce navigateur ne permet pas de choisir un dossier sans tout charger.\n\nUtilise « 📁 Dossier (tout) », de préférence sur une copie locale du dossier photos.");
+    return;
+  }
+  if (_ingestBusy){ alert('Un import est déjà en cours, patiente quelques secondes.'); return; }
+  const wanted=[...new Set(allCodes().filter(c=>!String(c).startsWith('SLOT') && !matchedFiles[c]))];
+  if (!wanted.length){ alert('Toutes les références ont déjà une photo 🎉'); return; }
+  let dir;
+  try{ dir=await window.showDirectoryPicker({mode:'read'}); }
+  catch(e){ if(e.name!=='AbortError') alert('Dossier non accessible : '+e.message); return; }
+
+  _ingestBusy=true; _importCancel=false; AUTOSAVE_SUSPENDED=true; setImportUI(true);
+  try{
+    const fournMap=fournByCode();
+    const found=[]; let notFound=[];
+    _prefBase=null; _prefExt=null;
+
+    // PHASE 0 — reconnaissance du nommage du dossier.
+    // On essaie toutes les formes (code article, variantes de zéros, réf. fournisseur et
+    // ses variantes de séparateurs) sur les premières références seulement. Le premier
+    // succès désigne la convention du dossier : les références suivantes n'essaieront
+    // plus qu'elle. C'est ce qui permet de basculer tout seul d'un dossier nommé par
+    // code article à un dossier nommé par référence fournisseur.
+    ingestProgress('🔎 Reconnaissance du nommage du dossier…');
+    await new Promise(r=>setTimeout(r,0));
+    const probe=await detectConvention(dir, wanted.slice(0,5), fournMap);
+    if (probe){
+      _prefBase=probe.kind; _prefExt=probe.ext;
+      ingestProgress('🎯 Nommage reconnu : '+conventionLabel(probe.kind, probe.ext)+' — recherche en cours…');
+      await new Promise(r=>setTimeout(r,0));
+    }
+
+    if (probe){
+      // PHASE 1 — recherche ciblée, une demande par référence dans le cas nominal
+      let cursor=0, done=0;
+      const CONC=8;   // c'est de l'attente réseau, pas du calcul
+      async function seeker(){
+        while (cursor < wanted.length && !_importCancel){
+          const code=wanted[cursor++];
+          let file=null;
+          for (const cand of candidateNames(code, fournMap)){
+            if (_importCancel) break;
+            try{
+              const fh=await dir.getFileHandle(cand.name);
+              file=await fh.getFile();
+              _prefBase=cand.kind; _prefExt=cand.ext;
+              break;
+            }catch(e){ /* NotFoundError : candidat suivant */ }
+          }
+          done++;
+          if (file){ matchedFiles[code]=file; restoredPhotos.delete(code); found.push(code); }
+          else notFound.push(code);
+          if (done%5===0 || done===wanted.length){
+            ingestProgress('🎯 Recherche ciblée ('+conventionLabel(_prefBase,_prefExt)+')… '
+              +done+' / '+wanted.length+' · '+found.length+' trouvée(s)');
+            await new Promise(r=>setTimeout(r,0));
+          }
+        }
+      }
+      await Promise.all(Array.from({length:Math.min(CONC,wanted.length)}, seeker));
+    } else {
+      // aucun nom direct ne correspond : inutile d'interroger le partage référence par
+      // référence, on passe directement au parcours qui reconnaît des noms plus libres.
+      notFound=wanted.slice();
+    }
+
+    // PHASE 2 — repli par parcours du dossier (reconnaît aussi les noms approchants :
+    // réf. fournisseur écrite autrement, suffixes " (1)", sous-dossiers).
+    if (!_importCancel && notFound.length){
+      const msg = probe
+        ? notFound.length+' référence(s) sur '+wanted.length+' non trouvée(s) par leur nom de fichier.\n\n'
+        : "Aucune photo de ce dossier ne porte directement le nom d'une de tes références.\n"
+          +(Object.keys(REF_FOURN).length ? '' : "\n⚠️ Ta base articles ne contient pas de colonne « Réf. fournisseur » : recharge-la avec cette colonne pour reconnaître un dossier nommé par référence fournisseur.\n")
+          +'\n';
+      if (confirm(msg
+          +'Parcourir le dossier et ses sous-dossiers pour les retrouver ?\n'
+          +'(plus long, mais interruptible — l\'onglet reste utilisable)')){
+        ingestProgress('🔎 Parcours du dossier…');
+        const extra=await scanDirectory(dir, notFound);
+        for (const c of notFound) if (matchedFiles[c] && !found.includes(c)) found.push(c);
+        if (extra) ingestProgress(extra+' photo(s) retrouvée(s) par parcours');
+      }
+    }
+
+    if (found.length) await cacheAndShow(found);
+    refreshStats();
+    const restant=allCodes().filter(c=>!matchedFiles[c] && !String(c).startsWith('SLOT')).length;
+    ingestProgress((_importCancel?'⏹ Import interrompu · ':'✅ ')+found.length+' photo(s) chargée(s)'
+      +(restant?' · '+restant+' référence(s) encore sans photo':' · toutes les références sont servies'));
+    setTimeout(()=>ingestProgress(''), 10000);
+  } finally {
+    _ingestBusy=false; _importCancel=false; AUTOSAVE_SUSPENDED=false; setImportUI(false);
+    scheduleAutosave();
+  }
+}
+$('pickTargetedBtn').addEventListener('click', targetedImport);
+$('pickBtn').addEventListener('click',()=>$('dirInput').click());
+$('pickFilesBtn').addEventListener('click',()=>$('multiInput').click());
+// on COPIE la FileList dans un tableau AVANT de vider l'input (sinon la liste se vide aussi)
+$('dirInput').addEventListener('change',()=>{const l=[...$('dirInput').files];$('dirInput').value='';ingestFiles(l);});
+$('multiInput').addEventListener('change',()=>{const l=[...$('multiInput').files];$('multiInput').value='';ingestFiles(l);});
+
+// ---------- dépôt de fichiers / dossiers sur la page (V12) ----------
+// Avant : lâcher une photo ailleurs que sur une vignette faisait OUVRIR l'image par le
+// navigateur — la page était quittée et tout le travail non sauvegardé perdu.
+// Maintenant : le dépôt est capté et lance l'import de masse, dossiers compris.
+async function filesFromDataTransfer(dt){
+  const items=dt.items?[...dt.items]:[];
+  const entries=items.map(it=>it.webkitGetAsEntry?it.webkitGetAsEntry():null).filter(Boolean);
+  if (!entries.length) return [...dt.files];
+  const out=[];
+  const readAll=reader=>new Promise(res=>reader.readEntries(res,()=>res([])));
+  async function walk(entry){
+    if (entry.isFile){
+      const f=await new Promise(res=>entry.file(res,()=>res(null)));
+      if (f) out.push(f);
+    } else if (entry.isDirectory){
+      const reader=entry.createReader();
+      let batch;
+      do { batch=await readAll(reader); for (const e of batch) await walk(e); } while (batch.length);
+    }
+  }
+  for (const e of entries) await walk(e);
+  return out;
+}
+const dropHint=document.createElement('div');
+dropHint.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(27,67,50,.82);color:#fff;display:none;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;font-family:inherit;text-align:center;padding:24px;pointer-events:none';
+dropHint.textContent='📥 Lâche ici pour importer les photos';
+document.body.appendChild(dropHint);
+let _dragDepth=0;
+document.addEventListener('dragenter',e=>{
+  if (!e.dataTransfer||![...(e.dataTransfer.types||[])].includes('Files')) return;
+  _dragDepth++; if ($('builder') && !$('builder').classList.contains('hidden')) dropHint.style.display='flex';
+});
+document.addEventListener('dragleave',()=>{ if(--_dragDepth<=0){ _dragDepth=0; dropHint.style.display='none'; } });
+document.addEventListener('dragover',e=>{
+  if (e.dataTransfer && [...(e.dataTransfer.types||[])].includes('Files')) e.preventDefault();
+});
+document.addEventListener('drop', async e=>{
+  _dragDepth=0; dropHint.style.display='none';
+  if (e.defaultPrevented) return;                  // déjà traité par une vignette
+  if (!e.dataTransfer || ![...(e.dataTransfer.types||[])].includes('Files')) return;
+  e.preventDefault();
+  if ($('builder').classList.contains('hidden')){
+    alert('Construis d\'abord les planches (étape 1), puis dépose les photos.');
+    return;
+  }
+  ingestProgress('📥 Lecture du dépôt…');
+  const files=await filesFromDataTransfer(e.dataTransfer);
+  if (files.length) ingestFiles(files); else ingestProgress('');
+});
+
+// ---------- garde-fou à la fermeture (V12) ----------
+// L'autosave IndexedDB ne garantit pas les photos au-delà du seuil de sécurité :
+// on prévient avant de perdre un montage non sauvegardé.
+let _dirty=false;
+window.addEventListener('beforeunload', e=>{
+  if (!_dirty || !allCodes().length) return;
+  e.preventDefault(); e.returnValue='';
+});
+$('singleInput').addEventListener('change',()=>{
+  if ($('singleInput').files[0]&&currentEditCode) setCardImage(currentEditCode,$('singleInput').files[0],true,false,currentEditCard);
+  $('singleInput').value='';currentEditCode=null;currentEditCard=null;
+});
+// Liste des références sans photo. navigator.clipboard n'existe PAS quand la page est
+// ouverte en file:// (contexte non sécurisé) : l'ancien code levait une exception et le
+// bouton ne faisait rien, sans message. On tente le presse-papier, puis on retombe sur
+// une copie via textarea, et en dernier recours sur un fichier .txt téléchargeable.
+$('exportMissing').addEventListener('click', async ()=>{
+  const list=(window._missing||[]);
+  if (!list.length){ alert('Aucune référence sans photo 🎉'); return; }
+  const txt=list.join('\n');
+  try{
+    if (navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(txt);
+      alert(list.length+' code(s) copié(s) dans le presse-papier.');
+      return;
+    }
+    const ta=document.createElement('textarea');
+    ta.value=txt; ta.style.cssText='position:fixed;top:-1000px;left:0;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    const ok=document.execCommand('copy');
+    ta.remove();
+    if (ok){ alert(list.length+' code(s) copié(s) dans le presse-papier.'); return; }
+    throw new Error('copie refusée');
+  }catch(e){
+    showDownload(new Blob([txt],{type:'text/plain;charset=utf-8'}),
+      'references-sans-photo.txt',
+      list.length+' référence(s) sans photo');
+  }
+});
+
+// ---------- exports ----------
+// canvas unique réutilisé : évite d'allouer (puis de laisser au GC) un canvas par photo.
+// Sur un catalogue de 900 photos, c'est ce qui faisait exploser la mémoire.
+// Canvas réutilisé pour les exports (PDF/HTML), qui sont séquentiels : pas de risque
+// d'entrelacement ici. L'import, lui, tourne en parallèle et alloue son propre canvas.
+let _wCanvas=null;
+function workCanvas(w,h){
+  if(!_wCanvas) _wCanvas=document.createElement('canvas');
+  _wCanvas.width=w; _wCanvas.height=h;
+  return _wCanvas;
+}
+async function fileToDataURL(file,maxDim){
+  // decode a la taille cible quand le navigateur le permet (bien plus rapide et plus leger)
+  let bmp;
+  try{
+    const probe=await createImageBitmap(file);
+    const s0=Math.min(1,maxDim/Math.max(probe.width,probe.height));
+    if (s0<1){
+      const tw=Math.round(probe.width*s0), th=Math.round(probe.height*s0);
+      probe.close();
+      bmp=await createImageBitmap(file,{resizeWidth:tw,resizeHeight:th,resizeQuality:'high'});
+    } else { bmp=probe; }
+  }catch(e){ bmp=await createImageBitmap(file); }
+  const s=Math.min(1,maxDim/Math.max(bmp.width,bmp.height));
+  const w=Math.round(bmp.width*s),h=Math.round(bmp.height*s);
+  const cv=workCanvas(w,h);
+  const ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(bmp,0,0,w,h);bmp.close();
+  return {url:cv.toDataURL('image/jpeg',0.82),w,h};
+}
+$('makePdf').addEventListener('click', async ()=>{
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({unit:'mm',format:'a4'});
+  const prog=$('pdfProg');
+  const M=12,W=210,cols=3,cw=(W-2*M)/cols,chh=62;
+  let first=true,count=0;const N=allCodes().length;
+  for (const sec of PAGES){
+    if(!first)pdf.addPage();first=false;
+    pdf.setFillColor(27,67,50);pdf.rect(0,0,W,16,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);
+    pdf.text(String(sec.pg).slice(0,70),M,10);
+    pdf.setFontSize(8);pdf.setTextColor(200,169,81);pdf.text(sec.codes.length+' réf.',W-M,10,{align:'right'});
+    let x=M,y=20,col=0;
+    for (const code of sec.codes){
+      count++;prog.textContent='📄 PDF… '+count+' / '+N;
+      if (y+chh>292){pdf.addPage();pdf.setFillColor(27,67,50);pdf.rect(0,0,W,16,'F');
+        pdf.setTextColor(255,255,255);pdf.setFontSize(11);pdf.text(String(sec.pg)+' (suite)',M,10);y=20;x=M;col=0;}
+      const f=workFile(code);const p=PRODUCTS[code]||{lib:'',prix:''};   // copie locale : pas de relecture réseau
+      pdf.setDrawColor(220,215,205);pdf.rect(x,y,cw-4,chh-4);
+      if (f){try{
+        const img=await fileToDataURL(f,500);
+        const bw=cw-10,bh=chh-24,r=Math.min(bw/img.w,bh/img.h);
+        pdf.addImage(img.url,'JPEG',x+3+(bw-img.w*r)/2,y+2+(bh-img.h*r)/2,img.w*r,img.h*r);
+      }catch(e){}}
+      else{pdf.setTextColor(180,69,63);pdf.setFontSize(8);pdf.text('PHOTO MANQUANTE',x+(cw-4)/2,y+(chh-24)/2,{align:'center'});}
+      pdf.setTextColor(120,120,120);pdf.setFont('courier','normal');pdf.setFontSize(6.5);pdf.text(code.startsWith('SLOT')?'':code,x+3,y+chh-16);
+      pdf.setTextColor(26,26,26);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.text(String(p.lib||'').slice(0,34),x+3,y+chh-12);
+      // prix : soit promo (avec prix initial barré + remise), soit prix normal
+      const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
+      if (String(p.prixInit||'').trim()!==''){
+        // prix initial barré
+        pdf.setTextColor(150,150,150);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);
+        const initTxt=String(p.prixInit);
+        pdf.text(initTxt,x+3,y+chh-7);
+        const iw=pdf.getTextWidth(initTxt);
+        pdf.setDrawColor(176,42,60);pdf.setLineWidth(0.3);pdf.line(x+3,y+chh-8.2,x+3+iw,y+chh-8.2);
+        // prix promo en gras
+        pdf.setTextColor(139,26,43);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+        const promoTxt=String(p.prixPromo||p.prix||'');
+        pdf.text(promoTxt,x+3,y+chh-2.5);
+        // pastille remise
+        const rem=parseRemise(p.remise||'', numFromPrix(p.prixInit), numFromPrix(p.prixPromo||p.prix));
+        const remTxt=fmtRemiseText(rem, fmt).replace(/\u00a0/g,' ');
+        if (remTxt){
+          pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);
+          const rw=pdf.getTextWidth(remTxt)+3;
+          pdf.setFillColor(139,26,43);pdf.roundedRect(x+3+pdf.getTextWidth(promoTxt)+2, y+chh-6, rw, 4.2, 1.2, 1.2, 'F');
+          pdf.setTextColor(255,255,255);pdf.text(remTxt, x+3+pdf.getTextWidth(promoTxt)+3.5, y+chh-3);
+        }
+      } else {
+        pdf.setTextColor(139,26,43);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text(String(p.prix||''),x+3,y+chh-7);
+      }
+      col++;x+=cw;if(col>=cols){col=0;x=M;y+=chh;}
+      if (count%12===0) await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  prog.textContent='';
+  showDownload(pdf.output('blob'), 'planches-contacts.pdf', 'PDF des planches prêt');
+});
+// extension de fichier fiable : on suit le TYPE réel du blob, pas seulement le nom
+// (une copie de travail JPEG portant un nom .png donnait un fichier illisible chez l'imprimeur)
+function photoExt(f){
+  const t=(f&&f.type||'').toLowerCase();
+  if (t==='image/jpeg') return '.jpg';
+  if (t==='image/png')  return '.png';
+  if (t==='image/webp') return '.webp';
+  const n=String(f&&f.name||'');
+  const d=n.lastIndexOf('.');
+  return d>0 ? n.slice(d).toLowerCase() : '.jpg';
+}
+// Prévient si tout ou partie des photos ne sont pas en pleine résolution
+// (projet rouvert depuis un .json : les images y sont ré-encodées à ~1600px).
+function hdWarning(){
+  const codes=allCodes().filter(c=>matchedFiles[c]);
+  const dl=codes.filter(c=>!isHD(c));
+  if (!dl.length) return true;
+  return confirm(
+    '⚠️ '+dl.length+' photo(s) sur '+codes.length+' ne sont pas en pleine résolution.\n\n'
+    +'Elles proviennent d\'un projet rouvert (.json), où les images sont stockées en ~1600px.\n'
+    +'Pour un fichier imprimeur, recharge le dossier photos d\'origine.\n\n'
+    +'Exporter quand même ?');
+}
+$('makeFolder').addEventListener('click', async ()=>{
+  const btn=$('makeFolder');
+  if (!hdWarning()) return;
+  const write = async (rootHandle)=>{
+    let n=0;
+    for (const sec of PAGES){
+      const dir=await rootHandle.getDirectoryHandle(safeName(sec.pg)||'page',{create:true});
+      for (const code of sec.codes){
+        const f=matchedFiles[code];if(!f)continue;   // fichier d'ORIGINE, pleine résolution
+        const ext=photoExt(f);
+        const fh=await dir.getFileHandle((code.startsWith('SLOT')?safeName(baseName(f.name)):code)+ext,{create:true});
+        const w=await fh.createWritable();await w.write(f);await w.close();n++;
+        btn.textContent='🗂 '+n;
+      }
+    }
+    return n;
+  };
+  if (window.showDirectoryPicker){
+    try{
+      const dest=await window.showDirectoryPicker({mode:'readwrite'});
+      const root=await dest.getDirectoryHandle('PLANCHES_PHOTOS_PAR_PAGE',{create:true});
+      const n=await write(root);
+      btn.textContent='✅ '+n+' photos HD';
+    }catch(e){if(e.name!=='AbortError')alert(e.message);btn.textContent='🗂 Dossier prod HD';}
+  } else {
+    const zip=new JSZip();const root=zip.folder('PLANCHES_PHOTOS_PAR_PAGE');let n=0;
+    for (const sec of PAGES){
+      const dir=root.folder(safeName(sec.pg)||'page');
+      for (const code of sec.codes){
+        const f=matchedFiles[code];if(!f)continue;   // fichier d'ORIGINE, pleine résolution
+        const ext=photoExt(f);
+        dir.file((code.startsWith('SLOT')?safeName(baseName(f.name)):code)+ext,f,{compression:'STORE'});n++;
+      }
+    }
+    const blob=await zip.generateAsync({type:'blob'});
+    showDownload(blob, 'PLANCHES_PHOTOS_PAR_PAGE.zip', 'Archive photos HD prête');
+    btn.textContent='✅ Zip ('+n+')';
+  }
+});
+// ---------- export EXCEL du catalogue final (1 ligne par produit) ----------
+$('makeXlsx').addEventListener('click', ()=>{
+  const btn=$('makeXlsx'); const oldTxt=btn.textContent;
+  try{
+    const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
+    // map inverse code article -> réf fournisseur (première trouvée)
+    const codeToFourn={};
+    // V14 : on exporte la référence TELLE QU'ÉCRITE dans la base quand on l'a,
+    // la forme normalisée n'étant qu'un repli (bases chargées avant la V14).
+    for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) codeToFourn[c]=arr[0]; }
+    for (const [fKey,c] of Object.entries(REF_FOURN||{})){ if(!(c in codeToFourn)) codeToFourn[c]=fKey; }
+    const rows=[[
+      'Page','N° page','Code article','Réf. fournisseur','Libellé',
+      'Prix','Prix initial','Prix promo','Remise %','Remise (F)','Remise (affichée)','Photo'
+    ]];
+    for (const sec of PAGES){
+      let pos=0;
+      for (const code of sec.codes){
+        pos++;
+        const p=PRODUCTS[code]||{};
+        const isSlot=String(code).startsWith('SLOT');
+        const codeAff=isSlot?'':code;
+        const hasInit=String(p.prixInit||'').trim()!=='';
+        const initNum=numFromPrix(p.prixInit);
+        const promoNum=numFromPrix(p.prixPromo||p.prix);
+        const rem=hasInit?parseRemise(p.remise||'', initNum, promoNum):{pct:null,val:null};
+        const remAff=hasInit?fmtRemiseText(rem, fmt).replace(/\u00a0|\u202f/g,' '):'';
+        rows.push([
+          sec.pg||'',
+          pos,
+          codeAff,
+          codeToFourn[code]||'',
+          p.lib||'',
+          p.prix||'',
+          hasInit?(p.prixInit||''):'',
+          hasInit?(p.prixPromo||p.prix||''):'',
+          (rem.pct!=null)?Math.round(rem.pct):'',
+          (rem.val!=null)?Math.round(rem.val):'',
+          remAff,
+          matchedFiles[code]?'Oui':'Manquante'
+        ]);
+      }
+    }
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[
+      {wch:22},{wch:7},{wch:14},{wch:16},{wch:40},
+      {wch:10},{wch:11},{wch:11},{wch:9},{wch:11},{wch:18},{wch:11}
+    ];
+    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:11}})};
+    ws['!freeze']={xSplit:0,ySplit:1};
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Catalogue');
+    const wbout=XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    const blob=new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const stamp=new Date().toISOString().slice(0,10);
+    showDownload(blob, 'catalogue-planches-NPC-'+stamp+'.xlsx', 'Catalogue Excel prêt ('+(rows.length-1)+' produits)');
+    btn.textContent='✅ Excel exporté'; setTimeout(()=>btn.textContent=oldTxt,2500);
+  }catch(e){ alert('Erreur export Excel : '+e.message); btn.textContent=oldTxt; }
+});
+
+// ---------- export HTML autonome (planches figées) ----------
+$('makeHtml').addEventListener('click', async ()=>{
+  const btn=$('makeHtml'); const oldTxt=btn.textContent;
+  const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const N=allCodes().length; let done=0;
+  let sections='';
+  for (const sec of PAGES){
+    let cards='';
+    for (const code of sec.codes){
+      done++; btn.textContent='📤 '+done+'/'+N;
+      const p=PRODUCTS[code]||{lib:'',prix:''};
+      const f=workFile(code);   // copie locale : pas de relecture réseau
+      let imgHtml='<div class="x-ph">PHOTO MANQUANTE</div>';
+      if (f){ try{ const im=await fileToDataURL(f,800); imgHtml='<img class="x-img" src="'+im.url+'" alt="'+esc(code)+'">'; }catch(e){} }
+      // prix
+      let priceHtml='';
+      if (String(p.prixInit||'').trim()!==''){
+        const rem=parseRemise(p.remise||'', numFromPrix(p.prixInit), numFromPrix(p.prixPromo||p.prix));
+        const remTxt=fmtRemiseText(rem, fmt);
+        priceHtml='<div class="x-prices"><span class="x-init">'+esc(p.prixInit)+'</span>'
+          +'<span class="x-promo">'+esc(p.prixPromo||p.prix||'')+'</span></div>'
+          +(remTxt?'<span class="x-rem">'+esc(remTxt)+'</span>':'');
+      } else {
+        priceHtml='<div class="x-prices"><span class="x-promo">'+esc(p.prix||'')+'</span></div>';
+      }
+      const codeTxt = code.startsWith('SLOT')?'':code;
+      cards+='<div class="x-card">'
+        +'<div class="x-slot">'+imgHtml+'</div>'
+        +'<div class="x-body"><div class="x-code">'+esc(codeTxt)+'</div>'
+        +'<div class="x-lib">'+esc(p.lib||'')+'</div>'+priceHtml+'</div></div>';
+    }
+    sections+='<section class="x-planche"><div class="x-head"><h2>'+esc(sec.pg)+'</h2>'
+      +'<span class="x-count">'+sec.codes.length+' réf.</span></div>'
+      +'<div class="x-grid">'+cards+'</div></section>';
+  }
+  const title='Planches Contacts — NPC';
+  const doc='<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+    +'<title>'+title+'</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">'
+    +'<style>'
+    +'*{margin:0;padding:0;box-sizing:border-box}'
+    +'body{font-family:\'DM Sans\',sans-serif;background:#F5F3F0;color:#1A1A1A;padding-bottom:40px}'
+    +'.x-header{background:linear-gradient(135deg,#0D1B2A,#1B4332);color:#fff;padding:24px;text-align:center}'
+    +'.x-header h1{font-family:\'Playfair Display\',serif;font-size:1.6rem}.x-header h1 em{color:#C8A951}'
+    +'.x-header p{color:rgba(255,255,255,.55);font-size:.8rem;margin-top:4px}'
+    +'.x-planche{max-width:1200px;margin:24px auto;padding:0 16px}'
+    +'.x-head{display:flex;align-items:center;gap:12px;border-left:5px solid #8B1A2B;padding:8px 14px;background:#fff;border-radius:0 10px 10px 0;box-shadow:0 1px 8px rgba(0,0,0,.05)}'
+    +'.x-head h2{font-size:1rem;font-weight:700;flex-grow:1}.x-count{font-size:.75rem;color:#888}'
+    +'.x-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:12px}'
+    +'.x-card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 8px rgba(0,0,0,.06)}'
+    +'.x-slot{aspect-ratio:1;background:#FAF8F5;display:flex;align-items:center;justify-content:center}'
+    +'.x-img{width:100%;height:100%;object-fit:contain}'
+    +'.x-ph{font-size:.6rem;color:#B4453F;font-weight:700;text-align:center}'
+    +'.x-body{padding:8px 9px 9px}.x-code{font-size:.62rem;color:#999;font-family:monospace}'
+    +'.x-lib{font-size:.68rem;font-weight:500;line-height:1.25;min-height:2.2em;margin-top:2px}'
+    +'.x-prices{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:4px}'
+    +'.x-init{font-size:.68rem;color:#999;text-decoration:line-through;text-decoration-color:#B02A3C;font-weight:600}'
+    +'.x-promo{font-weight:700;font-size:.8rem;color:#8B1A2B}'
+    +'.x-rem{display:inline-block;background:#8B1A2B;color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:10px;margin-top:3px;line-height:1.1}'
+    +'@media print{body{background:#fff}.x-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.x-planche{page-break-after:always}.x-card{box-shadow:none;border:1px solid #ddd}}'
+    +'</style></head><body>'
+    +'<div class="x-header"><h1>Planches <em>Contacts</em></h1><p>Nouméa Pas Cher · '+new Date().toLocaleDateString('fr-FR')+'</p></div>'
+    +sections
+    +'</body></html>';
+  const blob=new Blob([doc],{type:'text/html;charset=utf-8'});
+  showDownload(blob, 'planches-contacts-NPC.html', 'Page HTML des planches prête');
+  btn.textContent='✅ HTML exporté'; setTimeout(()=>btn.textContent=oldTxt,2500);
+});
+
+// ================= SAUVEGARDE / REPRISE DE PROJET =================
+// convertit une image (File) en dataURL HD (~1600px) pour la sauvegarde
+async function fileToProjectDataURL(file){
+  try{ const im=await fileToDataURL(file,1600); return {url:im.url, name:file.name}; }
+  catch(e){ return null; }
+}
+// dataURL -> File (reconstruit une "photo" à la reprise)
+function dataURLtoFile(dataURL, name){
+  const [head,body]=dataURL.split(',');
+  const mime=(head.match(/data:([^;]+)/)||[])[1]||'image/jpeg';
+  const bin=atob(body); const arr=new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new File([arr], name||'photo.jpg', {type:mime});
+}
+// FIGE dans PRODUCTS tout ce qui est affiché sur les cartes (lib, prix, prixInit, prixPromo, remise).
+// Indispensable avant sauvegarde : rend le projet 100% autonome, sans dépendre de la base articles
+// au rechargement (notamment pour les produits résolus via code fournisseur -> code article).
+function syncProductsFromDOM(){
+  document.querySelectorAll('.card').forEach(card=>{
+    const code=card.dataset.code; if(!code) return;
+    const g=sel=>{ const el=card.querySelector(sel); return el?el.textContent.trim():''; };
+    const raw=(()=>{ const el=card.querySelector('.card-remise'); return el?(el.dataset.raw||el.textContent.trim()):''; })();
+    const prev=PRODUCTS[code]||{};
+    const initTxt=g('.card-prix-init');
+    const prixTxt=g('.card-prix');
+    PRODUCTS[code]={
+      lib: g('.card-lib') || prev.lib || '',
+      // si un prix barré est présent, le prix affiché est le prix promo ; sinon c'est le prix normal
+      prix: (initTxt!=='' ? (prev.prix||prixTxt) : prixTxt) || '',
+      prixInit: initTxt || '',
+      prixPromo: initTxt!=='' ? (prixTxt || prev.prixPromo || '') : (prev.prixPromo||''),
+      remise: raw || prev.remise || ''
+    };
+  });
+}
+// construit l'objet projet complet (planches + produits + photos)
+// Deux formats de photos selon la destination :
+//   opts.blobs = true  -> Blob bruts, pour IndexedDB (reprise automatique) : instantané
+//   sinon              -> dataURL base64, pour le fichier projet .json (JSON = texte)
+// opts.limit ne sert plus qu'à protéger le mode dataURL si on devait le réutiliser
+// pour une sauvegarde automatique.
+async function buildProject(includePhotos, opts){
+  opts=opts||{};
+  syncProductsFromDOM();
+  const photos={};
+  if (includePhotos){
+    const entries=Object.entries(matchedFiles).filter(([,f])=>!!f);
+    // MODE BLOB (V13) — réservé à la sauvegarde automatique dans IndexedDB.
+    // IndexedDB stocke nativement des Blob : on y range la copie de travail telle quelle,
+    // sans canvas ni base64. L'ancien mode ré-encodait jusqu'à 600 photos en dataURL
+    // toutes les 3 secondes après la moindre frappe — c'est ce qui figeait l'onglet
+    // juste après un import. Ici la sauvegarde est quasi instantanée et sans plafond.
+    if (opts.blobs){
+      for (const [code] of entries){
+        const b=localBlobs[code];
+        if (!b) continue;   // pas de copie locale (photo pas encore préparée) -> on saute
+        photos[code]={blob:b, name:b.name||(code+'.jpg')};
+      }
+    } else {
+      // MODE DATAURL — fichier projet .json (JSON = pas de binaire), sauvegarde manuelle
+      if (opts.limit && entries.length>opts.limit){
+        // trop d'images pour un encodage sûr : on signale au lieu de faire tomber l'onglet
+        const err=new Error('too-many-photos'); err.code='TOO_MANY_PHOTOS'; throw err;
+      }
+      let i=0;
+      for (const [code] of entries){
+        const d=await fileToProjectDataURL(workFile(code));   // copie locale : pas de relecture réseau
+        if (d) photos[code]=d;
+        if (opts.progress && ++i%10===0) opts.progress(i, entries.length);
+        // on rend la main régulièrement pour ne pas geler l'interface ni saturer la RAM
+        if (i%20===0) await new Promise(r=>setTimeout(r,0));
+      }
+    }
+  }
+  return {
+    _type:'studio-planches-projet', _version:2,
+    date:new Date().toISOString(),
+    pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice()})),
+    products:JSON.parse(JSON.stringify(PRODUCTS)),
+    manual:[...manualSet],
+    remiseFormat: ($('remiseFormat')&&$('remiseFormat').value)||'pct',
+    // on embarque la base articles + l'index fournisseur pour que l'auto-remplissage
+    // (glisser une nouvelle photo, résolution code fournisseur -> code article)
+    // fonctionne à la reprise, même sur un navigateur vierge.
+    ref: JSON.parse(JSON.stringify(REF||{})),
+    refFourn: JSON.parse(JSON.stringify(REF_FOURN||{})),
+    refFournRaw: JSON.parse(JSON.stringify(REF_FOURN_RAW||{})),
+    refMeta: JSON.parse(JSON.stringify(REF_META||{date:null})),
+    photos
+  };
+}
+// applique un projet chargé (reconstruit planches + produits + photos)
+function applyProject(proj){
+  if (!proj || proj._type!=='studio-planches-projet'){ alert('Fichier projet non reconnu.'); return false; }
+  PAGES=(proj.pages||[]).map(s=>({pg:s.pg, codes:(s.codes||[]).slice()}));
+  PRODUCTS=proj.products||{};
+  // restaure la base articles embarquée dans le projet (fusion : ne pas perdre une base déjà chargée)
+  if (proj.ref && Object.keys(proj.ref).length){
+    for (const [c,rec] of Object.entries(proj.ref)){ if(!REF[c]) REF[c]=rec; }
+  }
+  if (proj.refFourn && Object.keys(proj.refFourn).length){
+    for (const [k,c] of Object.entries(proj.refFourn)){ if(!REF_FOURN[k]) REF_FOURN[k]=c; }
+  }
+  if (proj.refFournRaw){
+    for (const [c,arr] of Object.entries(proj.refFournRaw)){ if(!REF_FOURN_RAW[c]) REF_FOURN_RAW[c]=arr.slice(); }
+  }
+  if (Object.keys(REF_FOURN).length) reindexFourn();   // projet enregistré avant la V14
+  if (proj.refMeta && proj.refMeta.date && !(REF_META&&REF_META.date)) REF_META=proj.refMeta;
+  // persiste la base fusionnée pour les prochaines sessions + met à jour le bouton
+  (async()=>{ try{ await idbSet('refProduits',REF); await idbSet('refFourn',REF_FOURN); await idbSet('refFournRaw',REF_FOURN_RAW); await idbSet('refMeta',REF_META); }catch(e){} if(typeof updateRefBtn==='function') updateRefBtn(); })();
+  // reset photos
+  for (const k of Object.keys(matchedFiles)) delete matchedFiles[k];
+  for (const k of Object.keys(localBlobs)) delete localBlobs[k];
+  restoredPhotos.clear();
+  manualSet.clear(); (proj.manual||[]).forEach(c=>manualSet.add(c));
+  renderBuilder();
+  if (proj.remiseFormat && $('remiseFormat')){ $('remiseFormat').value=proj.remiseFormat; }
+  // ré-injecte les photos
+  const photos=proj.photos||{};
+  for (const [code,ph] of Object.entries(photos)){
+    if (!ph) continue;
+    // deux formats possibles : Blob (reprise automatique, V13) ou dataURL (fichier .json)
+    let file=null, src=null;
+    if (ph.blob){
+      file=new File([ph.blob], ph.name||(code+'.jpg'), {type:ph.blob.type||'image/jpeg'});
+      try{ src=URL.createObjectURL(file); }catch(e){ continue; }
+    } else if (ph.url){
+      file=dataURLtoFile(ph.url, ph.name);
+      src=ph.url;
+    } else continue;
+    matchedFiles[code]=file;
+    localBlobs[code]=file;      // photo restaurée = déjà locale
+    restoredPhotos.add(code);   // …mais version allégée : ce n'est pas du HD imprimeur
+    // toutes les vignettes du code (un article peut figurer sur plusieurs planches)
+    cardsOf(code).forEach(card=>{
+      const img=card.querySelector('.prod-img');
+      if (ph.blob) img.dataset.blobUrl=src;
+      img.src=src; img.style.display='block';
+      card.querySelector('.ph-fallback').style.display='none';
+      card.classList.remove('missing');
+      // ré-applique les infos produit sauvegardées sur la carte (sans dépendre de la base articles)
+      const pp=PRODUCTS[code]||{};
+      const setTxt=(sel,val)=>{ const el=card.querySelector(sel); if(el && val!=null) el.textContent=val; };
+      setTxt('.card-code', code.startsWith('SLOT')?'':code);
+      setTxt('.card-lib', pp.lib||'');
+      setTxt('.card-prix-init', pp.prixInit||'');
+      setTxt('.card-prix', pp.prixPromo||pp.prix||'');
+      const remEl=card.querySelector('.card-remise'); if(remEl) remEl.dataset.raw=pp.remise||'';
+    });
+  }
+  renderAllRemises();
+  refreshStats();
+  return true;
+}
+
+// --- bouton Sauvegarder : télécharge un .json ---
+$('saveProj').addEventListener('click', async ()=>{
+  const btn=$('saveProj'); const old=btn.textContent; btn.textContent='💾 …';
+  try{
+    // sauvegarde manuelle = complète (toutes les photos), avec progression
+    const proj=await buildProject(true, {progress:(i,n)=>{ btn.textContent='💾 '+i+'/'+n; }});
+    const blob=new Blob([JSON.stringify(proj)],{type:'application/json'});
+    const stamp=new Date().toISOString().slice(0,10);
+    showDownload(blob, 'projet-planches-'+stamp+'.json', 'Fichier projet prêt (à rouvrir avec « Ouvrir projet »)');
+    _dirty=false;
+    btn.textContent='✅ Sauvegardé';
+  }catch(e){ alert('Erreur sauvegarde : '+e.message); btn.textContent=old; return; }
+  setTimeout(()=>btn.textContent=old,2500);
+});
+
+// --- bouton Ouvrir projet : recharge un .json ---
+$('openProj').addEventListener('click', ()=>$('projInput').click());
+$('projInput').addEventListener('change', async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const txt=await f.text();
+    const proj=JSON.parse(txt);
+    if (applyProject(proj)){ /* ok */ }
+  }catch(err){ alert('Impossible de lire le projet : '+err.message); }
+  $('projInput').value='';
+});
+
+// --- AUTO-REPRISE : sauvegarde continue dans IndexedDB (sans les photos si trop lourd) ---
+let _autosaveTimer=null;
+let _autosaveRunning=false;
+async function autosave(){
+  if (AUTOSAVE_SUSPENDED || _autosaveRunning) return;
+  _autosaveRunning=true;
+  try{
+    // on tente AVEC photos, mais SEULEMENT sous le seuil de sécurité ;
+    // au-delà on sauve la structure sans les images (l'onglet survit).
+    let proj;
+    try{
+      // V13 : photos stockées en Blob, sans ré-encodage ni plafond de sécurité
+      proj=await buildProject(true, {blobs:true});
+      await idbSet('autosaveProjet', proj);
+      _dirty=false;         // photos comprises : rien à perdre en fermant
+    }catch(e){
+      proj=await buildProject(false);
+      proj._noPhotos=true;
+      await idbSet('autosaveProjet', proj);
+      // structure sauvée mais PAS les photos -> on garde l'avertissement de fermeture
+    }
+    await idbSet('autosaveMeta', {date:new Date().toISOString(), pages:PAGES.length, codes:allCodes().length});
+  }catch(e){ /* silencieux */ }
+  finally{ _autosaveRunning=false; }
+}
+function scheduleAutosave(){
+  _dirty=true;
+  if (AUTOSAVE_SUSPENDED) return;
+  clearTimeout(_autosaveTimer);
+  _autosaveTimer=setTimeout(autosave, 3000);   // débounce
+}
+// déclenche l'autosave sur les interactions clés
+['input','blur'].forEach(ev=>document.addEventListener(ev, e=>{
+  if (e.target.closest && e.target.closest('#builder')) scheduleAutosave();
+}, true));
+
+// --- proposition de reprise au chargement ---
+(async ()=>{
+  try{
+    const meta=await idbGet('autosaveMeta');
+    if (meta && meta.codes>0){
+      const when=new Date(meta.date).toLocaleString('fr-FR');
+      const bar=document.createElement('div');
+      bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:200;background:#1B4332;color:#fff;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:.85rem;box-shadow:0 -2px 12px rgba(0,0,0,.2)';
+      bar.innerHTML='↩️ Un projet en cours a été trouvé ('+meta.codes+' réf. · '+meta.pages+' planche(s) · '+when+'). ';
+      const yes=document.createElement('button'); yes.className='btn gold'; yes.textContent='Reprendre'; yes.style.cssText='padding:8px 18px';
+      const no=document.createElement('button'); no.className='btn ghost'; no.textContent='Ignorer'; no.style.cssText='padding:8px 18px';
+      bar.appendChild(yes); bar.appendChild(no);
+      document.body.appendChild(bar);
+      yes.onclick=async ()=>{ const proj=await idbGet('autosaveProjet'); if(proj){ applyProject(proj); if(proj._noPhotos) setTimeout(()=>alert('Projet repris. ⚠️ Les photos n ont pas pu être mémorisées automatiquement (trop volumineuses) — recharge-les, ou utilise 💾 Sauvegarder pour un fichier projet complet.'),300); } bar.remove(); };
+      no.onclick=()=>bar.remove();
+    }
+  }catch(e){}
+})();
+
+$('makeZip').addEventListener('click', async ()=>{
+  if (!hdWarning()) return;
+  const zip=new JSZip();
+  for (const [code,f] of Object.entries(matchedFiles)){
+    if(!f)continue;const ext=photoExt(f);
+    zip.file((code.startsWith('SLOT')?safeName(baseName(f.name)):code)+ext,f);
+  }
+  const blob=await zip.generateAsync({type:'blob'});
+  showDownload(blob, 'photos-planches.zip', 'Archive photos prête');
+});
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
+</body></html>
