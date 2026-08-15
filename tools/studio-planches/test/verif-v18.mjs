@@ -25,7 +25,8 @@ const r = await p.evaluate(() => {
     crlf: s.texte.includes('\r\n') && !/[^\r]\n/.test(s.texte),
     citeEspaces: s.texte.includes('"ref xyz 99.jpg"') && s.texte.includes('"\\\\10.10.101.52\\AUTRE dossier"'),
     aucuneSuppression: !/\/MIR|\/PURGE|del |rmdir|rd /i.test(s.texte),
-    bouton: !!box.textContent.includes('Script de copie des 72 photos')
+    // V20 : la commande a coller est devenue la methode principale, le .bat le repli
+    bouton: box.textContent.includes('Copier les 72 photos en local') && box.textContent.includes('fichier .bat')
   };
 });
 const ck = (n, ok, d) => console.log((ok ? '  OK   ' : '  ECHEC') + ' | ' + n + (ok ? '' : '  -> ' + d));

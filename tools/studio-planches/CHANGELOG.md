@@ -1,5 +1,27 @@
 # Studio Planches Contacts — journal des versions
 
+## V20 — une commande à coller, quand Windows refuse le .bat
+
+Le `.bat` téléchargé est bloqué par le gestionnaire de pièces jointes :
+« Vos paramètres de sécurité Internet ont empêché l'ouverture d'un ou de plusieurs
+fichiers ». Tout fichier venu d'Internet porte cette marque, et la stratégie en place
+interdit d'ouvrir les scripts ainsi marqués. Le contournement manuel existe — clic droit
+→ Propriétés → Débloquer — mais il n'est pas toujours autorisé.
+
+Méthode principale désormais : **📋 Copier les N photos en local**. Une fenêtre affiche
+la commande, avec la marche à suivre (Windows + R → `cmd` → clic droit pour coller →
+Entrée). Rien n'est téléchargé, donc rien n'est marqué ni bloqué.
+
+La commande est assemblée en **une seule ligne** avec `&`. Une zone de texte HTML
+normalise les fins de ligne : un CRLF y devient un LF, et coller plusieurs lignes dans
+`cmd` devient hasardeux. Au-delà de la limite de longueur de Windows, on repasse à
+plusieurs lignes, chacune complète et exécutable séparément.
+
+La commande est présentée dans une zone de texte sélectionnable : si le navigateur refuse
+l'accès au presse-papier, `Ctrl+C` reste possible. Le `.bat` demeure disponible en repli,
+avec le rappel de la manipulation « Débloquer ».
+
+
 ## V19 — destination du script et conduite à tenir dans la fenêtre Windows
 
 Deux corrections issues de l'usage réel.
