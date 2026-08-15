@@ -1,5 +1,17 @@
 # Studio Planches Contacts — journal des versions
 
+## V15 — lever la confusion entre les deux méthodes d'import
+
+Le bouton « 📁 Dossier (tout) » restait trop proche de « 🎯 Photos (dossier réseau) » :
+cliqué par erreur, il déclenche la demande de Chrome « Importer 9 011 fichiers sur ce
+site ? », c'est-à-dire la lecture intégrale du partage pour 72 photos utiles.
+
+- étiquettes explicites : **🎯 Chercher les photos** / **📁 Tout charger (lent)** /
+  **🖼 Quelques images** ;
+- l'ancienne méthode demande confirmation, rappelle le nombre de références réellement
+  sans photo et renvoie vers la recherche ciblée.
+
+
 ## V14 — reconnaissance du nommage : code article ou réf. fournisseur
 
 La V13 ne savait aller chercher un fichier que par son code article. Trois défauts
