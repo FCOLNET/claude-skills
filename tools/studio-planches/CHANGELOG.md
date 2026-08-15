@@ -1,5 +1,23 @@
 # Studio Planches Contacts — journal des versions
 
+## V19 — destination du script et conduite à tenir dans la fenêtre Windows
+
+Deux corrections issues de l'usage réel.
+
+**Destination du script de copie.** Elle passe de `%USERPROFILE%\Desktop\PHOTOS_PLANCHES`
+à `%USERPROFILE%\PHOTOS_PLANCHES`. Quand OneDrive gère les dossiers du profil — le cas
+ici, « OneDrive - SERCOPAC » —, `%USERPROFILE%\Desktop` n'existe plus : le Bureau réel se
+trouve sous `OneDrive - <entreprise>\Bureau`. Robocopy aurait créé un dossier fantôme,
+invisible sur le Bureau. La racine du profil est toujours locale et toujours présente.
+
+**Conduite à tenir dans la fenêtre de sélection.** Sélectionner « Réseau » dans le volet
+de gauche produit « Vous ne pouvez pas ouvrir ce dossier avec ce programme » : c'est un
+emplacement virtuel de Windows, pas un dossier. L'encart indique désormais l'ordre des
+opérations — script d'abord, sélection du dossier local ensuite — et précise que le
+chemin UNC, si on y tient, se colle entier dans le champ « Dossier », jamais en naviguant
+par « Réseau ».
+
+
 ## V18 — copier les seules photos utiles au lieu d'ouvrir le dossier entier
 
 Le partage contient 9 011 photos, les planches en utilisent 72. Le navigateur se fige
