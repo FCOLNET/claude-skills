@@ -1,5 +1,31 @@
 # Studio Planches Contacts — journal des versions
 
+## V16 — l'outil s'adapte au navigateur
+
+La recherche ciblée repose sur `showDirectoryPicker` (File System Access API), absente du
+navigateur utilisé en production : le bouton affichait une impasse. Il n'apparaît
+désormais que là où l'API existe, et « 📁 Dossier photos » redevient la méthode
+principale partout ailleurs, sans message la présentant comme un pis-aller.
+
+### Ce qui fige réellement le navigateur
+
+Les deux fenêtres de sélection n'ont pas le même coût, et c'est ce qui avait été confondu :
+
+| Fenêtre | Contenu affiché | Sur un partage réseau |
+|---|---|---|
+| 🖼 Quelques images (Ctrl+A) | miniatures de chaque photo | **fige le navigateur** — le rendu des miniatures lit les images |
+| 📁 Dossier photos | dossiers uniquement, aucune miniature | sûr — seuls les noms sont transmis |
+
+L'appariement ne lit que les noms de fichiers ; seules les photos des références présentes
+dans les planches sont réellement ouvertes.
+
+Mesuré sur 9 011 fichiers présentés pour 72 références (données locales, hors latence
+réseau) : **4,3 s**, dont l'essentiel est la préparation des 72 photos retenues.
+Le tri et l'appariement des 8 939 fichiers non concernés sont négligeables.
+
+L'infobulle et le texte d'aide signalent maintenant le piège du Ctrl+A.
+
+
 ## V15 — lever la confusion entre les deux méthodes d'import
 
 Le bouton « 📁 Dossier (tout) » restait trop proche de « 🎯 Photos (dossier réseau) » :
