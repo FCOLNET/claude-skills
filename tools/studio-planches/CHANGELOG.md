@@ -1,5 +1,27 @@
 # Studio Planches Contacts — journal des versions
 
+## V18 — copier les seules photos utiles au lieu d'ouvrir le dossier entier
+
+Le partage contient 9 011 photos, les planches en utilisent 72. Le navigateur se fige
+pendant que Chrome énumère le partage pour construire la sélection — avant que la page
+ne reçoive quoi que ce soit.
+
+**Vérifié par élimination**, pour ne pas optimiser le mauvais endroit : une fois les
+fichiers remis à la page, le tri de 9 011 noms coûte 11 ms et le traitement complet
+4,3 s. Le coût n'est donc pas dans l'outil, et aucun réglage de la page n'y donne accès.
+
+La seule issue est de ne plus présenter le dossier entier. Comme le fichier source donne
+les chemins exacts, l'encart propose désormais **📥 Script de copie des N photos** : un
+`.bat` qui copie exactement les photos des planches vers `Bureau\PHOTOS_PLANCHES`, puis
+ouvre le dossier. Il reste à le sélectionner dans l'outil — 72 fichiers au lieu de 9 011.
+
+Le script utilise `robocopy` avec une liste de noms de fichiers, ce qui évite une
+commande par photo ; il est découpé pour rester loin de la limite de longueur d'une
+ligne de commande Windows, cite les noms comportant des espaces, et ne contient aucune
+commande de suppression ou de synchronisation — il lit le serveur, il n'y écrit rien.
+Il est lisible dans le Bloc-notes avant exécution.
+
+
 ## V17 — exploitation de la colonne « chemin photo »
 
 Le fichier de définition des planches contient une colonne du type
