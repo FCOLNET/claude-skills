@@ -1,5 +1,45 @@
 # Studio Planches Contacts — journal des versions
 
+## V17 — exploitation de la colonne « chemin photo »
+
+Le fichier de définition des planches contient une colonne du type
+`\\10.10.101.52\SMRC_photo\105143.jpg`. Elle est désormais reconnue à l'étape de
+correspondance des colonnes (« Chemin photo »).
+
+### Ce que le navigateur refuse
+
+Un chemin réseau ne permet pas de se passer de l'import. Mesuré dans Chromium, page
+ouverte en `file://` :
+
+| Opération | Résultat |
+|---|---|
+| Afficher la photo (`<img src>`) | ✅ fonctionne |
+| Lire ses octets (`fetch`) | ❌ `TypeError` |
+| La dessiner dans un canvas | ❌ `SecurityError` (canvas *tainted*) |
+
+Le canvas est le passage obligé du PDF, de l'export HTML, du dossier prod HD et de la
+sauvegarde de projet. Une planche construite sur les seuls chemins afficherait donc des
+vignettes à l'écran et produirait des exports vides.
+
+### Ce que la colonne apporte
+
+- **Appariement exact.** Le nom de fichier annoncé prime sur toutes les heuristiques de
+  nommage. Une photo `ref-xyz-99.jpg` rattachée à l'article `105145` est reconnue, ce
+  qu'aucune déduction sur le code ou la référence fournisseur ne permettait.
+- **Le dossier à sélectionner.** Un encart liste les dossiers attendus, le nombre de
+  références de chacun, combien sont servies, et un bouton copie le chemin — les fenêtres
+  de sélection Windows acceptent un chemin UNC collé.
+- **Recherche ciblée immédiate.** Là où l'API le permet, une seule demande par référence,
+  sans phase de reconnaissance de convention.
+- **Vignette parlante.** Une référence sans photo affiche le nom du fichier attendu au
+  lieu de « clique pour choisir ».
+- **Liste des manquants exploitable.** Code, libellé et chemin attendu, collables dans
+  Excel.
+
+Le chemin est préservé par `syncProductsFromDOM` et par la sauvegarde de projet : sans
+cette précaution il disparaissait à la première sauvegarde, la carte ne l'affichant pas.
+
+
 ## V16 — l'outil s'adapte au navigateur
 
 La recherche ciblée repose sur `showDirectoryPicker` (File System Access API), absente du
