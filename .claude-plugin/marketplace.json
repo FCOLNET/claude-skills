@@ -1,0 +1,14 @@
+{
+  "name": "retail-nc",
+  "owner": {
+    "name": "FCOLNET"
+  },
+  "plugins": [
+    {
+      "name": "merchandising-magasin",
+      "displayName": "Merchandising magasin",
+      "source": "./merchandising-magasin",
+      "description": "Implantation de rayon, merchandising visuel, PLV prête pour l'imprimeur et étiquettes prix conformes à la réglementation française d'affichage."
+    }
+  ]
+}

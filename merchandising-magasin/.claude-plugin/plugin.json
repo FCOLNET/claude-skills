@@ -1,0 +1,8 @@
+{
+  "name": "merchandising-magasin",
+  "version": "1.0.0",
+  "description": "Implantation de rayon, merchandising visuel, PLV prête pour l'imprimeur et étiquettes prix conformes à la réglementation française d'affichage.",
+  "author": {
+    "name": "FCOLNET"
+  }
+}
