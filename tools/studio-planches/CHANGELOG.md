@@ -1,5 +1,27 @@
 # Studio Planches Contacts — journal des versions
 
+## V21 — la copie des photos ne dépend plus d'une colonne facultative
+
+Défaut de conception de la V20 : la seule méthode d'import qui fonctionne sur un partage
+réseau — la commande de copie — était construite à partir de la colonne « Chemin photo ».
+Un catalogue dont le fichier source ne porte pas cette colonne n'y avait pas droit et
+renvoyait vers la fenêtre de sélection, celle qui fait planter le navigateur. Constaté
+sur un catalogue de 483 références et un dossier de 17 044 fichiers.
+
+L'encart s'affiche désormais dès qu'il manque des photos, colonne chemin ou non, et
+propose un champ **« Dossier des photos sur le serveur »**, saisi une fois puis mémorisé
+entre les sessions. Les photos y sont réclamées par leur code article avec un joker
+d'extension (`086894.*`), ce qui évite d'avoir à deviner `.jpg`, `.png` ou `.jpeg`.
+Quand le fichier source donne les chemins, ils restent prioritaires : le nom exact prime
+sur le joker.
+
+**Découpage des commandes.** 483 références tiennent en une commande de 5 553 caractères.
+Au-delà de la limite de longueur d'une ligne Windows, la commande est découpée et chaque
+morceau est présenté séparément, numéroté, avec son propre bouton de copie et un
+avertissement de les coller un par un — vérifié sur 2 000 références : 5 commandes,
+chacune exécutable seule.
+
+
 ## V20 — une commande à coller, quand Windows refuse le .bat
 
 Le `.bat` téléchargé est bloqué par le gestionnaire de pièces jointes :

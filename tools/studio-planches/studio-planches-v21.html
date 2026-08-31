@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V20)</title>
+<title>Studio Planches Contacts — NPC (V21)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -701,6 +701,7 @@ async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{
     REF = (await idbGet('refProduits')) || {};
     REF_FOURN = (await idbGet('refFourn')) || {};
     REF_FOURN_RAW = (await idbGet('refFournRaw')) || {};
+    PHOTO_SRC_DIR = (await idbGet('photoSrcDir')) || '';   // dossier photo mémorisé
     if (Object.keys(REF_FOURN).length){
       reindexFourn();                          // migration silencieuse vers la normalisation V14
       try{ await idbSet('refFourn', REF_FOURN); }catch(e){}
@@ -896,15 +897,26 @@ const COPY_DEST='%USERPROFILE%\\PHOTOS_PLANCHES';
 // robocopy accepte une liste de noms de fichiers après le dossier source : une seule
 // commande par dossier au lieu d'une par photo. On découpe bien en dessous de la limite
 // de longueur d'une ligne de commande Windows (~8191 caractères).
+// V21 — le dossier source saisi à la main sert quand le fichier source n'a pas de
+// colonne chemin. C'était le défaut de conception de la V20 : la seule méthode qui
+// fonctionne dépendait d'une colonne facultative, et un catalogue sans cette colonne
+// renvoyait l'utilisateur vers la fenêtre de sélection qui fait planter le navigateur.
+let PHOTO_SRC_DIR = '';
 function robocopyLines(codesVoulus, dest){
   const parDossier=new Map();
-  for (const c of codesVoulus){
-    const p=(PRODUCTS[c]||{}).photo; if(!p) continue;
-    const dir=photoFolder(p), fn=photoFileName(p);
-    if (!dir || !fn) continue;
+  const ajoute=(dir,motif)=>{
     if (!parDossier.has(dir)) parDossier.set(dir,[]);
     const arr=parDossier.get(dir);
-    if (!arr.includes(fn)) arr.push(fn);
+    if (!arr.includes(motif)) arr.push(motif);
+  };
+  for (const c of codesVoulus){
+    const p=(PRODUCTS[c]||{}).photo;
+    const dir=photoFolder(p), fn=photoFileName(p);
+    if (dir && fn){ ajoute(dir, fn); continue; }          // chemin exact connu
+    // sinon : dossier saisi + nom déduit du code, extension laissée libre.
+    // robocopy accepte les jokers dans la liste de fichiers : "086894.*" prend le .jpg,
+    // le .png ou le .jpeg sans qu'on ait à deviner lequel.
+    if (PHOTO_SRC_DIR && !String(c).startsWith('SLOT')) ajoute(PHOTO_SRC_DIR, c+'.*');
   }
   if (!parDossier.size) return null;
   const lignes=[]; let total=0;
@@ -1002,46 +1014,98 @@ function showCommandOverlay(cmd, nb){
     +'<b>3.</b> Dans la fenêtre noire, <b>clic droit</b> pour coller, puis <b>Entrée</b>.<br>'
     +'<b>4.</b> Le dossier des photos s\'ouvre. Reviens ici, clique « 📁 Dossier photos » et sélectionne-le.'
     +'</div>';
-  const ta=document.createElement('textarea');
-  ta.readOnly=true; ta.value=cmd;
-  ta.style.cssText='width:100%;height:130px;font-family:monospace;font-size:.72rem;padding:10px;border:1px solid #ccc;border-radius:8px;background:#FAF8F5;resize:vertical';
-  ta.onclick=()=>ta.select();
+  // Sur un gros catalogue, la commande dépasse la longueur maximale d'une ligne Windows
+  // et doit être découpée. Chaque morceau est alors présenté et copié SÉPARÉMENT :
+  // coller plusieurs lignes d'un coup dans cmd n'est pas fiable.
+  const parts=cmd.split('\r\n').filter(Boolean);
+  if (parts.length>1){
+    const av=document.createElement('div');
+    av.style.cssText='font-size:.78rem;color:#8B1A2B;font-weight:600;margin-bottom:10px';
+    av.textContent='⚠ '+parts.length+' commandes : colle-les une par une, en attendant la fin de chacune.';
+    box.appendChild(av);
+  }
+  parts.forEach((part,i)=>{
+    const bloc=document.createElement('div');
+    bloc.style.cssText='margin-bottom:12px';
+    if (parts.length>1){
+      const t=document.createElement('div');
+      t.style.cssText='font-size:.72rem;font-weight:700;color:#666;margin-bottom:4px';
+      t.textContent='Commande '+(i+1)+' sur '+parts.length;
+      bloc.appendChild(t);
+    }
+    const ta=document.createElement('textarea');
+    ta.readOnly=true; ta.value=part;
+    ta.style.cssText='width:100%;height:'+(parts.length>1?'90':'130')+'px;font-family:monospace;font-size:.72rem;padding:10px;border:1px solid #ccc;border-radius:8px;background:#FAF8F5;resize:vertical';
+    ta.onclick=()=>ta.select();
+    const cp=document.createElement('button');
+    cp.className='btn red'; cp.style.cssText='padding:10px 18px;font-size:.82rem;margin-top:8px';
+    cp.textContent=parts.length>1 ? '📋 Copier la commande '+(i+1) : '📋 Copier la commande';
+    cp.onclick=async ()=>{
+      ta.select();
+      const ok=await copyText(part);
+      const base=cp.textContent;
+      cp.textContent = ok ? '✅ Copiée — colle-la dans cmd' : '⚠ Copie refusée : fais Ctrl+C';
+      setTimeout(()=>cp.textContent=base, 3000);
+    };
+    bloc.appendChild(ta); bloc.appendChild(cp);
+    box.appendChild(bloc);
+  });
   const row=document.createElement('div');
-  row.style.cssText='display:flex;gap:10px;margin-top:14px;flex-wrap:wrap';
-  const cp=document.createElement('button');
-  cp.className='btn red'; cp.style.cssText='padding:11px 20px;font-size:.85rem';
-  cp.textContent='📋 Copier la commande';
-  cp.onclick=async ()=>{
-    ta.select();
-    const ok=await copyText(cmd);
-    cp.textContent = ok ? '✅ Copiée — colle-la dans cmd' : '⚠ Copie refusée : fais Ctrl+C';
-    setTimeout(()=>cp.textContent='📋 Copier la commande', 3000);
-  };
+  row.style.cssText='display:flex;gap:10px;margin-top:6px;flex-wrap:wrap';
   const cl=document.createElement('button');
   cl.className='btn ghost'; cl.style.cssText='padding:11px 20px;font-size:.85rem';
   cl.textContent='Fermer';
   cl.onclick=()=>ov.remove();
-  row.appendChild(cp); row.appendChild(cl);
-  box.appendChild(ta); box.appendChild(row);
+  row.appendChild(cl);
+  box.appendChild(row);
   ov.appendChild(box);
   ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
   document.body.appendChild(ov);
-  setTimeout(()=>ta.select(), 50);
+  setTimeout(()=>{ const first=box.querySelector('textarea'); if(first) first.select(); }, 50);
 }
 
 // Encart « voici le dossier à sélectionner », avec copie du chemin : les fenêtres de
 // sélection Windows acceptent un chemin UNC collé dans le champ « Nom du fichier ».
 function renderPhotoFolders(){
   const box=$('photoFolders'); if(!box) return;
+  // ne pas reconstruire pendant que l'utilisateur saisit le dossier source
+  if (box.contains(document.activeElement)) return;
   const list=photoFolders();
-  if (!list.length){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  // V21 : toute référence sans photo compte, qu'un chemin soit fourni ou non.
+  const manquantes=[...new Set(allCodes())].filter(c=>!matchedFiles[c] && !String(c).startsWith('SLOT'));
+  if (!manquantes.length && !list.length){ box.classList.add('hidden'); box.innerHTML=''; return; }
   box.classList.remove('hidden');
-  const manquantes=[...new Set(allCodes())].filter(c=>!matchedFiles[c] && (PRODUCTS[c]||{}).photo);
-  box.innerHTML='<b>📂 Photos indiquées par ton fichier</b>'
+  const avecChemin=manquantes.filter(c=>(PRODUCTS[c]||{}).photo).length;
+  box.innerHTML='<b>📂 Récupérer les '+manquantes.length+' photo(s) manquante(s)</b>'
     +'<div style="font-size:.75rem;color:#666;margin:4px 0 10px">'
-    +'Ton dossier photo contient des milliers de fichiers : le navigateur se fige rien qu\'à les lister. '
-    +'Le script ci-dessous copie <b>uniquement les '+manquantes.length+' photo(s) de tes planches</b> sur ton Bureau ; '
-    +'tu sélectionnes ensuite ce petit dossier avec « 📁 Dossier photos », et tout devient instantané.</div>';
+    +'Un dossier photo de plusieurs milliers de fichiers fait planter le navigateur au moment où il tente de les lister. '
+    +'La commande ci-dessous copie <b>uniquement les '+manquantes.length+' photo(s) de tes planches</b> dans un dossier local, '
+    +'que tu sélectionnes ensuite avec « 📁 Dossier photos » en une seconde.</div>';
+  // Dossier source : indispensable quand le fichier source ne porte pas de colonne chemin.
+  if (avecChemin < manquantes.length){
+    const wrap=document.createElement('div');
+    wrap.style.cssText='margin-bottom:12px';
+    const lab=document.createElement('label');
+    lab.style.cssText='display:block;font-size:.75rem;font-weight:700;margin-bottom:4px';
+    lab.textContent='Dossier des photos sur le serveur';
+    const inp=document.createElement('input');
+    inp.type='text'; inp.id='photoSrcDir';
+    inp.placeholder='\\\\10.10.101.52\\SMRC_photo';
+    inp.value=PHOTO_SRC_DIR||(list.length?list[0][0]:'');
+    inp.style.cssText='width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:8px;font-size:.85rem;font-family:monospace';
+    inp.addEventListener('input',()=>{ PHOTO_SRC_DIR=inp.value.trim(); });
+    inp.addEventListener('change',()=>{
+      PHOTO_SRC_DIR=inp.value.trim();
+      idbSet('photoSrcDir', PHOTO_SRC_DIR).catch(()=>{});   // mémorisé pour les prochains catalogues
+      renderPhotoFolders();
+    });
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:.7rem;color:#888;margin-top:4px';
+    hint.textContent='Ton fichier de planches ne donne pas les chemins photo : indique le dossier une fois, il sera mémorisé. '
+      +'Les photos y sont cherchées par leur code article, quelle que soit leur extension.';
+    wrap.appendChild(lab); wrap.appendChild(inp); wrap.appendChild(hint);
+    box.appendChild(wrap);
+  }
   if (manquantes.length){
     const act=document.createElement('div');
     act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #EEE9E1';
@@ -1055,7 +1119,12 @@ function renderPhotoFolders(){
     cmd.title="Affiche une commande à coller dans une fenêtre cmd. Rien n'est téléchargé, donc rien n'est bloqué par la sécurité Windows.";
     cmd.onclick=()=>{
       const c=buildCopyCommand(manquantes);
-      if (!c){ alert("Aucun chemin photo exploitable dans le fichier source."); return; }
+      if (!c){
+        alert("Indique d'abord le dossier des photos sur le serveur, juste au-dessus du bouton.\n\n"
+          +"Exemple : \\\\10.10.101.52\\SMRC_photo");
+        const i=$('photoSrcDir'); if(i) i.focus();
+        return;
+      }
       showCommandOverlay(c.texte, c.total);
     };
     const dl=document.createElement('button');
@@ -1064,7 +1133,7 @@ function renderPhotoFolders(){
     dl.title="Télécharge un .bat équivalent. Windows peut refuser de l'ouvrir : clic droit → Propriétés → cocher « Débloquer » → OK.";
     dl.onclick=()=>{
       const s=buildCopyScript(manquantes);
-      if (!s){ alert("Aucun chemin photo exploitable dans le fichier source."); return; }
+      if (!s){ alert("Indique d'abord le dossier des photos sur le serveur, juste au-dessus du bouton."); return; }
       showDownload(new Blob([s.texte],{type:'application/octet-stream'}),
         'copier-photos-planches.bat',
         'Script prêt — '+s.total+' photo(s). Si Windows refuse de l\'ouvrir : clic droit → Propriétés → Débloquer.');
@@ -1075,6 +1144,7 @@ function renderPhotoFolders(){
     act.appendChild(cmd); act.appendChild(dl); act.appendChild(aide);
     box.appendChild(act);
   }
+  if (!list.length) return;   // pas de colonne chemin : rien à détailler par dossier
   const sub=document.createElement('div');
   sub.style.cssText='font-size:.72rem;color:#888;margin-bottom:6px';
   sub.innerHTML='Dossiers d\'origine sur le serveur. Si tu tiens à les ouvrir directement : copie le chemin, '
