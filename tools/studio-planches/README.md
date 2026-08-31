@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v29.html` | **version courante**, à utiliser |
+| `studio-planches-v30.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -43,9 +43,9 @@ l'historique git.
    Une archive doit être décompressée avant d'ouvrir la page, sinon les visuels
    manquent — le catalogue le signale lui-même.
 8. **Maquette** — deux voies vers InDesign :
-   - glisser une vignette hors de la fenêtre dépose la photo pleine résolution dans
-     InDesign, Illustrator, Photoshop ou Word (Chromium uniquement) ; si l'application
-     refuse le dépôt, le bouton ⧉ de la vignette met l'image dans le presse-papier ;
+   - bouton « ⧉ Copier » sur la vignette, puis Ctrl+V dans Word, InDesign ou PowerPoint —
+     méthode fiable, vérifiée de bout en bout ; le glisser-déposer d'une photo est laissé
+     au comportement natif du navigateur et transmet la copie d'affichage ;
    - « 🧩 Fusion InDesign » produit un dossier autonome — fichier de fusion, photos et
      mode d'emploi — à transmettre à la personne qui fait la maquette. Les chemins y
      sont relatifs : elle décompresse où elle veut, sans accès au serveur.
@@ -55,7 +55,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v29.mjs ../studio-planches-v29.html
+node verif-v30.mjs ../studio-planches-v30.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et

@@ -1,5 +1,33 @@
 # Studio Planches Contacts — journal des versions
 
+## V30 — le glisser d'une photo est rendu au navigateur
+
+Trois tentatives ont échoué à faire accepter une promesse de fichier par Word, qui
+insérait un cadre gris vide. Explication cohérente avec les trois essais : sous Windows,
+une application retient le format le plus « riche » qu'on lui propose. Word préférait donc
+la promesse de fichier au bitmap, sans parvenir à la résoudre — la page étant ouverte en
+`file://`, contexte où le navigateur ne livre pas ce fichier.
+
+Correction **par soustraction** : l'outil ne propose plus rien du tout au glisser d'une
+photo. Le comportement natif reprend la main, celui qui fonctionne partout — glisser une
+image depuis une page web vers Word est un cas ordinaire du navigateur.
+
+Contrepartie assumée : c'est la copie d'affichage (1 200 px) qui part, non l'original.
+Pour de la pleine résolution il y a « 🗂 Dossier prod HD », « 🧩 Fusion InDesign » et le
+bouton de copie.
+
+Le bouton de copie, seule voie vérifiée de bout en bout, passe du symbole `⧉` seul à
+**⧉ Copier**, et l'aide de la page le désigne comme la méthode à employer. Une vignette
+sans photo continue de déposer son texte.
+
+### Rangement des vérifications
+
+Les contrôles V22 et V29 portaient sur la promesse de fichier, mécanisme abandonné : ils
+sont supprimés plutôt que maintenus sur du code mort. Les contrôles V30 vérifient
+l'inverse — qu'aucun format n'est imposé au navigateur — et que la copie presse-papier
+reste intacte.
+
+
 ## V29 — le glisser vers Word insérait un cadre vide
 
 Word recevait une promesse de fichier qu'il ne savait pas résoudre, et insérait un cadre

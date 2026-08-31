@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V29)</title>
+<title>Studio Planches Contacts — NPC (V30)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -69,7 +69,7 @@
   .del-card { position:absolute; top:5px; right:5px; z-index:6; width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,.5); color:#fff; font-size:.8rem; line-height:1; cursor:pointer; opacity:0; transition:opacity .15s, background .15s; display:flex; align-items:center; justify-content:center; }
   .card:hover .del-card { opacity:1; }
   .del-card:hover { background:#8B1A2B; }
-  .copy-card { position:absolute; top:5px; left:5px; z-index:6; height:22px; padding:0 8px; border-radius:11px; border:none; background:rgba(0,0,0,.5); color:#fff; font-size:.72rem; line-height:1; cursor:pointer; opacity:0; transition:opacity .15s, background .15s; display:flex; align-items:center; justify-content:center; }
+  .copy-card { position:absolute; top:5px; left:5px; z-index:6; height:22px; padding:0 9px; font-weight:700; letter-spacing:.02em; border-radius:11px; border:none; background:rgba(0,0,0,.5); color:#fff; font-size:.72rem; line-height:1; cursor:pointer; opacity:0; transition:opacity .15s, background .15s; display:flex; align-items:center; justify-content:center; }
   .card:hover .copy-card { opacity:1; }
   .copy-card:hover { background:#1B4332; }
   .card.missing { outline:2px dashed #E8B4B4; }
@@ -210,7 +210,7 @@
   <div class="formbox hidden" id="photoFolders" style="max-width:900px;margin:10px auto 0;padding:14px 18px"></div>
   <div class="pdfprog" id="pdfProg"></div>
   <div style="text-align:center"><button class="btn ghost hidden" id="cancelImport" style="padding:6px 18px;font-size:.75rem">✖ Interrompre l'import</button></div>
-  <p class="subhint">📚 <b>Base articles</b> : charge l'export complet de ta base (tous rayons) — stockage illimité, mémorisé entre sessions. Recharge le même export pour mettre les prix à jour → toute photo posée remplit automatiquement code, libellé et prix (mémorisé pour les prochaines sessions).<br>Fenêtre "dossier" = n'affiche QUE les dossiers (normal, clique "Sélectionner" même si ça semble vide) — c'est la méthode à privilégier sur un partage réseau. À l'inverse, <b>ne fais pas Ctrl+A dans "🖼 Quelques images"</b> : cette fenêtre affiche les miniatures de chaque photo et c'est leur rendu depuis le réseau qui fige le navigateur. Clic sur une photo = la remplacer. <b>Vers une maquette</b> : glisser la photo hors de la fenêtre dépose le fichier pleine résolution ; si l'application le refuse, le bouton <b>⧉</b> en haut à gauche de la vignette met l'image dans le presse-papier (Ctrl+V dans Word, InDesign, PowerPoint…). Codes, libellés, prix et titres de pages sont éditables directement (clic sur le texte).</p>
+  <p class="subhint">📚 <b>Base articles</b> : charge l'export complet de ta base (tous rayons) — stockage illimité, mémorisé entre sessions. Recharge le même export pour mettre les prix à jour → toute photo posée remplit automatiquement code, libellé et prix (mémorisé pour les prochaines sessions).<br>Fenêtre "dossier" = n'affiche QUE les dossiers (normal, clique "Sélectionner" même si ça semble vide) — c'est la méthode à privilégier sur un partage réseau. À l'inverse, <b>ne fais pas Ctrl+A dans "🖼 Quelques images"</b> : cette fenêtre affiche les miniatures de chaque photo et c'est leur rendu depuis le réseau qui fige le navigateur. Clic sur une photo = la remplacer. <b>Envoyer une photo dans un document</b> : bouton <b>⧉ Copier</b> en haut à gauche de la vignette, puis Ctrl+V dans Word, InDesign ou PowerPoint — c'est la méthode fiable. Le glisser-déposer fonctionne aussi vers les applications qui l'acceptent, mais il transmet la copie d'affichage ; pour de la pleine résolution, utilise « 🗂 Dossier prod HD » ou « 🧩 Fusion InDesign ». Codes, libellés, prix et titres de pages sont éditables directement (clic sur le texte).</p>
   <div id="planches"></div>
 </div>
 
@@ -478,8 +478,8 @@ function buildCard(sec, code, grid){
   card._sec = sec;
   card.innerHTML=`
     <button class="del-card" title="Supprimer cette vignette">✕</button>
-    <button class="copy-card" title="Copier la photo dans le presse-papier, puis Ctrl+V dans Word, InDesign, PowerPoint…">⧉</button>
-    <div class="photo-slot" draggable="true" title="Clic : choisir une photo · Glisser la photo : la déposer dans InDesign, Illustrator, Word…">
+    <button class="copy-card" title="Copier la photo dans le presse-papier, puis Ctrl+V dans Word, InDesign, PowerPoint…">⧉ Copier</button>
+    <div class="photo-slot" draggable="true" title="Clic : choisir une photo. Pour l'envoyer dans un document : bouton « ⧉ Copier » puis Ctrl+V.">
       <img class="prod-img" draggable="true" alt="${escA(code)}">
       <div class="ph-fallback"><span class="photo-code">${esc(code.startsWith('SLOT')?'—':code)}</span><span class="photo-file">${esc(photoFileName(p.photo)||'clique pour choisir')}</span></div>
       <div class="ph-edit">📷 changer · ↗ glisser</div>
@@ -537,16 +537,20 @@ function buildCard(sec, code, grid){
     (PRODUCTS[card.dataset.code]||(PRODUCTS[card.dataset.code]={})).remise=el.textContent.trim();
   });
   card.querySelector('.photo-slot').addEventListener('click', ()=>{ currentEditCode=card.dataset.code; currentEditCard=card; $('singleInput').click(); });
-  // ⚠️ La source du glisser est l'IMAGE elle-même, pas son conteneur.
-  // V22-V28 : le conteneur était la source. Or, quand un simple bloc est à l'origine d'un
-  // glisser, le navigateur ne joint AUCUNE représentation d'image native — seulement la
-  // promesse de fichier que nous ajoutons. Word, qui ne sait pas la résoudre, insérait
-  // alors un cadre gris vide. Une IMAGE comme source, en revanche, fait joindre au
-  // navigateur ses propres formats image, que Word et consorts savent coller.
-  card.querySelector('.prod-img').addEventListener('dragstart', e=>dragOutStart(e, card));
-  // le conteneur ne sert de source que pour une vignette SANS photo : seul le texte part
+  // ⚠️ V30 — ON NE TOUCHE PLUS AU GLISSER D'UNE PHOTO.
+  // Trois tentatives ont échoué à faire accepter une promesse de fichier (DownloadURL) :
+  // Word insérait un cadre gris vide. Explication cohérente avec les trois essais : sous
+  // Windows, une application retient le format le plus « riche » qu'on lui propose. Word
+  // préférait donc la promesse de fichier au bitmap, sans parvenir à la résoudre — la
+  // page étant ouverte en file://, contexte où le navigateur ne livre pas ce fichier.
+  // En ne proposant plus rien, le comportement natif reprend la main : glisser une image
+  // depuis une page web vers Word fonctionne, c'est le cas ordinaire du navigateur.
+  // Contrepartie assumée : c'est la copie d'affichage (1200 px) qui part, pas l'original.
+  // Pour la pleine résolution il y a le dossier prod HD, l'export de fusion et le bouton ⧉.
+  //
+  // Le conteneur ne sert de source que pour une vignette SANS photo : seul le texte part.
   card.querySelector('.photo-slot').addEventListener('dragstart', e=>{
-    if (e.target && e.target.classList.contains('prod-img')) return;   // déjà traité
+    if (e.target && e.target.classList.contains('prod-img')) return;   // glisser natif
     dragOutStart(e, card);
   });
   // …ou copier la photo dans le presse-papier, si l'application réceptrice accepte mal
@@ -1420,25 +1424,20 @@ function dragOutStart(e, card){
   const dt=e.dataTransfer;
   if (!dt) return;
 
-  // On envoie le fichier D'ORIGINE pleine résolution : c'est une maquette qui le reçoit,
-  // pas un aperçu. Si seule la copie de travail existe, on l'envoie plutôt que rien.
+  // Ce gestionnaire ne s'applique plus qu'aux vignettes SANS photo : on y dépose le texte,
+  // seule chose utile dans ce cas. Le glisser d'une photo est laissé au navigateur.
+  const txt=[code.startsWith('SLOT')?'':code, p.lib||'', p.prixPromo||p.prix||''].filter(Boolean).join(' · ');
+  try{ dt.setData('text/plain', txt); }catch(err){}
+  dt.effectAllowed='copy';
+}
+
+// conservé : le nom de fichier lisible sert aux exports
+function _dragOutInutilise(e, card){
+  const code=card.dataset.code;
+  const dt=e.dataTransfer;
   const file=matchedFiles[code]||localBlobs[code];
+  if (!file) return;
 
-  if (!file){
-    // aucune photo : le texte est alors la seule chose utile à déposer
-    const txt=[code.startsWith('SLOT')?'':code, p.lib||'', p.prixPromo||p.prix||''].filter(Boolean).join(' · ');
-    try{ dt.setData('text/plain', txt); }catch(err){}
-    dt.effectAllowed='copy';
-    return;
-  }
-
-  // ⚠️ CORRECTIF V24 — NE RIEN PROPOSER D'AUTRE QUE LE FICHIER.
-  // La V23 joignait aussi text/plain et text/html. Word, comme la plupart des
-  // traitements de texte, privilégie le texte dès qu'on lui en propose : il insérait
-  // « 105143 · AXE GEL DOUCHE · 490 F » au lieu de la photo, ou rien du tout, le HTML
-  // pointant vers une URL interne au navigateur qu'une application native ne sait pas
-  // résoudre. Un glisser depuis la photo doit déposer LA PHOTO.
-  // (Pour déposer le texte : sélectionner la désignation sur la carte et la glisser.)
   let url=dragUrls.get(code);
   if (!url){
     try{ url=URL.createObjectURL(file); dragUrls.set(code, url); }
