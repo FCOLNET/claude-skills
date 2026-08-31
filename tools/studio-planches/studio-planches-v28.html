@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V27)</title>
+<title>Studio Planches Contacts — NPC (V28)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -2716,7 +2716,19 @@ function blocPrixHtml(p, fmt, esc){
     +'<span class="pv-barre">'+esc(p.prixInit)+'</span></div>';
 }
 
-async function buildCatalogueWeb(){
+// Convertit un blob en dataURL, pour incorporer les visuels dans un fichier unique.
+function blobToDataURL(b){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=()=>res(fr.result); fr.onerror=()=>rej(fr.error);
+    fr.readAsDataURL(b);
+  });
+}
+// mode 'dossier'  : index.html + images/ — pour mettre en ligne, visuels en 1000 px
+// mode 'unique'   : un seul fichier HTML, visuels incorporés — impossible de perdre les
+//                   images en route, mais plus lourd : visuels ramenés à 800 px.
+async function buildCatalogueWeb(mode){
+  mode=mode||'dossier';
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
   const zip=new JSZip();
@@ -2726,13 +2738,18 @@ async function buildCatalogueWeb(){
 
   let fait=0;
   const totalPhotos=[...new Set(allCodes())].filter(c=>matchedFiles[c]||localBlobs[c]).length;
-  const nomImg={};
+  const srcImg={};   // code -> chemin relatif, ou dataURL en mode fichier unique
+  const dim = mode==='unique' ? 800 : 1000;
   for (const code of new Set(allCodes())){
     const src=matchedFiles[code]||localBlobs[code];
     if (!src) continue;
-    const web=await reencode(src, 1000) || src;   // 1000 px : net à l'écran, léger à charger
-    nomImg[code]=code+'.jpg';
-    imgs.file(nomImg[code], web, {compression:'STORE'});
+    const web=await reencode(src, dim) || src;
+    if (mode==='unique'){
+      srcImg[code]=await blobToDataURL(web);
+    } else {
+      srcImg[code]='images/'+code+'.jpg';
+      imgs.file(code+'.jpg', web, {compression:'STORE'});
+    }
     fait++;
     if (fait%5===0){
       ingestProgress('🛍 Préparation des visuels… '+fait+' / '+totalPhotos);
@@ -2750,8 +2767,8 @@ async function buildCatalogueWeb(){
     for (const code of sec.codes){
       const p=PRODUCTS[code]||{};
       const niv=nivOf(sec, code);
-      const img=nomImg[code]
-        ? '<img src="images/'+esc(nomImg[code])+'" alt="'+esc(p.lib||code)+'" loading="lazy">'
+      const img=srcImg[code]
+        ? '<img src="'+srcImg[code]+'" alt="'+esc(p.lib||code)+'" loading="lazy">'
         : '<div class="sans-photo">visuel à venir</div>';
       cartes+='<article class="prod n-'+niv+'">'
         +'<div class="prod-img">'+img+'</div>'
@@ -2803,6 +2820,10 @@ async function buildCatalogueWeb(){
 '.prod.n-hero .eco{font-size:.76rem;padding:5px 12px}',
 '.bandeau{background:#1B4332;color:#fff;text-align:center;padding:22px;font-weight:700;font-size:clamp(.9rem,2vw,1.15rem);letter-spacing:.02em}',
 '.pied{text-align:center;color:#999;font-size:.72rem;padding:18px}',
+// bandeau d'alerte : s'affiche tout seul si les visuels ne se chargent pas
+'#alerteImg{display:none;position:fixed;left:0;right:0;bottom:0;z-index:99;background:#B00020;color:#fff;padding:16px 20px;font-size:.85rem;line-height:1.5;text-align:center;box-shadow:0 -3px 16px rgba(0,0,0,.3)}',
+'#alerteImg b{display:block;font-size:1rem;margin-bottom:5px}',
+'#alerteImg button{margin-left:12px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:16px;padding:4px 14px;font-size:.75rem;cursor:pointer;font-family:inherit}',
 '@media print{',
 '  .som{display:none}',
 '  .planche{break-after:page;background:#fff !important}',
@@ -2816,14 +2837,37 @@ async function buildCatalogueWeb(){
     +'<meta name="viewport" content="width=device-width,initial-scale=1">'
     +'<title>Catalogue — Nouméa Pas Cher</title>'
     +'<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">'
-    +'<style>'+css+'</style></head><body>'
+    +'<style>'+css+'</style>'
+    +'<script>(function(){'
+    +'function alerte(){var a=document.getElementById("alerteImg");if(a)a.style.display="block";}'
+    +'document.addEventListener("error",function(e){if(e.target&&e.target.tagName==="IMG")alerte();},true);'
+    +'function balayage(){var im=document.images,n=0;'
+    +'for(var i=0;i<im.length;i++){if(im[i].complete&&im[i].naturalWidth===0)n++;}'
+    +'if(n)alerte();}'
+    +'window.addEventListener("load",function(){balayage();setTimeout(balayage,1500);});'
+    +'})();<\/script>'
+    +'</head><body>'
     +'<div class="entete"><h1>Catalogue <em>Jouets</em></h1><p>Nouméa Pas Cher · '+new Date().toLocaleDateString('fr-FR')+'</p></div>'
     +'<nav class="som">'+sommaire+'</nav>'
     +sections
     +'<div class="bandeau">LES PRIX LES PLUS BAS SUR LE JOUET, TOUTE L\'ANNÉE</div>'
     +'<div class="pied">Catalogue généré par Studio Planches Contacts · '+new Date().toLocaleString('fr-FR')+'</div>'
+    // Diagnostic embarqué : la cause n°1 d'un catalogue sans visuels est d'ouvrir
+    // index.html depuis l'intérieur du .zip — seul ce fichier est alors extrait, le
+    // dossier images reste dans l'archive. La page le dit elle-même au lieu de laisser
+    // l'utilisateur devant des cadres vides.
+    +'<div id="alerteImg"><b>Les visuels ne se chargent pas</b>'
+    +'Le dossier <code>images</code> n\'est pas à côté de ce fichier. '
+    +'Si tu as ouvert la page depuis l\'intérieur du .zip, ferme-la : fais un clic droit sur l\'archive, '
+    +'« Extraire tout », puis ouvre <code>index.html</code> depuis le dossier extrait.'
+    +'<button onclick="this.parentNode.style.display=\'none\'">Fermer</button></div>'
     +'</body></html>';
 
+  if (mode==='unique'){
+    ingestProgress('');
+    return {unique:true, blob:new Blob([doc],{type:'text/html;charset=utf-8'}),
+            planches:PAGES.length, produits:allCodes().length, visuels:fait};
+  }
   racine.file('index.html', doc);
   racine.file('LISEZ-MOI.txt', utf8BomBlob([
     'CATALOGUE WEB',
@@ -2849,20 +2893,70 @@ async function buildCatalogueWeb(){
   return {blob, planches:PAGES.length, produits:allCodes().length, visuels:fait};
 }
 
-$('makeCatalogue').addEventListener('click', async ()=>{
-  if (!allCodes().length){ alert('Construis d\'abord les planches.'); return; }
+async function genererCatalogue(mode){
   const btn=$('makeCatalogue'); const vieux=btn.textContent;
   btn.disabled=true; btn.textContent='🛍 …';
   try{
-    const r=await buildCatalogueWeb();
-    showDownload(r.blob, 'CATALOGUE-WEB-'+new Date().toISOString().slice(0,10)+'.zip',
-      'Catalogue web prêt — '+r.planches+' planche(s), '+r.produits+' produit(s), '+r.visuels+' visuel(s). '
-      +'Décompresse et ouvre index.html.');
+    const r=await buildCatalogueWeb(mode);
+    const stamp=new Date().toISOString().slice(0,10);
+    if (r.unique){
+      showDownload(r.blob, 'catalogue-'+stamp+'.html',
+        'Catalogue prêt — '+r.produits+' produit(s), '+r.visuels+' visuel(s) incorporé(s), '+moTxt(r.blob.size)+'. '
+        +'Un seul fichier : double-clic pour l\'ouvrir, rien à décompresser.');
+    } else {
+      showDownload(r.blob, 'CATALOGUE-WEB-'+stamp+'.zip',
+        'Catalogue web prêt — '+r.planches+' planche(s), '+r.produits+' produit(s), '+r.visuels+' visuel(s). '
+        +'⚠️ Décompresse l\'archive AVANT d\'ouvrir index.html : ouverte depuis l\'intérieur du .zip, la page n\'a pas accès au dossier images.');
+    }
   }catch(e){
     ingestProgress('');
-    alert('Génération impossible : '+e.message);
+    alert('Génération impossible : '+e.message
+      +(mode==='unique'?'\n\nSur un gros catalogue, le fichier unique demande beaucoup de mémoire : prends la version en dossier.':''));
   }
   btn.disabled=false; btn.textContent=vieux;
+}
+
+$('makeCatalogue').addEventListener('click', ()=>{
+  if (!allCodes().length){ alert('Construis d\'abord les planches.'); return; }
+  const avecPhoto=[...new Set(allCodes())].filter(c=>matchedFiles[c]||localBlobs[c]).length;
+  if (!avecPhoto){
+    alert("Aucune photo n'est chargée : le catalogue sortirait sans aucun visuel.\n\n"
+      +"Charge d'abord les photos (« 📁 Dossier photos »), puis reviens ici.");
+    return;
+  }
+  let ov=document.getElementById('catOverlay'); if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.id='catOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(13,27,42,.75);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px;max-width:600px;width:100%;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.4);max-height:90vh;overflow:auto';
+  box.innerHTML='<div style="font-family:\'Playfair Display\',serif;font-size:1.2rem;font-weight:700;color:#1B4332;margin-bottom:6px">Catalogue web</div>'
+    +'<div style="font-size:.8rem;color:#666;margin-bottom:16px">'
+    +allCodes().length+' produit(s), '+avecPhoto+' avec visuel.</div>';
+  const opt=(titre,desc,cls,fn)=>{
+    const d=document.createElement('div');
+    d.style.cssText='border:2px solid #E5E0D8;border-radius:12px;padding:16px;margin-bottom:12px';
+    d.innerHTML='<div style="font-weight:700;font-size:.9rem;margin-bottom:4px">'+titre+'</div>'
+      +'<div style="font-size:.76rem;color:#666;line-height:1.45;margin-bottom:10px">'+desc+'</div>';
+    const b=document.createElement('button');
+    b.className='btn '+cls; b.style.cssText='padding:9px 18px;font-size:.8rem';
+    b.textContent='Générer';
+    b.onclick=()=>{ ov.remove(); fn(); };
+    d.appendChild(b); box.appendChild(d);
+  };
+  opt('📄 Fichier unique — le plus simple',
+    'Un seul fichier HTML, visuels incorporés dedans. Double-clic pour l\'ouvrir, rien à décompresser, rien à perdre en route. Envoyable par mail. Visuels en 800 px.',
+    'red', ()=>genererCatalogue('unique'));
+  opt('📦 Dossier web — pour la mise en ligne',
+    'index.html + dossier images en 1000 px, structure propre pour un hébergement. <b>Il faut décompresser l\'archive avant d\'ouvrir la page</b> : lue depuis l\'intérieur du .zip, elle n\'accède pas au dossier images et n\'affiche aucun visuel.',
+    'green', ()=>genererCatalogue('dossier'));
+  const cl=document.createElement('button');
+  cl.className='btn ghost'; cl.style.cssText='padding:10px 20px;font-size:.82rem';
+  cl.textContent='Annuler'; cl.onclick=()=>ov.remove();
+  box.appendChild(cl);
+  ov.appendChild(box);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
 });
 
 // ---------- export HTML autonome (planches figées) ----------

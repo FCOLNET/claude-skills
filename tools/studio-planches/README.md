@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v27.html` | **version courante**, à utiliser |
+| `studio-planches-v28.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -37,8 +37,11 @@ l'historique git.
    page d'un clic sur le niveau de la vignette.
 6. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
    récapitulatif, HTML pour diffusion.
-7. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand : dossier
-   `index.html` + `images/`, à mettre en ligne ou à imprimer en PDF (Ctrl+P).
+7. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand, au choix en
+   fichier unique (visuels incorporés, rien à décompresser) ou en dossier
+   `index.html` + `images/` pour une mise en ligne. Imprimable en PDF (Ctrl+P).
+   Une archive doit être décompressée avant d'ouvrir la page, sinon les visuels
+   manquent — le catalogue le signale lui-même.
 8. **Maquette** — deux voies vers InDesign :
    - glisser une vignette hors de la fenêtre dépose la photo pleine résolution dans
      InDesign, Illustrator, Photoshop ou Word (Chromium uniquement) ; si l'application
@@ -52,7 +55,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v27.mjs ../studio-planches-v27.html
+node verif-v28.mjs ../studio-planches-v28.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et

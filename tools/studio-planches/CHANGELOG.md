@@ -1,5 +1,31 @@
 # Studio Planches Contacts — journal des versions
 
+## V28 — un catalogue web qui ne perd plus ses visuels
+
+La version en dossier (`index.html` + `images/`) est correcte pour une mise en ligne,
+mais elle a un piège : sous Windows, double-cliquer sur une archive ouvre un aperçu, et
+ouvrir `index.html` depuis cet aperçu n'extrait **que ce fichier**. La page cherche alors
+`images/…` à côté d'elle et ne trouve rien — catalogue sans aucun visuel, sans la moindre
+explication.
+
+**Fichier unique.** Nouvelle option, proposée en premier : un seul HTML, visuels
+incorporés dedans (800 px). Double-clic pour l'ouvrir, rien à décompresser, rien à perdre
+en route, envoyable par mail. La version en dossier reste là pour l'hébergement, avec
+l'avertissement de décompresser d'abord.
+
+**Le catalogue se diagnostique lui-même.** Si des visuels ne se chargent pas, un bandeau
+rouge apparaît en bas de la page et explique quoi faire. Deux filets : une écoute des
+erreurs de chargement en phase de capture, et un balayage au chargement complet qui
+rattrape les images en chargement différé.
+
+Le premier essai a d'ailleurs montré que ce bandeau ne s'affichait pas : le script était
+en fin de page, si bien que **les images du haut avaient déjà échoué avant qu'il ne
+s'installe**. Déplacé dans l'en-tête, avant toute image, plus le balayage de rattrapage.
+
+**Garde-fou en amont.** Générer le catalogue sans aucune photo chargée est désormais
+refusé avec l'explication, au lieu de produire un catalogue de cadres vides.
+
+
 ## V27 — contrôle des fonds photo et générateur de catalogue web
 
 ### 🔍 Contrôle des fonds
