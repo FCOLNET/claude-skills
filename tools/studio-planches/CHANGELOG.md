@@ -1,5 +1,47 @@
 # Studio Planches Contacts — journal des versions
 
+## V31 — la cause du cadre gris, enfin mesurée
+
+Les trois tentatives précédentes reposaient sur des hypothèses, testées avec des
+événements **simulés** — lesquels ne disent rien de ce que le navigateur fabrique lors
+d'un vrai glisser. En déclenchant un glisser à la souris et en inspectant ce qui part, la
+cause apparaît :
+
+```
+text/uri-list : blob:null/edfb50c9-…
+text/html     : <img src="blob:null/edfb50c9-…">
+Files         : un JPEG valide de 17 751 octets,
+                nommé « edfb50c9-… », SANS EXTENSION
+```
+
+Word retient le format HTML, crée un cadre image, puis tente de charger `blob:null/…` —
+une adresse qui n'existe que dans le navigateur. D'où le rectangle gris. Le fichier joint
+est bien valide, mais sans extension Word ne l'identifie pas davantage.
+
+**Correction** : le format HTML est remplacé par une version où l'image est
+**incorporée** (`data:`), résoluble par n'importe quelle application — c'est exactement ce
+qui rend le copier-coller fonctionnel. Les autres formats, dont le fichier, sont
+conservés.
+
+L'incorporation demande une lecture asynchrone, impossible pendant `dragstart` qui est
+synchrone. L'image est donc préparée **au survol** de la vignette, bien avant que le
+glisser ne commence, avec un second déclenchement à l'appui du bouton si le survol a été
+trop bref. Le cache est borné à 24 images pour ne pas gonfler la mémoire.
+
+Vérifié sur un **vrai glisser à la souris** : image incorporée, plus aucune adresse
+interne au navigateur, fichier joint conservé, libellé échappé, cache borné.
+
+### Deux erreurs de méthode corrigées au passage
+
+Mes premières mesures ne déclenchaient aucun `dragstart` : la vignette se trouvait sous la
+ligne de flottaison et le pointeur cliquait dans le vide — `mousedown` ciblait `HTML`.
+Le banc de test amène désormais l'élément dans la fenêtre avant de le saisir.
+
+Et un test témoin, sur une page vierge, a montré la différence décisive : glisser une
+**image** produit `["text/uri-list","text/html","Files"]`, glisser un **bloc** ne produit
+rien. C'est ce témoin qui aurait dû ouvrir le diagnostic.
+
+
 ## V30 — le glisser d'une photo est rendu au navigateur
 
 Trois tentatives ont échoué à faire accepter une promesse de fichier par Word, qui

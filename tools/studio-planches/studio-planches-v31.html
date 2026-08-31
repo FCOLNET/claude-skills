@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V30)</title>
+<title>Studio Planches Contacts — NPC (V31)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -550,8 +550,24 @@ function buildCard(sec, code, grid){
   //
   // Le conteneur ne sert de source que pour une vignette SANS photo : seul le texte part.
   card.querySelector('.photo-slot').addEventListener('dragstart', e=>{
-    if (e.target && e.target.classList.contains('prod-img')) return;   // glisser natif
+    if (e.target && e.target.classList.contains('prod-img')) return;   // traité ci-dessous
     dragOutStart(e, card);
+  });
+  // préparation anticipée : au survol, bien avant que le glisser ne démarre
+  card.querySelector('.photo-slot').addEventListener('mouseenter', ()=>{ prepareDragImage(card.dataset.code); });
+  // second filet, si le survol a été trop bref pour laisser la préparation aboutir
+  card.querySelector('.photo-slot').addEventListener('pointerdown', ()=>{ prepareDragImage(card.dataset.code); });
+  // au glisser d'une photo : on ne remplace QUE le format HTML, en y incorporant l'image.
+  // Les formats que le navigateur joint par ailleurs (dont le fichier) sont conservés.
+  card.querySelector('.prod-img').addEventListener('dragstart', e=>{
+    const code=card.dataset.code;
+    const d=dragDataUrls.get(code);
+    if (!d) return;   // pas encore prêt : on laisse le comportement natif
+    const p=PRODUCTS[code]||{};
+    try{
+      e.dataTransfer.setData('text/html',
+        '<img src="'+d+'" alt="'+escA(p.lib||code)+'">');
+    }catch(err){}
   });
   // …ou copier la photo dans le presse-papier, si l'application réceptrice accepte mal
   // le glisser-déposer depuis un navigateur
@@ -1407,6 +1423,41 @@ function fillCardFromBase(card, code, force){
 // À noter : c'est propre à Chromium. Sur un navigateur qui l'ignore, le glisser retombe
 // sur le comportement habituel (image + texte), sans erreur.
 const dragUrls = new Map();   // code -> URL blob maintenue en vie le temps du dépôt
+
+// ============ POURQUOI LE GLISSER DÉPOSAIT UN CADRE VIDE (V31) ============
+// Mesuré sur un vrai glisser à la souris, ce que le navigateur joint de lui-même :
+//   text/uri-list : blob:null/edfb50c9-…
+//   text/html     : <img src="blob:null/edfb50c9-…">
+//   Files         : un JPEG valide, mais nommé « edfb50c9-… », SANS EXTENSION
+// Word retient le format HTML, crée un cadre image, puis tente de charger
+// « blob:null/… » — une adresse qui n'existe que dans le navigateur. D'où le rectangle
+// gris. Le fichier joint, lui, n'a pas d'extension : Word ne l'identifie pas non plus.
+//
+// Correction : on remplace le format HTML par une version où l'image est INCORPORÉE
+// (data:), donc résoluble par n'importe quelle application — c'est exactement ce qui
+// rend le copier-coller fonctionnel.
+//
+// Contrainte : l'incorporation demande une lecture asynchrone, impossible pendant
+// dragstart qui est synchrone. On prépare donc l'image au survol de la vignette, bien
+// avant que le glisser ne commence, et on borne le cache pour ne pas gonfler la mémoire.
+const dragDataUrls = new Map();
+const DRAG_CACHE_MAX = 24;
+const DRAG_DATA_DIM = 1400;
+async function prepareDragImage(code){
+  if (!code || dragDataUrls.has(code)) return;
+  const f = localBlobs[code] || matchedFiles[code];
+  if (!f) return;
+  dragDataUrls.set(code, null);            // réserve la place : pas deux préparations en parallèle
+  try{
+    const petite = await reencode(f, DRAG_DATA_DIM) || f;
+    dragDataUrls.set(code, await blobToDataURL(petite));
+  }catch(e){ dragDataUrls.delete(code); return; }
+  while (dragDataUrls.size > DRAG_CACHE_MAX){
+    const premier = dragDataUrls.keys().next().value;
+    if (premier===code) break;
+    dragDataUrls.delete(premier);
+  }
+}
 
 function dragFileName(code){
   const f=matchedFiles[code];
