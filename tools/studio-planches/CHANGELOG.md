@@ -1,5 +1,20 @@
 # Studio Planches Contacts — journal des versions
 
+## V32 — retirer les formats « adresse »
+
+La V31 avait fait tomber le cadre gris : avec l'image incorporée dans le format HTML,
+Word ne posait plus de cadre vide. Mais il insérait alors le **lien**
+`blob:null/ff89486c-…` — il retenait `text/uri-list`, une adresse tout aussi inutilisable
+hors du navigateur.
+
+Ces formats sont désormais retirés du glisser (`clearData` sur `text/uri-list`,
+`text/plain` et `text/x-moz-url`). Il ne reste que deux choses : le HTML porteur de
+l'image incorporée, et le fichier. Word n'a plus d'adresse à préférer.
+
+Vérifié sur un vrai glisser à la souris : les formats transmis se réduisent exactement à
+`["text/html", "Files"]`, le HTML contenant l'image en `data:`.
+
+
 ## V31 — la cause du cadre gris, enfin mesurée
 
 Les trois tentatives précédentes reposaient sur des hypothèses, testées avec des

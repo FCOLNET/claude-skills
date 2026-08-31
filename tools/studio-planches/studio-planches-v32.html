@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V31)</title>
+<title>Studio Planches Contacts — NPC (V32)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -564,10 +564,16 @@ function buildCard(sec, code, grid){
     const d=dragDataUrls.get(code);
     if (!d) return;   // pas encore prêt : on laisse le comportement natif
     const p=PRODUCTS[code]||{};
-    try{
-      e.dataTransfer.setData('text/html',
-        '<img src="'+d+'" alt="'+escA(p.lib||code)+'">');
-    }catch(err){}
+    const dt=e.dataTransfer;
+    try{ dt.setData('text/html', '<img src="'+d+'" alt="'+escA(p.lib||code)+'">'); }catch(err){}
+    // V32 — on RETIRE les formats « adresse ».
+    // Avec l'image incorporée dans le HTML, Word cessait de poser un cadre vide mais
+    // insérait le lien « blob:null/… » : il retenait alors text/uri-list, tout aussi
+    // inutilisable hors du navigateur. En supprimant ces formats, il ne reste que le
+    // HTML porteur de l'image et le fichier.
+    try{ dt.clearData('text/uri-list'); }catch(err){}
+    try{ dt.clearData('text/plain'); }catch(err){}
+    try{ dt.clearData('text/x-moz-url'); }catch(err){}
   });
   // …ou copier la photo dans le presse-papier, si l'application réceptrice accepte mal
   // le glisser-déposer depuis un navigateur

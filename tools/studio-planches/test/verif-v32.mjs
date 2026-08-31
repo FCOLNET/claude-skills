@@ -50,6 +50,11 @@ ck('le fichier joint est conservé', r.types.includes('Files') && r.fichier && r
 ck('libellé échappé dans le HTML', /alt="AXE GEL DOUCHE &quot;3E&quot;"/.test(r.html || ''), (r.html || '').slice(-60));
 const prep = await p.evaluate(() => ({ taille: dragDataUrls.size, borne: DRAG_CACHE_MAX }));
 ck('cache de préparation borné', prep.taille >= 1 && prep.taille <= prep.borne, JSON.stringify(prep));
+// V32 : plus aucun format "adresse", que Word insérait sous forme de lien
+ck('aucun format adresse résiduel',
+  !r.types.includes('text/uri-list') && !r.types.includes('text/plain'), JSON.stringify(r.types));
+ck('seuls le HTML porteur de l image et le fichier subsistent',
+  r.types.includes('text/html') && r.types.includes('Files') && r.types.length === 2, JSON.stringify(r.types));
 console.log('  info  | HTML transmis : ' + Math.round((r.html || '').length / 1024) + ' Ko, image incorporée');
 if (errs.length) console.log('Erreurs JS : ' + errs.join(' | '));
 await b.close();
