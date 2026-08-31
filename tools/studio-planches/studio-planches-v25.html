@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V24)</title>
+<title>Studio Planches Contacts — NPC (V25)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -2166,7 +2166,14 @@ function mergeImagePath(code, dossier){
   return base+'\\'+code+'.jpg';
 }
 
-function buildMergeFile(dossier){
+// Nom de l'image DANS le dossier livré. Le code seul : stable, sans accent ni espace,
+// et il correspond à la colonne Code du fichier de fusion.
+function packImageName(code){
+  const f=matchedFiles[code]||localBlobs[code];
+  return String(code)+(f?photoExt(f):'.jpg');
+}
+
+function buildMergeFile(dossier, relatif){
   const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
   const codeToFourn={};
   for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) codeToFourn[c]=arr[0]; }
@@ -2184,8 +2191,13 @@ function buildMergeFile(dossier){
       const isSlot=String(code).startsWith('SLOT');
       const hasInit=String(p.prixInit||'').trim()!=='';
       const rem=hasInit?parseRemise(p.remise||'', numFromPrix(p.prixInit), numFromPrix(p.prixPromo||p.prix)):{pct:null,val:null};
-      const chemin=mergeImagePath(code, dossier);
-      const dispo=!!matchedFiles[code];
+      const dispo=!!(matchedFiles[code]||localBlobs[code]);
+      // relatif = dossier livré : le chemin est « Images\105143.jpg », résolu par InDesign
+      // à partir de l'emplacement du fichier de fusion. C'est ce qui rend le dossier
+      // transmissible : il fonctionne chez le destinataire sans accès au serveur.
+      const chemin = relatif
+        ? (dispo ? 'Images\\'+packImageName(code) : '')
+        : mergeImagePath(code, dossier);
       if (dispo) avecPhoto++;
       lignes.push([
         champ(sec.pg), pos, champ(isSlot?'':code), champ(codeToFourn[code]||''), champ(p.lib||''),
@@ -2199,7 +2211,175 @@ function buildMergeFile(dossier){
   return {texte:lignes.join('\r\n')+'\r\n', total:lignes.length-1, avecPhoto};
 }
 
-$('makeMerge').addEventListener('click', ()=>{
+// ---------- DOSSIER DE FUSION AUTONOME (V25) ----------
+// À transmettre tel quel : le fichier de fusion et les images voyagent ensemble, les
+// chemins étant relatifs. Le destinataire décompresse où il veut, pointe InDesign sur le
+// fichier, et toutes les images se lient — sans accès au serveur, sans lettre de lecteur
+// à faire correspondre.
+function utf8BomBlob(texte){
+  return new Blob([new Uint8Array([0xEF,0xBB,0xBF]), texte], {type:'text/plain;charset=utf-8'});
+}
+function moTxt(o){ return o>=1048576 ? (o/1048576).toFixed(o>=104857600?0:1)+' Mo' : Math.max(1,Math.round(o/1024))+' Ko'; }
+
+function lisezMoi(nb, avecPhoto, mode){
+  return [
+    'DOSSIER DE FUSION INDESIGN',
+    'Genere le '+new Date().toLocaleString('fr-FR')+' depuis Studio Planches Contacts',
+    '',
+    'CONTENU',
+    '  fusion-indesign.txt   '+nb+' produit(s), dont '+avecPhoto+' avec photo',
+    '  Images\\               les photos, '+(mode==='hd'?'en pleine resolution':'allegees a 2000 px'),
+    '',
+    'IMPORTANT',
+    '  Garde le fichier fusion-indesign.txt ET le dossier Images ENSEMBLE.',
+    '  Les chemins sont relatifs : deplacer l un sans l autre casse les liens.',
+    '  Decompresse le dossier avant de t en servir (ne travaille pas depuis le .zip).',
+    '',
+    'MARCHE A SUIVRE DANS INDESIGN',
+    '  1. Ouvre ton document, ou cree-le au format voulu.',
+    '  2. Fenetre > Utilitaires > Fusion de donnees.',
+    '  3. Menu du panneau (les trois traits) > Selectionner la source de donnees.',
+    '     Choisis fusion-indesign.txt.',
+    '     Si un choix d encodage apparait : Unicode.',
+    '  4. Sur ta page, cree les blocs : un bloc image et des blocs de texte.',
+    '  5. Clique dans un bloc, puis sur le champ correspondant dans le panneau.',
+    '     Le champ @Photo se place dans le bloc image, les autres dans les blocs texte.',
+    '  6. Menu du panneau > Creer un document fusionne.',
+    '     Coche "Plusieurs enregistrements" pour placer plusieurs produits par page,',
+    '     puis regle la disposition dans l onglet correspondant.',
+    '',
+    'COLONNES DISPONIBLES',
+    '  Planche         nom de la planche du catalogue',
+    '  Position        rang du produit dans sa planche',
+    '  Code            code article',
+    '  RefFournisseur  reference fournisseur',
+    '  Designation     libelle produit',
+    '  Prix            prix normal',
+    '  PrixInitial     prix barre (vide hors promotion)',
+    '  PrixPromo       prix remise (vide hors promotion)',
+    '  Remise          remise mise en forme',
+    '  PhotoPresente   Oui / Non',
+    '  @Photo          image liee (le prefixe @ est ce qui en fait un champ image)',
+    '',
+    'SI UNE IMAGE MANQUE',
+    '  La colonne PhotoPresente vaut Non : la reference n avait pas de photo au moment',
+    '  de la generation. Le bloc image restera vide, le reste se placera normalement.',
+    ''
+  ].join('\r\n');
+}
+
+async function buildMergePackage(mode){
+  const codes=[...new Set(allCodes())].filter(c=>matchedFiles[c]||localBlobs[c]);
+  const zip=new JSZip();
+  const racine=zip.folder('FUSION-INDESIGN-'+new Date().toISOString().slice(0,10));
+  const imgs=racine.folder('Images');
+  const m=buildMergeFile('', true);
+  racine.file('fusion-indesign.txt', utf16leBlob(m.texte));
+  racine.file('LISEZ-MOI.txt', utf8BomBlob(lisezMoi(m.total, m.avecPhoto, mode)));
+  let n=0;
+  for (const code of codes){
+    let blob;
+    if (mode==='hd'){
+      blob=matchedFiles[code]||localBlobs[code];
+    } else {
+      blob=await reencode(matchedFiles[code]||localBlobs[code], 2000);
+      if (!blob) blob=localBlobs[code]||matchedFiles[code];
+    }
+    // STORE : un JPEG est déjà compressé, le recompresser coûte du temps pour rien
+    imgs.file(packImageName(code), blob, {compression:'STORE'});
+    n++;
+    if (n%5===0){
+      ingestProgress('📦 Préparation du dossier… '+n+' / '+codes.length+' photo(s)');
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  ingestProgress('📦 Compression du dossier…');
+  await new Promise(r=>setTimeout(r,0));
+  const blob=await zip.generateAsync({type:'blob', compression:'STORE'});
+  ingestProgress('');
+  return {blob, total:m.total, avecPhoto:n};
+}
+
+// ré-encode une image à une dimension maximale (version allégée du dossier)
+async function reencode(file, maxDim){
+  try{
+    const probe=await createImageBitmap(file);
+    const s=Math.min(1, maxDim/Math.max(probe.width,probe.height));
+    let bmp=probe;
+    if (s<1){
+      const tw=Math.round(probe.width*s), th=Math.round(probe.height*s);
+      probe.close();
+      bmp=await createImageBitmap(file,{resizeWidth:tw,resizeHeight:th,resizeQuality:'high'});
+    }
+    const cv=document.createElement('canvas'); cv.width=bmp.width; cv.height=bmp.height;
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,bmp.width,bmp.height);
+    ctx.drawImage(bmp,0,0); bmp.close();
+    return await new Promise(r=>cv.toBlob(r,'image/jpeg',0.88));
+  }catch(e){ return null; }
+}
+
+// Fenêtre de choix : dossier autonome à transmettre, ou fichier seul.
+function showMergeChoice(){
+  const codes=[...new Set(allCodes())].filter(c=>matchedFiles[c]||localBlobs[c]);
+  const poidsHD=codes.reduce((s,c)=>s+((matchedFiles[c]||localBlobs[c]||{}).size||0),0);
+  let ov=document.getElementById('mergeOverlay'); if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.id='mergeOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(13,27,42,.75);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px;max-width:600px;width:100%;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.4);max-height:90vh;overflow:auto';
+  box.innerHTML='<div style="font-family:\'Playfair Display\',serif;font-size:1.2rem;font-weight:700;color:#1B4332;margin-bottom:6px">Fusion InDesign</div>'
+    +'<div style="font-size:.8rem;color:#666;line-height:1.5;margin-bottom:16px">'
+    +codes.length+' produit(s) avec photo sur '+[...new Set(allCodes())].length+'.</div>';
+  const opt=(titre,desc,cls,onclick)=>{
+    const d=document.createElement('div');
+    d.style.cssText='border:2px solid #E5E0D8;border-radius:12px;padding:16px;margin-bottom:12px';
+    d.innerHTML='<div style="font-weight:700;font-size:.9rem;margin-bottom:4px">'+titre+'</div>'
+      +'<div style="font-size:.76rem;color:#666;line-height:1.45;margin-bottom:10px">'+desc+'</div>';
+    const b=document.createElement('button');
+    b.className='btn '+cls; b.style.cssText='padding:9px 18px;font-size:.8rem';
+    b.textContent='Générer';
+    b.onclick=onclick;
+    d.appendChild(b);
+    box.appendChild(d);
+    return b;
+  };
+  const lancer=async (mode,btn)=>{
+    const old=btn.textContent; btn.disabled=true; btn.textContent='Préparation…';
+    try{
+      const r=await buildMergePackage(mode);
+      ov.remove();
+      showDownload(r.blob, 'FUSION-INDESIGN-'+new Date().toISOString().slice(0,10)+'.zip',
+        'Dossier prêt à transmettre — '+r.total+' produit(s), '+r.avecPhoto+' photo(s), '+moTxt(r.blob.size)
+        +'. Ta responsable com le décompresse et pointe InDesign sur fusion-indesign.txt.');
+    }catch(e){
+      ingestProgress('');
+      btn.disabled=false; btn.textContent=old;
+      alert('Génération impossible : '+e.message
+        +'\n\nSi le catalogue est très volumineux, choisis la version allégée : elle demande beaucoup moins de mémoire au navigateur.');
+    }
+  };
+  const b1=opt('📦 Dossier complet à transmettre — pleine résolution',
+    'Le fichier de fusion <b>et</b> les photos d\'origine, avec des chemins relatifs : ta responsable com décompresse où elle veut, sans accès à ton serveur. Un mode d\'emploi InDesign est joint.<br>Poids estimé : <b>'+moTxt(poidsHD)+'</b>.'
+    +(poidsHD>400*1048576?'<br><span style="color:#B00020;font-weight:700">Volumineux : le navigateur peut ne pas y arriver. Essaie d\'abord la version allégée.</span>':''),
+    'red', ()=>lancer('hd', b1));
+  const b2=opt('📦 Dossier complet à transmettre — allégé 2000 px',
+    'Le même dossier, photos ramenées à 2000 px. Convient au calage de la maquette et à un envoi par mail ; pour l\'impression finale, préférer la pleine résolution.<br>Poids typique : <b>5 à 10 fois moins</b>.',
+    'green', ()=>lancer('light', b2));
+  const b3=opt('📄 Fichier de fusion seul',
+    'Sans les photos. À réserver au cas où la personne accède déjà au dossier photos : les chemins pointent alors vers le serveur ou le dossier que tu indiques.',
+    'ghost', ()=>{ ov.remove(); exportMergeFileOnly(); });
+  const cl=document.createElement('button');
+  cl.className='btn ghost'; cl.style.cssText='padding:10px 20px;font-size:.82rem;margin-top:4px';
+  cl.textContent='Annuler'; cl.onclick=()=>ov.remove();
+  box.appendChild(cl);
+  ov.appendChild(box);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
+function exportMergeFileOnly(){
   if (!allCodes().length){ alert('Construis d\'abord les planches.'); return; }
   // Dossier où InDesign ira chercher les images. Inutile de le demander si le fichier
   // source donne déjà les chemins complets.
@@ -2220,11 +2400,15 @@ $('makeMerge').addEventListener('click', ()=>{
     dossier=saisi.trim();
     if (dossier){ PHOTO_SRC_DIR=dossier; idbSet('photoSrcDir', dossier).catch(()=>{}); }
   }
-  const m=buildMergeFile(dossier);
+  const m=buildMergeFile(dossier, false);   // chemins absolus : la personne accède au dossier photos
   const stamp=new Date().toISOString().slice(0,10);
   showDownload(utf16leBlob(m.texte), 'fusion-indesign-'+stamp+'.txt',
     'Fichier de fusion prêt — '+m.total+' produit(s), '+m.avecPhoto+' avec photo. '
     +'Dans InDesign : Fenêtre → Utilitaires → Fusion de données → Sélectionner la source de données.');
+}
+$('makeMerge').addEventListener('click', ()=>{
+  if (!allCodes().length){ alert('Construis d\'abord les planches.'); return; }
+  showMergeChoice();
 });
 
 // ---------- export EXCEL du catalogue final (1 ligne par produit) ----------

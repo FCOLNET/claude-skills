@@ -1,5 +1,43 @@
 # Studio Planches Contacts — journal des versions
 
+## V25 — un dossier de fusion autonome, à transmettre tel quel
+
+L'export V23 écrivait des **chemins absolus** vers le partage
+(`\\10.10.101.52\SMRC_photo\105143.jpg`). Transmis à quelqu'un qui n'a pas accès à ce
+serveur — ou dont les lettres de lecteur diffèrent —, le fichier de fusion ne liait
+aucune image. Il ne servait qu'à son auteur.
+
+Le bouton **🧩 Fusion InDesign** ouvre désormais un choix :
+
+| | Contenu | Pour qui |
+|---|---|---|
+| **Dossier complet, pleine résolution** | fichier de fusion + photos d'origine + mode d'emploi | la personne qui fait la maquette, jusqu'à l'impression |
+| **Dossier complet, allégé 2000 px** | idem, photos ramenées à 2 000 px | calage de maquette, envoi par mail |
+| **Fichier seul** | sans les photos, chemins absolus | quand la personne accède déjà au dossier photos |
+
+Le dossier livré :
+
+```
+FUSION-INDESIGN-2026-08-31/
+   fusion-indesign.txt     @Photo = Images\105143.jpg
+   LISEZ-MOI.txt           marche à suivre InDesign, description des colonnes
+   Images/                 105143.jpg, 105144.png…
+```
+
+Les chemins sont **relatifs au fichier de fusion**, qu'InDesign résout depuis son
+emplacement : le dossier se décompresse n'importe où et fonctionne. Les images sont
+renommées d'après le code article — ce qui les fait correspondre à la colonne `Code` — en
+conservant leur extension réelle : une photo `.png` ne devient pas `.jpg`.
+
+Le poids estimé est affiché avant de générer, avec un avertissement au-delà de 400 Mo :
+le navigateur assemble l'archive en mémoire et peut ne pas y arriver, d'où la version
+allégée.
+
+Vérifié en décompressant l'archive produite : structure, chemins relatifs, absence de tout
+chemin serveur résiduel, encodages, et image pleine résolution identique octet pour octet
+à la source.
+
+
 ## V24 — le glisser vers Word déposait du texte au lieu de la photo
 
 La V23 joignait au fichier deux formats concurrents : `text/plain` (code · désignation ·

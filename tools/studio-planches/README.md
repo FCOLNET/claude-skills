@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v24.html` | **version courante**, à utiliser |
+| `studio-planches-v25.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -34,16 +34,16 @@ l'historique git.
    - glisser une vignette hors de la fenêtre dépose la photo pleine résolution dans
      InDesign, Illustrator, Photoshop ou Word (Chromium uniquement) ; si l'application
      refuse le dépôt, le bouton ⧉ de la vignette met l'image dans le presse-papier ;
-   - « 🧩 Fusion InDesign » produit le fichier source d'une Fusion de données, pour
-     laisser InDesign composer toutes les pages (Fenêtre → Utilitaires → Fusion de
-     données).
+   - « 🧩 Fusion InDesign » produit un dossier autonome — fichier de fusion, photos et
+     mode d'emploi — à transmettre à la personne qui fait la maquette. Les chemins y
+     sont relatifs : elle décompresse où elle veut, sans accès au serveur.
 
 ## Vérifications
 
 ```bash
 cd test
 npm i playwright-core
-node verif-v24.mjs ../studio-planches-v24.html
+node verif-v25.mjs ../studio-planches-v25.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et
