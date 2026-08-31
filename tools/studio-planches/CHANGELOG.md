@@ -14,6 +14,21 @@ l'image incorporée, et le fichier. Word n'a plus d'adresse à préférer.
 Vérifié sur un vrai glisser à la souris : les formats transmis se réduisent exactement à
 `["text/html", "Files"]`, le HTML contenant l'image en `data:`.
 
+**Confirmé en production** : le glisser-déposer d'une photo vers Word fonctionne.
+
+### Ce que ces six versions ont appris
+
+Le diagnostic a coûté quatre tentatives infructueuses, toutes fondées sur des hypothèses
+testées avec des événements **simulés**. Un événement simulé ne contient que ce que le
+code lui met ; il ne dit rien de ce que le navigateur fabrique lors d'un vrai glisser.
+La cause n'est apparue qu'en déclenchant un glisser à la souris et en inspectant le
+contenu réel — et le champ s'est alors réduit en deux coups : cadre vide (HTML pointant
+un blob interne), puis lien (adresse préférée au HTML), puis image.
+
+Le contrôle `verif-v30`, qui vérifiait qu'aucun format n'était imposé au navigateur, est
+supprimé : cette assertion décrivait une approche abandonnée et ne passait plus que par
+l'effet de bord d'un test simulé.
+
 
 ## V31 — la cause du cadre gris, enfin mesurée
 
