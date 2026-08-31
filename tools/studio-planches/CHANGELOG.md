@@ -1,5 +1,42 @@
 # Studio Planches Contacts — journal des versions
 
+## V26 — capacité des planches et niveau de mise en avant
+
+Deux fonctions au service d'une même question : la sélection tient-elle dans le catalogue,
+et qui décide de la hiérarchie de la page.
+
+### Jauge de capacité
+
+Chaque planche porte son **nombre de pages de catalogue**, et un réglage global donne le
+**nombre de produits par page** (9 par défaut). L'en-tête de planche affiche en continu
+`37 / 36 (+1)` — vert si la planche tombe juste, orange s'il reste des emplacements,
+rouge en dépassement.
+
+Un encart de synthèse totalise l'ensemble, et signale deux choses qu'on découvre
+habituellement trop tard :
+
+- les planches auxquelles **aucune page n'est attribuée** ;
+- le fait qu'un catalogue en piqûre à cheval s'imprime par **cahiers de 4 pages** — 38
+  pages attribuées deviennent 40 à l'impression, soit 18 emplacements de plus à répartir.
+
+L'arbitrage de la sélection se fait ainsi sur la planche, en amont, et non au montage.
+
+### Niveau de mise en avant
+
+Chaque vignette porte un niveau — **standard**, **★ héros**, **▪ petit** — que l'on fait
+défiler d'un clic. Le héros s'affiche sur deux colonnes et cerclé d'or : la composition de
+la page se lit d'un coup d'œil.
+
+Le niveau appartient à la **planche**, non au produit : un même article peut être héros
+sur une page et discret sur une autre.
+
+Les colonnes `Niveau` et `PagesPlanche` partent dans l'export de fusion InDesign et dans
+l'export Excel. Le graphiste applique un gabarit par niveau au lieu d'arbitrer lui-même la
+hiérarchie — c'est-à-dire de faire le merchandising à la place du commerce.
+
+Nombre de pages, niveaux et densité sont conservés dans la sauvegarde de projet.
+
+
 ## V25 — un dossier de fusion autonome, à transmettre tel quel
 
 L'export V23 écrivait des **chemins absolus** vers le partage

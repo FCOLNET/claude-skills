@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V25)</title>
+<title>Studio Planches Contacts — NPC (V26)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -47,6 +47,23 @@
   .add-card-btn { padding:6px 14px !important; font-size:.72rem !important; }
   .planche-header h2[contenteditable]:focus { outline:2px solid #C8A951; border-radius:4px; }
   .count { font-size:.75rem; color:#888; }
+  /* jauge de capacité : nb de pages de la planche × produits par page */
+  .pg-pages { width:52px; padding:4px 6px; border:1px solid #ccc; border-radius:6px; font-size:.75rem; font-family:'DM Sans',sans-serif; text-align:center; }
+  .pg-lab { font-size:.7rem; color:#888; }
+  .pg-cap { font-size:.75rem; font-weight:700; padding:3px 9px; border-radius:10px; white-space:nowrap; }
+  .pg-cap.ok   { background:#E7F3EC; color:#1B4332; }
+  .pg-cap.over { background:#FCE8E8; color:#B00020; }
+  .pg-cap.under{ background:#FFF7E0; color:#8A6100; }
+  .pg-cap.none { background:#F1EDE7; color:#888; font-weight:600; }
+  /* niveau de mise en avant */
+  .niv-btn { display:block; width:100%; margin-top:5px; border:1px dashed #DDD6CA; background:#FBF9F6; color:#8A8272; font-size:.58rem; font-weight:700; letter-spacing:.04em; padding:3px 4px; border-radius:5px; cursor:pointer; font-family:'DM Sans',sans-serif; text-transform:uppercase; }
+  .niv-btn:hover { border-color:#C8A951; }
+  .card.niv-hero { grid-column:span 2; outline:2px solid #C8A951; }
+  .card.niv-hero .niv-btn { background:#C8A951; border-color:#C8A951; color:#1A1A1A; }
+  .card.niv-petit { opacity:.82; }
+  .card.niv-petit .niv-btn { background:#EFEFEF; color:#777; }
+  .density-box { display:flex; align-items:center; gap:6px; }
+  .density-box input { width:52px; padding:6px 8px; border:1px solid #ccc; border-radius:8px; font-size:.78rem; text-align:center; font-family:'DM Sans',sans-serif; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-top:12px; }
   .card { background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 8px rgba(0,0,0,.06); position:relative; }
   .del-card { position:absolute; top:5px; right:5px; z-index:6; width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,.5); color:#fff; font-size:.8rem; line-height:1; cursor:pointer; opacity:0; transition:opacity .15s, background .15s; display:flex; align-items:center; justify-content:center; }
@@ -168,6 +185,10 @@
     <button class="btn ghost" id="makeZip">📦 Zip</button>
     <button class="btn ghost" id="exportMissing">📋 Manquants</button>
     <button class="btn ghost" onclick="window.print()">🖨</button>
+    <div class="density-box" title="Nombre de produits par page de catalogue. Sert à calculer la capacité de chaque planche.">
+      <label class="pg-lab" for="perPage">📐 Produits / page</label>
+      <input type="number" id="perPage" value="9" min="1" max="40">
+    </div>
     <div class="promo-toggle">
       <label for="remiseFormat">🏷 Remise</label>
       <select id="remiseFormat">
@@ -183,6 +204,7 @@
     ⚠️ <b>Aucune base articles chargée.</b> Les vignettes ne pourront pas récupérer désignation et prix automatiquement.
     <button class="btn gold" id="baseWarnBtn" style="padding:5px 14px;margin-left:10px">📚 Charger la base</button>
   </div>
+  <div class="formbox hidden" id="capTotal" style="max-width:900px;margin:10px auto 0;padding:12px 18px;font-size:.82rem;line-height:1.6"></div>
   <div class="formbox hidden" id="photoFolders" style="max-width:900px;margin:10px auto 0;padding:14px 18px"></div>
   <div class="pdfprog" id="pdfProg"></div>
   <div style="text-align:center"><button class="btn ghost hidden" id="cancelImport" style="padding:6px 18px;font-size:.75rem">✖ Interrompre l'import</button></div>
@@ -468,6 +490,7 @@ function buildCard(sec, code, grid){
         <span class="card-prix" contenteditable data-role="prix">${esc(p.prixPromo||p.prix||'')}</span>
       </div>
       <span class="card-remise" contenteditable data-role="remise" data-raw="${escA(p.remise||'')}"></span>
+      <button class="niv-btn" title="Niveau de mise en avant dans la maquette — clic pour changer : standard → héros → petit">standard</button>
     </div>`;
   // édition code -> résout (article OU réf fournisseur) + auto-remplissage base
   card.querySelector('.card-code').addEventListener('blur', e=>{
@@ -561,7 +584,17 @@ function buildCard(sec, code, grid){
       if (ev.key==='Enter'){ ev.preventDefault(); el.blur(); }
     });
   });
+  // niveau de mise en avant : clic pour faire défiler standard → héros → petit
+  card.querySelector('.niv-btn').addEventListener('click', ev=>{
+    ev.stopPropagation();
+    const cc=card.dataset.code;
+    const suivant=NIVEAUX[(NIVEAUX.indexOf(nivOf(sec,cc))+1)%NIVEAUX.length];
+    setNiv(sec, cc, suivant);
+    applyNiv(card, suivant);
+    scheduleAutosave();
+  });
   grid.appendChild(card);
+  applyNiv(card, nivOf(sec, code));
   renderRemise(card);
   return card;
 }
@@ -578,17 +611,99 @@ function renderBuilder(){
   cont.innerHTML='';
   for (const sec of PAGES){
     const sc=document.createElement('section'); sc.className='planche';
-    sc.innerHTML=`<div class="planche-header"><h2 contenteditable data-pg="${escA(sec.pg)}">${esc(sec.pg)}</h2><span class="count">${sec.codes.length} réf.</span><button class="btn gold add-card-btn" title="Ajouter une vignette vide à cette planche">➕ Vignette</button></div><div class="grid"></div>`;
+    sc.innerHTML=`<div class="planche-header"><h2 contenteditable data-pg="${escA(sec.pg)}">${esc(sec.pg)}</h2>`
+      +`<span class="count">${sec.codes.length} réf.</span>`
+      +`<span class="pg-lab">pages</span><input class="pg-pages" type="number" min="0" max="40" value="${sec.pages||''}" placeholder="—" title="Nombre de pages de catalogue attribuées à cette planche">`
+      +`<span class="pg-cap none">capacité ?</span>`
+      +`<button class="btn gold add-card-btn" title="Ajouter une vignette vide à cette planche">➕ Vignette</button></div><div class="grid"></div>`;
     const grid=sc.querySelector('.grid');
     sc.querySelector('h2').addEventListener('input', e=>{ sec.pg=e.target.textContent.trim(); });
     sc.querySelector('h2').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); ev.target.blur(); } });
     sc.querySelector('.add-card-btn').addEventListener('click', ()=>{ addEmptyCard(sec, sc); });
+    sc.querySelector('.pg-pages').addEventListener('input', e=>{
+      const v=parseInt(e.target.value,10);
+      sec.pages = (isFinite(v)&&v>0) ? v : 0;
+      renderCapacity(sec, sc);
+      renderTotalCapacity();
+      scheduleAutosave();
+    });
     for (const code of sec.codes){ buildCard(sec, code, grid); }
     cont.appendChild(sc);
   }
   $('totalCount').textContent=allCodes().length;
   renderPhotoFolders();
   refreshStats();
+}
+
+// ============ CAPACITÉ DES PLANCHES (V26) ============
+// Une planche vaut un nombre de pages de catalogue ; chaque page accueille un nombre fixe
+// de produits. La jauge dit, à tout moment, si la sélection tient — l'arbitrage se fait
+// donc en amont, sur la planche, et non chez le graphiste au moment de la maquette.
+function perPage(){
+  const v=parseInt(($('perPage')&&$('perPage').value)||'9',10);
+  return (isFinite(v)&&v>0)?v:9;
+}
+function renderCapacity(sec, sectionEl){
+  const el=sectionEl.querySelector('.pg-cap'); if(!el) return;
+  const n=sec.codes.length;
+  if (!sec.pages){
+    el.className='pg-cap none';
+    el.textContent='capacité ?';
+    el.title="Indique le nombre de pages attribuées à cette planche pour connaître sa capacité.";
+    return;
+  }
+  const cap=sec.pages*perPage();
+  const ecart=n-cap;
+  el.textContent=n+' / '+cap+(ecart>0?'  (+'+ecart+')':(ecart<0?'  ('+ecart+')':''));
+  el.className='pg-cap '+(ecart>0?'over':(ecart<0?'under':'ok'));
+  el.title = ecart>0 ? ecart+' référence(s) de trop : la maquette ne pourra pas les placer.'
+           : ecart<0 ? Math.abs(ecart)+' emplacement(s) libre(s) sur cette planche.'
+           : 'La planche tombe juste.';
+}
+function renderTotalCapacity(){
+  const box=$('capTotal'); if(!box) return;
+  let pages=0, cap=0, sansPages=0;
+  for (const sec of PAGES){
+    if (sec.pages){ pages+=sec.pages; cap+=sec.pages*perPage(); }
+    else sansPages++;
+  }
+  const n=allCodes().length;
+  if (!pages){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const ecart=n-cap;
+  // un catalogue en piqûre à cheval s'imprime par cahiers de 4 pages
+  const pagesImpr=Math.ceil(pages/4)*4;
+  box.innerHTML='<b>📐 '+n+' référence(s)</b> pour <b>'+cap+' emplacement(s)</b> · '
+    +pages+' page(s) à '+perPage()+' produits'
+    +(pagesImpr!==pages?' · <span style="color:#8A6100">à imprimer sur '+pagesImpr+' pages (cahiers de 4) : '+((pagesImpr-pages)*perPage())+' emplacement(s) de plus disponibles</span>':'')
+    +(sansPages?' · <span style="color:#B00020">'+sansPages+' planche(s) sans nombre de pages</span>':'')
+    +'<br>'+(ecart>0
+        ? '<span style="color:#B00020;font-weight:700">'+ecart+' référence(s) de trop — la sélection doit être réduite d\'autant, ou le catalogue élargi de '+Math.ceil(ecart/perPage())+' page(s).</span>'
+        : ecart<0
+        ? '<span style="color:#1B4332;font-weight:700">'+Math.abs(ecart)+' emplacement(s) libre(s).</span>'
+        : '<span style="color:#1B4332;font-weight:700">La sélection tombe juste.</span>');
+}
+function renderAllCapacities(){
+  const sections=document.querySelectorAll('#planches .planche');
+  PAGES.forEach((sec,i)=>{ if(sections[i]) renderCapacity(sec, sections[i]); });
+  renderTotalCapacity();
+}
+
+// ---------- niveau de mise en avant (héros / standard / petit) ----------
+// Le niveau appartient à la PLANCHE, pas au produit : un même article peut être héros
+// sur une page et discret sur une autre.
+const NIVEAUX=['std','hero','petit'];
+const NIV_LABEL={std:'standard', hero:'★ héros', petit:'▪ petit'};
+function nivOf(sec, code){ return (sec.niveaux&&sec.niveaux[code])||'std'; }
+function setNiv(sec, code, niv){
+  sec.niveaux=sec.niveaux||{};
+  if (niv==='std') delete sec.niveaux[code]; else sec.niveaux[code]=niv;
+}
+function applyNiv(card, niv){
+  card.classList.remove('niv-hero','niv-petit');
+  if (niv!=='std') card.classList.add('niv-'+niv);
+  const b=card.querySelector('.niv-btn');
+  if (b) b.textContent=NIV_LABEL[niv];
 }
 
 // ajoute une vignette vide à la planche donnée
@@ -657,6 +772,7 @@ function renderRemise(card){
 function renderAllRemises(){ document.querySelectorAll('.card').forEach(renderRemise); }
 $('backBtn').addEventListener('click',()=>{ $('builder').classList.add('hidden'); $('step1').classList.remove('hidden'); setPill(1); });
 $('remiseFormat').addEventListener('change', renderAllRemises);
+$('perPage').addEventListener('input', ()=>{ renderAllCapacities(); scheduleAutosave(); });
 
 // ---------- référentiel produits ----------
 let REF = {};              // code -> {lib, prix}
@@ -1434,6 +1550,7 @@ function refreshStats(){
   $('koCount').textContent=(codes.length-ok)+' manquantes';
   $('totalCount').textContent=codes.length;
   window._missing=missing;
+  renderAllCapacities();  // jauge de capacité par planche + total
   renderPhotoFolders();   // met à jour le compteur « servies / attendues » par dossier
   setPill(ok>0?3:2);
 }
@@ -2179,7 +2296,7 @@ function buildMergeFile(dossier, relatif){
   for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) codeToFourn[c]=arr[0]; }
   for (const [fKey,c] of Object.entries(REF_FOURN||{})){ if(!(c in codeToFourn)) codeToFourn[c]=fKey; }
   const lignes=[[
-    'Planche','Position','Code','RefFournisseur','Designation',
+    'Planche','PagesPlanche','Position','Niveau','Code','RefFournisseur','Designation',
     'Prix','PrixInitial','PrixPromo','Remise','PhotoPresente','@Photo'
   ].join('\t')];
   let avecPhoto=0;
@@ -2200,7 +2317,8 @@ function buildMergeFile(dossier, relatif){
         : mergeImagePath(code, dossier);
       if (dispo) avecPhoto++;
       lignes.push([
-        champ(sec.pg), pos, champ(isSlot?'':code), champ(codeToFourn[code]||''), champ(p.lib||''),
+        champ(sec.pg), sec.pages||'', pos, NIV_LABEL[nivOf(sec,code)].replace(/[★▪]\s*/,''),
+        champ(isSlot?'':code), champ(codeToFourn[code]||''), champ(p.lib||''),
         champ(p.prix||''), champ(hasInit?p.prixInit:''), champ(hasInit?(p.prixPromo||p.prix):''),
         champ(hasInit?fmtRemiseText(rem,fmt).replace(/\u00a0|\u202f/g,' '):''),
         dispo?'Oui':'Non',
@@ -2250,7 +2368,9 @@ function lisezMoi(nb, avecPhoto, mode){
     '',
     'COLONNES DISPONIBLES',
     '  Planche         nom de la planche du catalogue',
+    '  PagesPlanche    nombre de pages attribuees a cette planche',
     '  Position        rang du produit dans sa planche',
+    '  Niveau          heros / standard / petit — taille de mise en avant voulue',
     '  Code            code article',
     '  RefFournisseur  reference fournisseur',
     '  Designation     libelle produit',
@@ -2423,7 +2543,7 @@ $('makeXlsx').addEventListener('click', ()=>{
     for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) codeToFourn[c]=arr[0]; }
     for (const [fKey,c] of Object.entries(REF_FOURN||{})){ if(!(c in codeToFourn)) codeToFourn[c]=fKey; }
     const rows=[[
-      'Page','N° page','Code article','Réf. fournisseur','Libellé',
+      'Page','Pages catalogue','N° page','Niveau','Code article','Réf. fournisseur','Libellé',
       'Prix','Prix initial','Prix promo','Remise %','Remise (F)','Remise (affichée)','Photo'
     ]];
     for (const sec of PAGES){
@@ -2440,7 +2560,9 @@ $('makeXlsx').addEventListener('click', ()=>{
         const remAff=hasInit?fmtRemiseText(rem, fmt).replace(/\u00a0|\u202f/g,' '):'';
         rows.push([
           sec.pg||'',
+          sec.pages||'',
           pos,
+          NIV_LABEL[nivOf(sec,code)].replace(/[★▪]\s*/,''),
           codeAff,
           codeToFourn[code]||'',
           p.lib||'',
@@ -2456,10 +2578,10 @@ $('makeXlsx').addEventListener('click', ()=>{
     }
     const ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=[
-      {wch:22},{wch:7},{wch:14},{wch:16},{wch:40},
+      {wch:22},{wch:14},{wch:7},{wch:10},{wch:14},{wch:16},{wch:40},
       {wch:10},{wch:11},{wch:11},{wch:9},{wch:11},{wch:18},{wch:11}
     ];
-    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:11}})};
+    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:13}})};
     ws['!freeze']={xSplit:0,ySplit:1};
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Catalogue');
@@ -2622,7 +2744,9 @@ async function buildProject(includePhotos, opts){
   return {
     _type:'studio-planches-projet', _version:2,
     date:new Date().toISOString(),
-    pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice()})),
+    // V26 : nb de pages de catalogue et niveaux de mise en avant appartiennent à la planche
+    pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice(), pages:s.pages||0, niveaux:Object.assign({}, s.niveaux||{})})),
+    perPage: perPage(),
     products:JSON.parse(JSON.stringify(PRODUCTS)),
     manual:[...manualSet],
     remiseFormat: ($('remiseFormat')&&$('remiseFormat').value)||'pct',
@@ -2639,7 +2763,8 @@ async function buildProject(includePhotos, opts){
 // applique un projet chargé (reconstruit planches + produits + photos)
 function applyProject(proj){
   if (!proj || proj._type!=='studio-planches-projet'){ alert('Fichier projet non reconnu.'); return false; }
-  PAGES=(proj.pages||[]).map(s=>({pg:s.pg, codes:(s.codes||[]).slice()}));
+  PAGES=(proj.pages||[]).map(s=>({pg:s.pg, codes:(s.codes||[]).slice(), pages:s.pages||0, niveaux:Object.assign({}, s.niveaux||{})}));
+  if (proj.perPage && $('perPage')) $('perPage').value=proj.perPage;
   PRODUCTS=proj.products||{};
   // restaure la base articles embarquée dans le projet (fusion : ne pas perdre une base déjà chargée)
   if (proj.ref && Object.keys(proj.ref).length){

@@ -28,7 +28,9 @@ const r = await p.evaluate(async () => {
   const m = buildMergeFile('\\\\10.10.101.52\\SMRC_photo');
   const l = m.texte.split('\r\n').filter(Boolean);
   const cols = l[0].split('\t');
-  const r1 = l[1].split('\t'), r2 = l[2].split('\t'), r3 = l[3].split('\t');
+  // on lit les colonnes PAR LEUR NOM : le test survit a l'ajout de colonnes
+  const col = (ligne, nom) => ligne.split('\t')[cols.indexOf(nom)];
+  const r1 = l[1], r2 = l[2], r3 = l[3];
   // encodage
   const blob = utf16leBlob('éÉ');
   const oct = new Uint8Array(await blob.arrayBuffer());
@@ -36,12 +38,12 @@ const r = await p.evaluate(async () => {
     cols, nLignes: l.length, total: m.total, avecPhoto: m.avecPhoto,
     champImage: cols[cols.length - 1],
     tabs: l.every(x => x.split('\t').length === cols.length),
-    pasDeVirguleCassee: r1[4] === 'POUSSEUR BÉBÉ, 2 en 1 "évolutif"',
-    cheminImporte: r1[10],           // doit suivre le nom REEL du fichier importe (.png)
-    cheminDeduit: r2[10],            // pas de photo importee -> code + .jpg
-    cheminFourni: r3[10],            // colonne chemin du fichier source -> prioritaire
-    photoPresente: [r1[9], r2[9], r3[9]],
-    fournisseur: r1[3],
+    pasDeVirguleCassee: col(r1,'Designation') === 'POUSSEUR BÉBÉ, 2 en 1 "évolutif"',
+    cheminImporte: col(r1,'@Photo'),           // doit suivre le nom REEL du fichier importe (.png)
+    cheminDeduit: col(r2,'@Photo'),            // pas de photo importee -> code + .jpg
+    cheminFourni: col(r3,'@Photo'),            // colonne chemin du fichier source -> prioritaire
+    photoPresente: [col(r1,'PhotoPresente'), col(r2,'PhotoPresente'), col(r3,'PhotoPresente')],
+    fournisseur: col(r1,'RefFournisseur'),
     bom: oct[0] === 0xFF && oct[1] === 0xFE,
     utf16: oct.length === 2 + 2 * 2 && oct[2] === 0xE9 && oct[3] === 0x00
   };
