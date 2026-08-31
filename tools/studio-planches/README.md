@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v33.html` | **version courante**, à utiliser |
+| `studio-planches-v34.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -34,7 +34,9 @@ l'historique git.
    direction artistique.
 5. **Table de travail** — « 🗂 Table de travail » : réorganiser la sélection par
    glisser-déposer, tester les voisinages page par page, écarter en réserve
-   (récupérable). C'est là que la sélection large devient la sélection finale.
+   (récupérable). Trois états : placé, vivier (à poser), réserve (écarté).
+   Pour composer de zéro : « ↥ Tout au vivier », puis « ➕ Page » et on dépose.
+   C'est là que la sélection large devient la sélection finale.
 6. **Calage éditorial** — renseigner le nombre de pages de chaque planche et le nombre de
    produits par page : la jauge dit si la sélection tient. Marquer les héros de chaque
    page d'un clic sur le niveau de la vignette.
@@ -58,7 +60,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v33.mjs ../studio-planches-v33.html
+node verif-v34.mjs ../studio-planches-v34.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V33)</title>
+<title>Studio Planches Contacts — NPC (V34)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -132,6 +132,9 @@
   .wt-item .wt-out:hover { background:#8B1A2B; }
   .wt-item.niv-hero { outline:2px solid #C8A951; }
   .wt-drop { outline:2px dashed #C8A951; outline-offset:2px; }
+  #wtPool { border:2px dashed #1B4332; border-radius:14px; padding:12px 14px; background:#F4FAF6; margin-top:24px; }
+  #wtPool h3 { font-size:.9rem; font-weight:700; margin-bottom:3px; }
+  #wtPool p { font-size:.72rem; color:#688; margin-bottom:9px; }
   #wtReserve { border:2px dashed #C8A951; border-radius:14px; padding:12px 14px; background:#FFFDF5; margin-top:24px; }
   #wtReserve h3 { font-size:.9rem; font-weight:700; margin-bottom:3px; }
   #wtReserve p { font-size:.72rem; color:#888; margin-bottom:9px; }
@@ -739,13 +742,24 @@ function renderCapacity(sec, sectionEl){
 }
 function renderTotalCapacity(){
   const box=$('capTotal'); if(!box) return;
+  // rappel indispensable : les produits au vivier n'apparaissent sur aucune planche,
+  // on ne doit pas croire les avoir perdus
+  const rappelVivier = POOL.length
+    ? '<div style="margin-top:6px;padding:8px 12px;background:#F4FAF6;border-left:4px solid #1B4332;border-radius:4px">'
+      +'📥 <b>'+POOL.length+' produit(s) au vivier</b>, pas encore placés — ils n\'apparaissent sur aucune planche. '
+      +'Ouvre « 🗂 Table de travail » pour les poser.</div>'
+    : '';
   let pages=0, cap=0, sansPages=0;
   for (const sec of PAGES){
     if (sec.pages){ pages+=sec.pages; cap+=sec.pages*perPage(); }
     else sansPages++;
   }
   const n=allCodes().length;
-  if (!pages){ box.classList.add('hidden'); return; }
+  if (!pages){
+    box.classList.toggle('hidden', !rappelVivier);
+    if (rappelVivier) box.innerHTML=rappelVivier;
+    return;
+  }
   box.classList.remove('hidden');
   const ecart=n-cap;
   // un catalogue en piqûre à cheval s'imprime par cahiers de 4 pages
@@ -758,7 +772,8 @@ function renderTotalCapacity(){
         ? '<span style="color:#B00020;font-weight:700">'+ecart+' référence(s) de trop — la sélection doit être réduite d\'autant, ou le catalogue élargi de '+Math.ceil(ecart/perPage())+' page(s).</span>'
         : ecart<0
         ? '<span style="color:#1B4332;font-weight:700">'+Math.abs(ecart)+' emplacement(s) libre(s).</span>'
-        : '<span style="color:#1B4332;font-weight:700">La sélection tombe juste.</span>');
+        : '<span style="color:#1B4332;font-weight:700">La sélection tombe juste.</span>')
+    +rappelVivier;
 }
 function renderAllCapacities(){
   const sections=document.querySelectorAll('#planches .planche');
@@ -1551,7 +1566,43 @@ function _dragOutInutilise(e, card){
 // Les planches ne sont pas un état final : c'est une sélection large qu'on affine.
 // Ici on réorganise, on teste les voisinages tels qu'ils seront sur la page, et on écarte
 // EN RÉSERVE — jamais en supprimant : un arbitrage doit pouvoir se rejouer.
-let RESERVE = [];           // [{code, pg}] — pg = planche d'origine, pour le retour
+let RESERVE = [];           // [{code, pg}] — écartés, pg = planche d'origine
+// V34 — VIVIER : produits de la sélection pas encore placés dans une page.
+// Trois états distincts, à ne pas confondre :
+//   placé   → figure dans une page d'une planche (sec.pagesContenu)
+//   vivier  → retenu mais pas encore posé  (POOL)
+//   réserve → écarté de la sélection        (RESERVE)
+let POOL = [];
+
+// Les pages tiennent leur propre contenu. Sans cela, une page ne pouvait être ni vide ni
+// incomplète : elle n'était qu'une tranche de 9 découpée dans une liste ordonnée, ce qui
+// interdit de composer un catalogue page par page.
+// sec.codes reste la liste à plat, reconstruite après chaque changement : tout l'aval —
+// exports, capacité, catalogue — continue de s'appuyer dessus.
+function pagesDe(sec){
+  if (Array.isArray(sec.pagesContenu) && sec.pagesContenu.length){
+    // RÉCONCILIATION — la liste à plat peut avoir bougé ailleurs : suppression d'une
+    // vignette dans la vue planches, changement de code, ajout d'une vignette vide.
+    // Sans ce recalage, la table de travail ressortirait des produits supprimés et
+    // ignorerait les nouveaux. On conserve la composition, on la remet d'aplomb :
+    // ce qui n'existe plus disparaît, ce qui est nouveau rejoint la dernière page.
+    const voulus=new Set(sec.codes), vus=new Set();
+    const out=sec.pagesContenu.map(pg=>pg.filter(c=>{
+      if (!voulus.has(c) || vus.has(c)) return false;
+      vus.add(c); return true;
+    }));
+    const manquants=sec.codes.filter(c=>!vus.has(c));
+    if (manquants.length) out[out.length-1]=out[out.length-1].concat(manquants);
+    return out;
+  }
+  const pp=perPage(); const out=[];
+  for (let i=0;i<sec.codes.length;i+=pp) out.push(sec.codes.slice(i,i+pp));
+  if (!out.length) out.push([]);
+  return out;
+}
+function aplatir(sec){
+  if (Array.isArray(sec.pagesContenu)) sec.codes=sec.pagesContenu.reduce((a,b)=>a.concat(b),[]);
+}
 let WT_MODE = 'pages';      // 'pages' (découpage réel) | 'plan' (tout d'un coup)
 let WT_SIZE = 150;
 
@@ -1631,14 +1682,33 @@ function wtZoneDepot(el){
 function wtSync(){
   const wt=$('worktable');
   if (!wt || wt.classList.contains('hidden')) return;
+  const lire=g=>[...g.querySelectorAll('.wt-item')].map(x=>x.dataset.code);
   wt.querySelectorAll('.wt-planche').forEach(secEl=>{
     const i=+secEl.dataset.idx;
     const sec=PAGES[i]; if(!sec) return;
-    sec.codes=[...secEl.querySelectorAll('.wt-item')].map(x=>x.dataset.code);
+    if (WT_MODE==='pages'){
+      sec.pagesContenu=[...secEl.querySelectorAll('.wt-grid')].map(lire);
+    } else {
+      // Plan d'ensemble : on relit le nouvel ordre, puis on le redistribue en conservant
+      // la TAILLE de chaque page. Réordonner dans la vue d'ensemble ne doit pas détruire
+      // une pagination composée à la main.
+      const tailles = Array.isArray(sec.pagesContenu) ? sec.pagesContenu.map(x=>x.length) : null;
+      const plat=lire(secEl);
+      if (tailles){
+        let k=0;
+        sec.pagesContenu=tailles.map(t=>plat.slice(k, k+=t));
+        if (k<plat.length) sec.pagesContenu.push(plat.slice(k));
+      } else {
+        sec.codes=plat;
+      }
+    }
+    aplatir(sec);
   });
+  const pool=wt.querySelector('#wtPoolGrid');
+  if (pool) POOL=lire(pool);
   const res=wt.querySelector('#wtReserveGrid');
   if (res){
-    const vus=[...res.querySelectorAll('.wt-item')].map(x=>x.dataset.code);
+    const vus=lire(res);
     const anciens=new Map(RESERVE.map(r=>[r.code,r]));
     RESERVE=vus.map(c=>anciens.get(c)||{code:c, pg:''});
   }
@@ -1668,8 +1738,19 @@ function renderWorktable(){
   retour.className='btn ghost'; retour.textContent='↩ Retour aux planches';
   retour.onclick=()=>{ wtSync(); fermerWorktable(); };
   const tot=document.createElement('div'); tot.className='wt-tot';
-  tot.textContent=allCodes().length+' retenu(s) · '+RESERVE.length+' en réserve';
-  bar.appendChild(retour); bar.appendChild(seg); bar.appendChild(taille); bar.appendChild(tot);
+  tot.textContent=allCodes().length+' placé(s) · '+POOL.length+' au vivier · '+RESERVE.length+' en réserve';
+  const bPlanche=document.createElement('button');
+  bPlanche.className='btn ghost'; bPlanche.style.cssText='padding:8px 14px;font-size:.75rem';
+  bPlanche.textContent='➕ Planche';
+  bPlanche.title='Créer une nouvelle planche vide';
+  bPlanche.onclick=()=>{
+    wtSync();
+    const nom=prompt('Nom de la nouvelle planche :', 'Planche '+(PAGES.length+1));
+    if (nom===null) return;
+    PAGES.push({pg:nom.trim()||('Planche '+(PAGES.length+1)), codes:[], pages:1, niveaux:{}, pagesContenu:[[]]});
+    renderWorktable(); scheduleAutosave();
+  };
+  bar.appendChild(retour); bar.appendChild(seg); bar.appendChild(taille); bar.appendChild(bPlanche); bar.appendChild(tot);
   wt.appendChild(bar);
   wt.style.setProperty('--wt', WT_SIZE+'px');
 
@@ -1681,6 +1762,31 @@ function renderWorktable(){
     secEl.innerHTML='<div class="wt-head"><h3>'+esc(sec.pg)+'</h3>'
       +'<span class="pg-cap '+(cap?(ecart>0?'over':(ecart<0?'under':'ok')):'none')+'">'
       +(cap?sec.codes.length+' / '+cap+(ecart>0?' (+'+ecart+')':''):'capacité ?')+'</span></div>';
+    // boutons de composition, sur l'en-tête de la planche
+    const tete=secEl.querySelector('.wt-head');
+    const bAjout=document.createElement('button');
+    bAjout.className='btn ghost'; bAjout.style.cssText='padding:5px 12px;font-size:.7rem';
+    bAjout.textContent='➕ Page';
+    bAjout.title='Ajouter une page vide à cette planche';
+    bAjout.onclick=()=>{
+      wtSync();
+      sec.pagesContenu = pagesDe(sec).map(x=>x.slice());
+      sec.pagesContenu.push([]);
+      if (sec.pages) sec.pages=Math.max(sec.pages, sec.pagesContenu.length);
+      aplatir(sec); renderWorktable(); scheduleAutosave();
+    };
+    const bVider=document.createElement('button');
+    bVider.className='btn ghost'; bVider.style.cssText='padding:5px 12px;font-size:.7rem';
+    bVider.textContent='↥ Tout au vivier';
+    bVider.title='Vider cette planche dans le vivier pour la composer page par page';
+    bVider.onclick=()=>{
+      wtSync();
+      POOL=POOL.concat(sec.codes);
+      sec.pagesContenu=[[]];
+      aplatir(sec); renderWorktable(); scheduleAutosave();
+    };
+    tete.appendChild(bAjout); tete.appendChild(bVider);
+
     if (WT_MODE==='plan'){
       const flow=wtZoneDepot(document.createElement('div'));
       flow.className='wt-flow';
@@ -1688,15 +1794,21 @@ function renderWorktable(){
       secEl.appendChild(flow);
     } else {
       const box=document.createElement('div'); box.className='wt-pages';
-      const nbPages=Math.max(sec.pages||0, Math.ceil(sec.codes.length/pp)) || 1;
+      const contenu=pagesDe(sec);
+      const nbPages=Math.max(contenu.length, sec.pages||0);
       for (let pg=0; pg<nbPages; pg++){
+        const dedans=contenu[pg]||[];
         const page=document.createElement('div');
         page.className='wt-page'+(sec.pages && pg>=sec.pages ? ' hors':'');
-        page.innerHTML='<div class="wt-page-t">'+(sec.pages&&pg>=sec.pages?'⚠ hors pagination · page ':'Page ')+(pg+1)+'</div>';
+        const trop=dedans.length>pp;
+        page.innerHTML='<div class="wt-page-t">'
+          +(sec.pages&&pg>=sec.pages?'⚠ hors pagination · page ':'Page ')+(pg+1)
+          +' <span style="font-weight:400;color:'+(trop?'#B00020':'#bbb')+'">'+dedans.length+'/'+pp+'</span></div>';
         const g=wtZoneDepot(document.createElement('div'));
         g.className='wt-grid';
         g.style.gridTemplateColumns='repeat('+cols+', var(--wt))';
-        for (const c of sec.codes.slice(pg*pp, (pg+1)*pp)) g.appendChild(wtItem(c, sec));
+        g.style.minHeight='calc(var(--wt) * 0.9)';
+        for (const c of dedans) g.appendChild(wtItem(c, sec));
         page.appendChild(g);
         box.appendChild(page);
       }
@@ -1704,6 +1816,16 @@ function renderWorktable(){
     }
     wt.appendChild(secEl);
   });
+
+  // vivier : ce qui reste à placer
+  const viv=document.createElement('div'); viv.id='wtPool';
+  viv.innerHTML='<h3>📥 Vivier — '+POOL.length+' produit(s) à placer</h3>'
+    +'<p>Sélection retenue mais pas encore posée. Glisse-les dans les pages ci-dessus, une par une. Utilise « ➕ Page » pour créer une page vide.</p>';
+  const vg=wtZoneDepot(document.createElement('div'));
+  vg.className='wt-flow'; vg.id='wtPoolGrid';
+  for (const c of POOL) vg.appendChild(wtItem(c, null));
+  viv.appendChild(vg);
+  wt.appendChild(viv);
 
   // réserve
   const res=document.createElement('div'); res.id='wtReserve';
@@ -3405,9 +3527,12 @@ async function buildProject(includePhotos, opts){
     _type:'studio-planches-projet', _version:2,
     date:new Date().toISOString(),
     // V26 : nb de pages de catalogue et niveaux de mise en avant appartiennent à la planche
-    pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice(), pages:s.pages||0, niveaux:Object.assign({}, s.niveaux||{})})),
+    pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice(), pages:s.pages||0,
+      niveaux:Object.assign({}, s.niveaux||{}),
+      pagesContenu: Array.isArray(s.pagesContenu)?s.pagesContenu.map(x=>x.slice()):null})),
     perPage: perPage(),
     reserve: RESERVE.map(r=>({code:r.code, pg:r.pg})),
+    pool: POOL.slice(),
     products:JSON.parse(JSON.stringify(PRODUCTS)),
     manual:[...manualSet],
     remiseFormat: ($('remiseFormat')&&$('remiseFormat').value)||'pct',
@@ -3424,9 +3549,12 @@ async function buildProject(includePhotos, opts){
 // applique un projet chargé (reconstruit planches + produits + photos)
 function applyProject(proj){
   if (!proj || proj._type!=='studio-planches-projet'){ alert('Fichier projet non reconnu.'); return false; }
-  PAGES=(proj.pages||[]).map(s=>({pg:s.pg, codes:(s.codes||[]).slice(), pages:s.pages||0, niveaux:Object.assign({}, s.niveaux||{})}));
+  PAGES=(proj.pages||[]).map(s=>({pg:s.pg, codes:(s.codes||[]).slice(), pages:s.pages||0,
+    niveaux:Object.assign({}, s.niveaux||{}),
+    pagesContenu: Array.isArray(s.pagesContenu)?s.pagesContenu.map(x=>x.slice()):null}));
   if (proj.perPage && $('perPage')) $('perPage').value=proj.perPage;
   RESERVE = Array.isArray(proj.reserve) ? proj.reserve.map(r=>({code:r.code, pg:r.pg||''})) : [];
+  POOL = Array.isArray(proj.pool) ? proj.pool.slice() : [];
   PRODUCTS=proj.products||{};
   // restaure la base articles embarquée dans le projet (fusion : ne pas perdre une base déjà chargée)
   if (proj.ref && Object.keys(proj.ref).length){

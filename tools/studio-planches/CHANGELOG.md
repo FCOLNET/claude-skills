@@ -1,5 +1,43 @@
 # Studio Planches Contacts — journal des versions
 
+## V34 — composer le catalogue page par page
+
+Cas de départ opposé au précédent : la sélection arrive en **un seul bloc**, sans que le
+nombre de pages soit encore décidé. Il faut alors fabriquer les pages au fur et à mesure
+et y déposer les produits un par un.
+
+L'outil supposait l'inverse. Une page n'était qu'une **tranche de 9 découpée dans une
+liste ordonnée** : elle ne pouvait être ni vide, ni incomplète, et déposer un produit à un
+endroit précis n'avait pas de sens.
+
+**Les pages tiennent désormais leur propre contenu.** Une page peut être vide, à moitié
+remplie, ou en dépassement — le compteur `4/9` de son en-tête le dit. La liste à plat est
+reconstruite après chaque changement, si bien que tout l'aval — exports, capacité,
+catalogue web — continue de fonctionner sans rien savoir de cette mécanique.
+
+**Trois états, distincts.** *Placé* : dans une page. *Vivier* : retenu mais pas encore
+posé. *Réserve* : écarté. Le vivier est une nouvelle zone verte, la réserve reste la zone
+dorée. Le compteur du haut suit les trois.
+
+**Trois boutons pour composer** : `➕ Page` ajoute une page vide à une planche,
+`↥ Tout au vivier` vide une planche pour la reprendre de zéro, `➕ Planche` crée un
+nouveau groupe. On part donc d'une sélection en vrac et on bâtit.
+
+Un rappel apparaît dans la vue planches tant qu'il reste des produits au vivier : ils
+ne figurent sur aucune planche, il ne faut pas les croire perdus.
+
+### Régression trouvée par les tests précédents
+
+Supprimer une vignette dans la **vue planches** laissait le contenu des pages périmé : la
+table de travail ressortait des produits supprimés et ignorait les nouveaux. La lecture
+des pages est désormais **auto-réparatrice** — ce qui n'existe plus disparaît, ce qui est
+nouveau rejoint la dernière page — sans détruire la composition manuelle.
+
+Même mécanisme pour la bascule entre les deux vues : réordonner dans le plan d'ensemble
+redistribue les produits en **conservant la taille de chaque page**, au lieu de rendre la
+pagination à un découpage automatique.
+
+
 ## V33 — table de travail : la sélection devient mobile
 
 Les planches ne sont pas un état final mais un **vivier** : une sélection large qu'on
