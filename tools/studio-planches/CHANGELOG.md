@@ -1,5 +1,35 @@
 # Studio Planches Contacts — journal des versions
 
+## V24 — le glisser vers Word déposait du texte au lieu de la photo
+
+La V23 joignait au fichier deux formats concurrents : `text/plain` (code · désignation ·
+prix) et `text/html`. Word, comme la plupart des traitements de texte, privilégie le
+texte dès qu'on lui en propose : il insérait la ligne de texte au lieu de la photo, ou
+rien du tout, le HTML pointant vers une URL interne au navigateur qu'une application
+native ne sait pas résoudre.
+
+Un glisser depuis la photo ne propose désormais **que le fichier**. Le texte reste
+disponible autrement : sélectionner la désignation sur la carte et la glisser. Une
+vignette sans photo continue de déposer son texte, seule chose utile dans ce cas.
+
+Le mécanisme lui-même n'était pas en cause : les téléchargements de l'outil — script de
+copie, Excel, PDF — empruntent le même type d'URL interne et fonctionnent.
+
+### Seconde voie : copier la photo dans le presse-papier
+
+Pour ne pas dépendre d'un mécanisme que rien ne garantit dans toutes les applications,
+un bouton **⧉** apparaît au survol de chaque vignette : il met l'image dans le
+presse-papier, et `Ctrl+V` la colle dans Word, InDesign ou PowerPoint.
+
+Le presse-papier de Chrome n'accepte que le PNG en écriture — format sans perte, la
+définition est donc conservée — avec un plafond à 3 000 px, au-delà duquel un PNG dépasse
+plusieurs dizaines de mégaoctets sans gain visible. Fond blanc appliqué, sans quoi une
+image transparente vire au noir dans Word.
+
+Vérifié de bout en bout : une source de 4 000 px est écrite dans le presse-papier en
+3 000 × 3 000, puis relue depuis le presse-papier.
+
+
 ## V23 — export « Fusion de données » pour InDesign
 
 Glisser 483 produits un par un n'est pas une méthode. InDesign sait composer les pages

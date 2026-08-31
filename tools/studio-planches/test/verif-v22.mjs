@@ -60,8 +60,10 @@ ck('type mime correct', r.mime === 'image/jpeg', r.mime);
 ck('nom de fichier lisible en maquette', /^105143.*\.jpg$/.test(r.nom), r.nom);
 ck('fichier envoye = pleine resolution', r.tailleEnvoyee === r.tailleHD && r.tailleHD > r.tailleCopie * 3,
   'envoye ' + r.tailleEnvoyee + ' / HD ' + r.tailleHD + ' / copie ' + r.tailleCopie);
-ck('texte joint (code, libelle, prix)', r.avec.txt.includes('105143') && r.avec.txt.includes('AFRICA') && r.avec.txt.includes('490 F'), r.avec.txt);
-ck('html joint', /<img/.test(r.avec.html), r.avec.html);
+// V24 : avec une photo, le fichier doit etre LE SEUL format propose.
+// Word privilegie le texte des qu'on lui en offre et ignore alors la photo.
+ck('aucun texte concurrent quand il y a une photo', r.avec.txt === '' && r.avec.html === '', 'txt=' + JSON.stringify(r.avec.txt) + ' html=' + JSON.stringify(r.avec.html));
+ck('un seul format propose', r.avec.types.length === 1 && r.avec.types[0] === 'downloadurl', JSON.stringify(r.avec.types));
 ck('vignette sans photo : texte seul, pas de fichier', !r.sans.dl && r.sans.txt.includes('105144'), JSON.stringify(r.sans));
 console.log('  info  | nom depose : ' + r.nom + ' — ' + Math.round(r.tailleEnvoyee / 1024) + ' Ko (copie de travail : ' + Math.round(r.tailleCopie / 1024) + ' Ko)');
 if (errs.length) console.log('Erreurs JS : ' + errs.join(' | '));
