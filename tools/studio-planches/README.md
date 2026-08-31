@@ -8,10 +8,11 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v26.html` | **version courante**, à utiliser |
+| `studio-planches-v27.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
+| `apercu-catalogue-web.png` | rendu du catalogue web généré, sur données d'exemple |
 
 Les versions 12 à 19 ont été retirées de l'arborescence ; elles restent accessibles dans
 l'historique git.
@@ -28,12 +29,17 @@ l'historique git.
    plusieurs milliers de fichiers, il faut donc lui présenter un petit dossier local.
    Si le fichier de planches ne donne pas les chemins, indiquer une fois le dossier
    source dans le champ prévu — il est mémorisé. Puis « 📁 Dossier photos ».
-4. **Calage éditorial** — renseigner le nombre de pages de chaque planche et le nombre de
+4. **Contrôle des fonds** — « 🔍 Fonds photo » classe les visuels en détouré / uni /
+   varié et indique la direction graphique atteignable. À faire avant d'arrêter la
+   direction artistique.
+5. **Calage éditorial** — renseigner le nombre de pages de chaque planche et le nombre de
    produits par page : la jauge dit si la sélection tient. Marquer les héros de chaque
    page d'un clic sur le niveau de la vignette.
-5. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
+6. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
    récapitulatif, HTML pour diffusion.
-6. **Maquette** — deux voies vers InDesign :
+7. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand : dossier
+   `index.html` + `images/`, à mettre en ligne ou à imprimer en PDF (Ctrl+P).
+8. **Maquette** — deux voies vers InDesign :
    - glisser une vignette hors de la fenêtre dépose la photo pleine résolution dans
      InDesign, Illustrator, Photoshop ou Word (Chromium uniquement) ; si l'application
      refuse le dépôt, le bouton ⧉ de la vignette met l'image dans le presse-papier ;
@@ -46,7 +52,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v26.mjs ../studio-planches-v26.html
+node verif-v27.mjs ../studio-planches-v27.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et

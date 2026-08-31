@@ -1,5 +1,54 @@
 # Studio Planches Contacts — journal des versions
 
+## V27 — contrôle des fonds photo et générateur de catalogue web
+
+### 🔍 Contrôle des fonds
+
+Le rendu « type Checkers » repose entièrement sur des visuels détourés ou sur fond blanc :
+c'est ce qui autorise la densité, les chevauchements et les pastilles posées sur l'image.
+Mélanger détouré et fonds variés ruine la page — c'est le point qui décide de la direction
+graphique, avant toute maquette.
+
+Le bouton **🔍 Fonds photo** échantillonne la **bordure** de chaque visuel : un packshot
+sur blanc a un pourtour clair et régulier, une photo d'ambiance non. Deux indicateurs
+suffisent — luminance moyenne du pourtour et écart-type — pour classer en *fond blanc*,
+*fond uni* ou *fond varié*. Les vignettes concernées reçoivent une pastille, et le bilan
+donne les proportions avec la direction graphique atteignable :
+
+- 85 % de détourés ou plus → direction du benchmark possible ;
+- entre 60 et 85 % → direction mixte, cadres photo pour homogénéiser, détouré réservé aux héros ;
+- en dessous → cadres systématiques, ou chantier de détourage sur les héros au minimum.
+
+### 🛍 Catalogue web
+
+Nouveau bouton qui produit le **catalogue marchand** — plus une planche contact, mais le
+catalogue tel qu'un client le voit. Il reprend la grammaire du benchmark : couleur
+d'univers par planche, sommaire collant, hiérarchie à trois niveaux (le héros occupe
+deux colonnes sur deux rangs, la grille dense comble les trous), bloc prix normalisé,
+économie affichée **en valeur** plutôt qu'en pourcentage, bandeau de positionnement.
+
+Le bloc prix est repensé pour le XPF : le système de Checkers repose sur un gros nombre
+suivi de centimes minuscules, ce qui n'existe pas en franc pacifique. On joue donc sur le
+contraste entre les chiffres et la devise, en gardant le prix barré à côté du prix promo.
+
+Livré en dossier — `index.html` + `images/` + mode d'emploi — à mettre en ligne tel quel
+ou à ouvrir localement. Le CSS d'impression fait démarrer chaque planche sur une nouvelle
+page : `Ctrl+P` donne la version PDF, ce qui couvre la seconde sortie demandée.
+
+### Bug trouvé en regardant le rendu
+
+Le libellé des produits héros s'affichait **en blanc sur blanc**. Collision de noms de
+classes : `hero` désignait à la fois le bandeau de titre du catalogue (texte blanc sur
+fond sombre) et le niveau de mise en avant des produits ; la carte héros héritait donc
+`color:#fff`. Seuls les éléments à couleur explicite — prix promo, pastille économie —
+restaient visibles, ce qui rendait le défaut discret : un héros **non promotionnel**
+aurait eu son prix invisible aussi.
+
+Corrigé en renommant le bandeau `.entete`, en préfixant les niveaux `n-hero` / `n-petit`,
+et en posant la couleur de texte explicitement sur la carte plutôt que de la laisser
+s'hériter. Deux contrôles verrouillent désormais ces deux points.
+
+
 ## V26 — capacité des planches et niveau de mise en avant
 
 Deux fonctions au service d'une même question : la sélection tient-elle dans le catalogue,

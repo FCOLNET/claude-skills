@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V26)</title>
+<title>Studio Planches Contacts — NPC (V27)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -179,10 +179,12 @@
     <button class="btn ghost" id="pickFilesBtn" title="Pour quelques photos seulement. Ne fais PAS Ctrl+A sur un dossier réseau : cette fenêtre affiche les miniatures, et c'est leur rendu qui fige le navigateur.">🖼 Quelques images</button>
     <button class="btn gold" id="makePdf">📄 PDF</button>
     <button class="btn green" id="makeFolder">🗂 Dossier prod HD</button>
-    <button class="btn blue" id="makeHtml">📤 Export HTML</button>
+    <button class="btn gold" id="makeCatalogue" title="Génère le catalogue marchand : couleur d'univers par planche, hiérarchie héros/standard/petit, blocs prix. Dossier web à mettre en ligne, imprimable en PDF.">🛍 Catalogue web</button>
+    <button class="btn blue" id="makeHtml" title="Planches contact figées (contrôle interne), pas le catalogue marchand">📤 Planches HTML</button>
     <button class="btn green" id="makeXlsx" title="Exporter le catalogue final en Excel (une ligne par produit)">📊 Excel</button>
     <button class="btn gold" id="makeMerge" title="Fichier source pour la Fusion de données d'InDesign : une ligne par produit, avec le chemin de l'image. InDesign place ensuite les pages tout seul.">🧩 Fusion InDesign</button>
     <button class="btn ghost" id="makeZip">📦 Zip</button>
+    <button class="btn ghost" id="checkFonds" title="Analyse le fond de chaque photo : détouré / fond blanc, fond uni, ou décor. Décide de la direction graphique possible.">🔍 Fonds photo</button>
     <button class="btn ghost" id="exportMissing">📋 Manquants</button>
     <button class="btn ghost" onclick="window.print()">🖨</button>
     <div class="density-box" title="Nombre de produits par page de catalogue. Sert à calculer la capacité de chaque planche.">
@@ -773,6 +775,7 @@ function renderAllRemises(){ document.querySelectorAll('.card').forEach(renderRe
 $('backBtn').addEventListener('click',()=>{ $('builder').classList.add('hidden'); $('step1').classList.remove('hidden'); setPill(1); });
 $('remiseFormat').addEventListener('change', renderAllRemises);
 $('perPage').addEventListener('input', ()=>{ renderAllCapacities(); scheduleAutosave(); });
+$('checkFonds').addEventListener('click', controlerFonds);
 
 // ---------- référentiel produits ----------
 let REF = {};              // code -> {lib, prix}
@@ -1441,6 +1444,91 @@ function dragOutStart(e, card){
     try{ dt.setDragImage(img, 40, 40); }catch(err){}
   }
 }
+// ============ CONTRÔLE DES FONDS PHOTO (V27) ============
+// Le rendu « type Checkers » repose entièrement sur des visuels détourés ou sur fond
+// blanc : c'est ce qui autorise la densité, les chevauchements et les pastilles posées
+// sur l'image. Mélanger détouré et fonds variés ruine la page.
+// On échantillonne la BORDURE de chaque photo — un packshot sur blanc a des bords
+// uniformes et clairs, une photo d'ambiance non. Deux indicateurs suffisent :
+// la luminance moyenne du pourtour et son écart-type.
+const fondAnalyse = {};   // code -> {moy, ec, verdict}
+async function analysePhoto(code){
+  const f=localBlobs[code]||matchedFiles[code];
+  if (!f) return null;
+  try{
+    const bmp=await createImageBitmap(f);
+    const S=64;
+    const cv=document.createElement('canvas'); cv.width=S; cv.height=S;
+    const ctx=cv.getContext('2d');
+    ctx.drawImage(bmp,0,0,S,S); bmp.close();
+    const d=ctx.getImageData(0,0,S,S).data;
+    const at=(x,y)=>{ const i=(y*S+x)*4; return 0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; };
+    const lum=[];
+    for (let i=0;i<S;i++){ lum.push(at(i,0), at(i,S-1), at(0,i), at(S-1,i)); }
+    const moy=lum.reduce((a,b)=>a+b,0)/lum.length;
+    const ec=Math.sqrt(lum.reduce((a,b)=>a+(b-moy)*(b-moy),0)/lum.length);
+    // seuils calés pour distinguer un packshot d'une photo d'ambiance :
+    // un fond blanc est très clair ET très régulier ; un fond uni (gris, coloré) reste
+    // régulier ; au-delà, il y a du décor sur les bords.
+    const verdict = (moy>=243 && ec<8) ? 'blanc' : (ec<12 ? 'uni' : 'varie');
+    const r={moy:Math.round(moy), ec:Math.round(ec), verdict};
+    fondAnalyse[code]=r;
+    return r;
+  }catch(e){ return null; }
+}
+function badgeFond(code){
+  const r=fondAnalyse[code];
+  cardsOf(code).forEach(card=>{
+    let b=card.querySelector('.fond-flag');
+    if (!r || r.verdict==='blanc'){ if(b) b.remove(); return; }
+    if (!b){
+      b=document.createElement('div');
+      b.className='fond-flag';
+      b.style.cssText='position:absolute;bottom:6px;left:6px;z-index:5;font-size:.58rem;font-weight:700;padding:2px 6px;border-radius:4px;pointer-events:none';
+      card.querySelector('.photo-slot').appendChild(b);
+    }
+    const uni = r.verdict==='uni';
+    b.style.background = uni ? '#E0A800' : '#B00020';
+    b.style.color='#fff';
+    b.textContent = uni ? 'FOND UNI' : 'FOND VARIÉ';
+    b.title = uni
+      ? 'Bord régulier mais pas blanc (gris, coloré). Utilisable, mais à harmoniser.'
+      : 'Décor ou ombre sur les bords : cette photo jurera à côté des packshots détourés.';
+  });
+}
+async function controlerFonds(){
+  const codes=[...new Set(allCodes())].filter(c=>localBlobs[c]||matchedFiles[c]);
+  if (!codes.length){ alert('Aucune photo chargée à contrôler.'); return; }
+  const btn=$('checkFonds'); const vieux=btn.textContent;
+  let n=0;
+  for (const c of codes){
+    await analysePhoto(c);
+    badgeFond(c);
+    if (++n%10===0){
+      btn.textContent='🔍 '+n+'/'+codes.length;
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  btn.textContent=vieux;
+  const cpt={blanc:0, uni:0, varie:0};
+  for (const c of codes) if (fondAnalyse[c]) cpt[fondAnalyse[c].verdict]++;
+  const pct=v=>Math.round(v/codes.length*100);
+  const sansPhoto=[...new Set(allCodes())].filter(c=>!matchedFiles[c] && !String(c).startsWith('SLOT')).length;
+  alert(
+    'Contrôle des fonds — '+codes.length+' photo(s) analysée(s)\n\n'
+    +'  Fond blanc ou détouré : '+cpt.blanc+'  ('+pct(cpt.blanc)+' %)\n'
+    +'  Fond uni, non blanc   : '+cpt.uni+'  ('+pct(cpt.uni)+' %)\n'
+    +'  Fond varié / décor    : '+cpt.varie+'  ('+pct(cpt.varie)+' %)\n'
+    +(sansPhoto?'\n  '+sansPhoto+' référence(s) encore sans photo\n':'')
+    +'\n'
+    +(pct(cpt.blanc)>=85
+      ? "→ Direction « type Checkers » possible : densité, chevauchements et pastilles posées sur l'image."
+      : pct(cpt.blanc)>=60
+      ? "→ Direction mixte recommandée : cadres photo sur fond neutre pour homogénéiser, détouré libre réservé aux héros.\n   Les vignettes signalées en rouge sont à retravailler ou à remplacer en priorité."
+      : "→ Trop peu de visuels détourés pour le rendu du benchmark. Prévoir des cadres photo systématiques,\n   ou un chantier de détourage sur les héros au minimum.")
+  );
+}
+
 // ---------- copier la photo dans le presse-papier (V24) ----------
 // Voie indépendante du glisser-déposer : Ctrl+V colle l'image dans Word, PowerPoint,
 // InDesign… Le presse-papier de Chrome n'accepte que le PNG en écriture, on ré-encode
@@ -2591,6 +2679,190 @@ $('makeXlsx').addEventListener('click', ()=>{
     showDownload(blob, 'catalogue-planches-NPC-'+stamp+'.xlsx', 'Catalogue Excel prêt ('+(rows.length-1)+' produits)');
     btn.textContent='✅ Excel exporté'; setTimeout(()=>btn.textContent=oldTxt,2500);
   }catch(e){ alert('Erreur export Excel : '+e.message); btn.textContent=oldTxt; }
+});
+
+// ============ CATALOGUE WEB MARCHAND (V27) ============
+// Ce n'est plus une planche contact : c'est le catalogue tel qu'un client le voit.
+// Reprend la grammaire du benchmark : couleur d'univers par planche, hiérarchie à trois
+// niveaux, bloc prix normalisé, économie affichée en valeur, bandeau de bas de page.
+// Livré en dossier — index.html + images/ — pour être mis en ligne ou ouvert tel quel,
+// et imprimable (Ctrl+P) : c'est ce qui couvre aussi la sortie PDF.
+const UNIVERS = [
+  {fond:'#FFF4E0', bande:'#E8871E', texte:'#7A4405'},
+  {fond:'#FDE9F3', bande:'#D6408C', texte:'#7C1E4C'},
+  {fond:'#E9F7EC', bande:'#2E9E52', texte:'#1B4332'},
+  {fond:'#E6F4FB', bande:'#0E86C4', texte:'#0B4C6E'},
+  {fond:'#F2ECFA', bande:'#7A4FBF', texte:'#3F2769'},
+  {fond:'#FFF7DC', bande:'#D8B10A', texte:'#6E5A00'},
+  {fond:'#FDECEA', bande:'#C0392B', texte:'#6E1E17'},
+  {fond:'#E8F6F5', bande:'#178F86', texte:'#0C4A46'}
+];
+function universDe(i){ return UNIVERS[i%UNIVERS.length]; }
+
+// Bloc prix en XPF. Le système de Checkers (gros nombre + centimes minuscules) ne se
+// transpose pas : en franc pacifique il n'y a pas de centimes. On joue donc sur le
+// contraste chiffres / devise, et l'économie s'affiche en VALEUR, plus parlante qu'un
+// pourcentage sur un jouet.
+function blocPrixHtml(p, fmt, esc){
+  const aInit=String(p.prixInit||'').trim()!=='';
+  if (!aInit){
+    return '<div class="pv"><span class="pv-n">'+esc(String(p.prix||'').replace(/\s*F$/,''))+'</span><span class="pv-d">F</span></div>';
+  }
+  const rem=parseRemise(p.remise||'', numFromPrix(p.prixInit), numFromPrix(p.prixPromo||p.prix));
+  const eco = rem.val!=null ? '-'+Math.round(rem.val).toLocaleString('fr-FR').replace(/ | /g,' ')+' F'
+            : (rem.pct!=null ? '-'+Math.round(rem.pct)+' %' : '');
+  return (eco?'<div class="eco">ÉCONOMIE '+esc(eco)+'</div>':'')
+    +'<div class="pv promo"><span class="pv-n">'+esc(String(p.prixPromo||p.prix||'').replace(/\s*F$/,''))+'</span><span class="pv-d">F</span>'
+    +'<span class="pv-barre">'+esc(p.prixInit)+'</span></div>';
+}
+
+async function buildCatalogueWeb(){
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
+  const zip=new JSZip();
+  const stamp=new Date().toISOString().slice(0,10);
+  const racine=zip.folder('CATALOGUE-WEB-'+stamp);
+  const imgs=racine.folder('images');
+
+  let fait=0;
+  const totalPhotos=[...new Set(allCodes())].filter(c=>matchedFiles[c]||localBlobs[c]).length;
+  const nomImg={};
+  for (const code of new Set(allCodes())){
+    const src=matchedFiles[code]||localBlobs[code];
+    if (!src) continue;
+    const web=await reencode(src, 1000) || src;   // 1000 px : net à l'écran, léger à charger
+    nomImg[code]=code+'.jpg';
+    imgs.file(nomImg[code], web, {compression:'STORE'});
+    fait++;
+    if (fait%5===0){
+      ingestProgress('🛍 Préparation des visuels… '+fait+' / '+totalPhotos);
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+
+  let sommaire='', sections='';
+  PAGES.forEach((sec,i)=>{
+    const u=universDe(i);
+    const id='pl'+i;
+    sommaire+='<a class="som-item" href="#'+id+'" style="border-color:'+u.bande+'"><span class="som-pastille" style="background:'+u.bande+'"></span>'
+      +esc(sec.pg)+'<span class="som-n">'+sec.codes.length+'</span></a>';
+    let cartes='';
+    for (const code of sec.codes){
+      const p=PRODUCTS[code]||{};
+      const niv=nivOf(sec, code);
+      const img=nomImg[code]
+        ? '<img src="images/'+esc(nomImg[code])+'" alt="'+esc(p.lib||code)+'" loading="lazy">'
+        : '<div class="sans-photo">visuel à venir</div>';
+      cartes+='<article class="prod n-'+niv+'">'
+        +'<div class="prod-img">'+img+'</div>'
+        +'<h3>'+esc(p.lib||'')+'</h3>'
+        +blocPrixHtml(p, fmt, esc)
+        +'</article>';
+    }
+    sections+='<section class="planche" id="'+id+'" style="background:'+u.fond+'">'
+      +'<div class="pl-bande" style="background:'+u.bande+'"><h2>'+esc(sec.pg)+'</h2>'
+      +'<span class="pl-n">'+sec.codes.length+' produits</span></div>'
+      +'<div class="grille">'+cartes+'</div>'
+      +'</section>';
+  });
+
+  const css=[
+'*{margin:0;padding:0;box-sizing:border-box}',
+"body{font-family:'DM Sans',system-ui,sans-serif;background:#fff;color:#141414}",
+'.entete{background:linear-gradient(135deg,#0D1B2A,#1B4332);color:#fff;padding:34px 20px;text-align:center}',
+".entete h1{font-family:'Playfair Display',Georgia,serif;font-size:clamp(1.6rem,4vw,2.6rem)}",
+'.entete h1 em{color:#C8A951;font-style:normal}',
+'.entete p{color:rgba(255,255,255,.7);font-size:.9rem;margin-top:6px}',
+'.som{display:flex;flex-wrap:wrap;gap:8px;padding:16px;max-width:1400px;margin:0 auto;position:sticky;top:0;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);z-index:20;border-bottom:1px solid #eee}',
+'.som-item{display:flex;align-items:center;gap:7px;text-decoration:none;color:#141414;font-size:.78rem;font-weight:700;padding:7px 13px;border:2px solid;border-radius:20px;white-space:nowrap}',
+'.som-pastille{width:9px;height:9px;border-radius:50%}',
+'.som-n{color:#999;font-weight:500;font-size:.72rem}',
+'.planche{padding:0 0 34px}',
+'.pl-bande{display:flex;align-items:baseline;gap:14px;padding:13px 22px;color:#fff;flex-wrap:wrap}',
+".pl-bande h2{font-family:'Playfair Display',Georgia,serif;font-size:clamp(1.1rem,2.6vw,1.7rem);letter-spacing:.01em}",
+'.pl-n{font-size:.76rem;opacity:.85;font-weight:600}',
+// grille dense : le héros occupe 2x2, les trous se comblent tout seuls
+'.grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));grid-auto-flow:dense;gap:14px;padding:20px 22px 0;max-width:1400px;margin:0 auto}',
+'.prod{background:#fff;color:#141414;border-radius:14px;padding:12px;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(0,0,0,.07)}',
+'.prod.n-hero{grid-column:span 2;grid-row:span 2}',
+'.prod-img{aspect-ratio:1;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:9px}',
+'.prod.n-hero .prod-img{aspect-ratio:1;min-height:0}',
+'.prod-img img{width:100%;height:100%;object-fit:contain}',
+'.sans-photo{font-size:.66rem;color:#bbb;font-weight:700;text-align:center;padding:24px 8px;border:1px dashed #ddd;border-radius:8px;width:100%}',
+'.prod h3{font-size:.76rem;font-weight:500;line-height:1.3;min-height:2.6em;margin-bottom:7px}',
+'.prod.n-hero h3{font-size:1.15rem;font-weight:700;min-height:0;margin-bottom:9px}',
+'.prod.n-petit h3{font-size:.7rem}',
+'.pv{display:flex;align-items:baseline;gap:3px;flex-wrap:wrap;margin-top:auto}',
+'.pv-n{font-weight:800;font-size:1.45rem;letter-spacing:-.02em;line-height:1}',
+'.prod.n-hero .pv-n{font-size:2.6rem}',
+'.prod.n-petit .pv-n{font-size:1.15rem}',
+'.pv-d{font-weight:700;font-size:.8rem;opacity:.75}',
+'.pv.promo .pv-n{color:#C0392B}',
+'.pv-barre{font-size:.72rem;color:#999;text-decoration:line-through;text-decoration-color:#C0392B;margin-left:5px;font-weight:600}',
+'.eco{display:inline-block;background:#C0392B;color:#fff;font-size:.62rem;font-weight:800;letter-spacing:.05em;padding:3px 8px;border-radius:4px;margin-bottom:5px;align-self:flex-start}',
+'.prod.n-hero .eco{font-size:.76rem;padding:5px 12px}',
+'.bandeau{background:#1B4332;color:#fff;text-align:center;padding:22px;font-weight:700;font-size:clamp(.9rem,2vw,1.15rem);letter-spacing:.02em}',
+'.pied{text-align:center;color:#999;font-size:.72rem;padding:18px}',
+'@media print{',
+'  .som{display:none}',
+'  .planche{break-after:page;background:#fff !important}',
+'  .pl-bande{-webkit-print-color-adjust:exact;print-color-adjust:exact}',
+'  .prod{box-shadow:none;border:1px solid #eee}',
+'  .eco,.pv.promo .pv-n{-webkit-print-color-adjust:exact;print-color-adjust:exact}',
+'}'
+  ].join('');
+
+  const doc='<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+    +'<title>Catalogue — Nouméa Pas Cher</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">'
+    +'<style>'+css+'</style></head><body>'
+    +'<div class="entete"><h1>Catalogue <em>Jouets</em></h1><p>Nouméa Pas Cher · '+new Date().toLocaleDateString('fr-FR')+'</p></div>'
+    +'<nav class="som">'+sommaire+'</nav>'
+    +sections
+    +'<div class="bandeau">LES PRIX LES PLUS BAS SUR LE JOUET, TOUTE L\'ANNÉE</div>'
+    +'<div class="pied">Catalogue généré par Studio Planches Contacts · '+new Date().toLocaleString('fr-FR')+'</div>'
+    +'</body></html>';
+
+  racine.file('index.html', doc);
+  racine.file('LISEZ-MOI.txt', utf8BomBlob([
+    'CATALOGUE WEB',
+    'Genere le '+new Date().toLocaleString('fr-FR'),
+    '',
+    'Ouvre index.html dans un navigateur.',
+    'Garde index.html et le dossier images ENSEMBLE : les visuels sont lies en relatif.',
+    '',
+    'MISE EN LIGNE',
+    '  Depose le contenu du dossier tel quel sur ton hebergement.',
+    '',
+    'VERSION PDF',
+    '  Ouvre index.html, puis Ctrl+P > Enregistrer au format PDF.',
+    '  Coche "Graphiques d arriere-plan" pour conserver les couleurs d univers.',
+    '  Chaque planche demarre sur une nouvelle page.',
+    ''
+  ].join('\r\n')));
+
+  ingestProgress('🛍 Compression du catalogue…');
+  await new Promise(r=>setTimeout(r,0));
+  const blob=await zip.generateAsync({type:'blob', compression:'STORE'});
+  ingestProgress('');
+  return {blob, planches:PAGES.length, produits:allCodes().length, visuels:fait};
+}
+
+$('makeCatalogue').addEventListener('click', async ()=>{
+  if (!allCodes().length){ alert('Construis d\'abord les planches.'); return; }
+  const btn=$('makeCatalogue'); const vieux=btn.textContent;
+  btn.disabled=true; btn.textContent='🛍 …';
+  try{
+    const r=await buildCatalogueWeb();
+    showDownload(r.blob, 'CATALOGUE-WEB-'+new Date().toISOString().slice(0,10)+'.zip',
+      'Catalogue web prêt — '+r.planches+' planche(s), '+r.produits+' produit(s), '+r.visuels+' visuel(s). '
+      +'Décompresse et ouvre index.html.');
+  }catch(e){
+    ingestProgress('');
+    alert('Génération impossible : '+e.message);
+  }
+  btn.disabled=false; btn.textContent=vieux;
 });
 
 // ---------- export HTML autonome (planches figées) ----------
