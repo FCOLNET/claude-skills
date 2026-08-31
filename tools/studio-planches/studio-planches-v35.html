@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V34)</title>
+<title>Studio Planches Contacts — NPC (V35)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -127,9 +127,15 @@
   .wt-item .wt-code { font-size:.55rem; color:#aaa; font-family:monospace; }
   .wt-item .wt-lib { font-size:.6rem; line-height:1.2; height:2.4em; overflow:hidden; }
   .wt-item .wt-prix { font-size:.68rem; font-weight:800; color:#8B1A2B; margin-top:2px; }
-  .wt-item .wt-out { position:absolute; top:4px; right:4px; width:19px; height:19px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff; font-size:.7rem; line-height:1; cursor:pointer; opacity:0; display:flex; align-items:center; justify-content:center; }
-  .wt-item:hover .wt-out { opacity:1; }
-  .wt-item .wt-out:hover { background:#8B1A2B; }
+  .wt-act { position:absolute; top:4px; right:4px; z-index:3; display:flex; gap:3px; opacity:0; transition:opacity .15s; }
+  .wt-item:hover .wt-act { opacity:1; }
+  .wt-act button { width:19px; height:19px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff; font-size:.62rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .wt-act .wt-out:hover { background:#C8A951; color:#1A1A1A; }
+  .wt-act .wt-del:hover { background:#B00020; }
+  .wt-item [contenteditable]:focus { outline:2px solid #C8A951; border-radius:3px; background:#fff; }
+  .wt-page-add { border:none; background:#EFEAE1; color:#555; font-size:.62rem; font-weight:700; padding:2px 8px; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; margin-left:auto; }
+  .wt-page-add:hover { background:#C8A951; color:#1A1A1A; }
+  .wt-page-t { display:flex; align-items:center; gap:6px; }
   .wt-item.niv-hero { outline:2px solid #C8A951; }
   .wt-drop { outline:2px dashed #C8A951; outline-offset:2px; }
   #wtPool { border:2px dashed #1B4332; border-radius:14px; padding:12px 14px; background:#F4FAF6; margin-top:24px; }
@@ -1621,11 +1627,13 @@ function wtItem(code, sec){
     if (!u){ try{ u=URL.createObjectURL(f); wtUrls.set(code,u); }catch(e){} }
     if (u) vis='<img src="'+escA(u)+'" loading="lazy" alt="">';
   }
-  el.innerHTML='<button class="wt-out" title="Mettre en réserve">✕</button>'
+  el.innerHTML='<div class="wt-act">'
+    +'<button class="wt-out" title="Mettre en réserve — récupérable">✕</button>'
+    +'<button class="wt-del" title="Supprimer définitivement de la sélection">🗑</button></div>'
     +'<div class="wt-img">'+vis+'</div>'
     +'<div class="wt-txt"><div class="wt-code">'+esc(String(code).startsWith('SLOT')?'':code)+'</div>'
-    +'<div class="wt-lib">'+esc(p.lib||'')+'</div>'
-    +'<div class="wt-prix">'+esc(p.prixPromo||p.prix||'')+'</div></div>';
+    +'<div class="wt-lib" contenteditable>'+esc(p.lib||'')+'</div>'
+    +'<div class="wt-prix" contenteditable>'+esc(p.prixPromo||p.prix||'')+'</div></div>';
   el.querySelector('.wt-out').addEventListener('click', ev=>{
     ev.stopPropagation();
     // ⚠️ ORDRE : retirer la vignette AVANT de relire le modèle depuis le DOM.
@@ -1636,6 +1644,43 @@ function wtItem(code, sec){
     RESERVE.push({code, pg:(sec&&sec.pg)||''});
     renderWorktable();
     scheduleAutosave();
+  });
+  el.querySelector('.wt-del').addEventListener('click', ev=>{
+    ev.stopPropagation();
+    const nom=(PRODUCTS[code]||{}).lib||code;
+    if (!confirm('Supprimer définitivement « '+nom+' » ?\n\n'
+      +'Il ne sera ni sur une planche, ni au vivier, ni en réserve.\n'
+      +'Pour pouvoir le retrouver, utilise plutôt ✕ qui le met en réserve.')) return;
+    el.remove();
+    wtSync();
+    // purge complète : le produit ne figure plus nulle part
+    POOL=POOL.filter(c=>c!==code);
+    RESERVE=RESERVE.filter(r=>r.code!==code);
+    for (const sc of PAGES){
+      if (Array.isArray(sc.pagesContenu)) sc.pagesContenu=sc.pagesContenu.map(pg=>pg.filter(c=>c!==code));
+      sc.codes=sc.codes.filter(c=>c!==code);
+      if (sc.niveaux) delete sc.niveaux[code];
+      aplatir(sc);
+    }
+    delete PRODUCTS[code]; delete matchedFiles[code]; delete localBlobs[code];
+    renderWorktable();
+    scheduleAutosave();
+  });
+  // saisie sur place : indispensable pour un article ajouté ici et absent de la base.
+  // Un champ éditable dans un élément déplaçable ne prend pas le curseur : on suspend le
+  // glisser le temps de la saisie.
+  el.querySelectorAll('[contenteditable]').forEach(ch=>{
+    ch.addEventListener('mousedown', ev=>{ ev.stopPropagation(); el.draggable=false; });
+    ch.addEventListener('focus', ()=>{ el.draggable=false; });
+    ch.addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); ch.blur(); } });
+    ch.addEventListener('blur', ()=>{
+      el.draggable=true;
+      const pr=PRODUCTS[code]||(PRODUCTS[code]={lib:'',prix:'',prixInit:'',prixPromo:'',remise:''});
+      const v=ch.textContent.trim();
+      if (ch.classList.contains('wt-lib')) pr.lib=v;
+      else if (String(pr.prixInit||'').trim()!=='') pr.prixPromo=v; else pr.prix=v;
+      scheduleAutosave();
+    });
   });
   el.addEventListener('dragstart', ev=>{
     ev.stopPropagation();                       // ne pas déclencher le glisser vers l'extérieur
@@ -1711,6 +1756,50 @@ function wtSync(){
     const vus=lire(res);
     const anciens=new Map(RESERVE.map(r=>[r.code,r]));
     RESERVE=vus.map(c=>anciens.get(c)||{code:c, pg:''});
+  }
+}
+
+// Ajoute un article à une page précise. Le code saisi est résolu contre la base articles
+// — code article, variantes de zéros, référence fournisseur — et la fiche est reprise de
+// la base quand elle s'y trouve. Sinon la vignette est créée vide : libellé et prix se
+// saisissent directement dessus.
+function ajouterArticle(sec, pageIdx){
+  const saisi=prompt(
+    'Article à ajouter à la page '+(pageIdx+1)+' de « '+sec.pg+' »\n\n'
+    +'Code article ou référence fournisseur.\n'
+    +'Laisse vide pour créer une vignette à remplir à la main.', '');
+  if (saisi===null) return;
+  wtSync();
+  const brut=saisi.trim();
+  let code, info=null;
+  if (!brut){
+    code='SLOT'+String(_slotSeq++).padStart(4,'0');
+  } else {
+    code=resolveToBase(brut)||normCode(brut);
+    info=REF[code]||null;
+    // déjà présent quelque part ? on ne duplique pas en silence
+    const ou = allCodes().includes(code) ? 'déjà sur une planche'
+             : POOL.includes(code) ? 'au vivier'
+             : RESERVE.some(r=>r.code===code) ? 'en réserve' : '';
+    if (ou){
+      if (!confirm('L\'article '+code+' est '+ou+'.\n\nL\'ajouter quand même ici ? '
+        +'Il apparaîtra alors à deux endroits.')) return;
+    }
+  }
+  PRODUCTS[code]=PRODUCTS[code]||{lib:'',prix:'',prixInit:'',prixPromo:'',remise:''};
+  if (info){
+    if (!PRODUCTS[code].lib)  PRODUCTS[code].lib=info.lib||'';
+    if (!PRODUCTS[code].prix) PRODUCTS[code].prix=info.prix||'';
+  }
+  sec.pagesContenu=pagesDe(sec).map(x=>x.slice());
+  while (sec.pagesContenu.length<=pageIdx) sec.pagesContenu.push([]);
+  sec.pagesContenu[pageIdx].push(code);
+  aplatir(sec);
+  renderWorktable();
+  scheduleAutosave();
+  if (brut && !info && refCount()){
+    setTimeout(()=>alert('L\'article '+code+' est introuvable dans la base : '
+      +'saisis son libellé et son prix directement sur la vignette.'), 60);
   }
 }
 
@@ -1801,9 +1890,11 @@ function renderWorktable(){
         const page=document.createElement('div');
         page.className='wt-page'+(sec.pages && pg>=sec.pages ? ' hors':'');
         const trop=dedans.length>pp;
-        page.innerHTML='<div class="wt-page-t">'
+        page.innerHTML='<div class="wt-page-t"><span>'
           +(sec.pages&&pg>=sec.pages?'⚠ hors pagination · page ':'Page ')+(pg+1)
-          +' <span style="font-weight:400;color:'+(trop?'#B00020':'#bbb')+'">'+dedans.length+'/'+pp+'</span></div>';
+          +'</span><span style="font-weight:400;color:'+(trop?'#B00020':'#bbb')+'">'+dedans.length+'/'+pp+'</span>'
+          +'<button class="wt-page-add" title="Ajouter un article à cette page">➕ Article</button></div>';
+        page.querySelector('.wt-page-add').onclick=()=>ajouterArticle(sec, pg);
         const g=wtZoneDepot(document.createElement('div'));
         g.className='wt-grid';
         g.style.gridTemplateColumns='repeat('+cols+', var(--wt))';

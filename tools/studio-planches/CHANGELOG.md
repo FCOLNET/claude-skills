@@ -1,5 +1,32 @@
 # Studio Planches Contacts — journal des versions
 
+## V35 — ajouter, saisir et supprimer depuis la table de travail
+
+La table de travail ne savait que déplacer ce qui existait déjà. Trois manques comblés.
+
+**➕ Article, sur chaque page.** Le code saisi est résolu contre la base articles — code
+article, variantes de zéros, référence fournisseur — et la fiche en est reprise. Si
+l'article figure déjà sur une planche, au vivier ou en réserve, l'outil le dit et demande
+confirmation avant de le faire apparaître à deux endroits. Un champ laissé vide crée une
+vignette à remplir de toutes pièces.
+
+**Saisie sur la vignette.** Libellé et prix s'éditent directement dans la table de
+travail — sans quoi un article ajouté hors base y serait inutilisable. Un champ éditable
+dans un élément déplaçable ne prend pas le curseur : le glisser est suspendu le temps de
+la saisie, puis rétabli.
+
+**Deux gestes distincts pour retirer**, et c'est volontaire :
+
+| | |
+|---|---|
+| **✕** | met en **réserve** — récupérable, la fiche et la photo sont conservées |
+| **🗑** | **supprime définitivement**, sur confirmation — plus sur aucune planche, ni au vivier, ni en réserve ; fiche, photo et niveau purgés |
+
+Le compteur de chaque page suit les ajouts et les retraits. Le nombre de produits par page
+reste un **repère**, jamais une limite : une page peut en contenir moins, ou davantage —
+le compteur passe alors au rouge.
+
+
 ## V34 — composer le catalogue page par page
 
 Cas de départ opposé au précédent : la sélection arrive en **un seul bloc**, sans que le
