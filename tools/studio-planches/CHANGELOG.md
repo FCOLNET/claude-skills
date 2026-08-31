@@ -1,5 +1,28 @@
 # Studio Planches Contacts — journal des versions
 
+## V29 — le glisser vers Word insérait un cadre vide
+
+Word recevait une promesse de fichier qu'il ne savait pas résoudre, et insérait un cadre
+gris à la place de la photo. Le copier-coller par le bouton ⧉, lui, fonctionnait.
+
+Cause : depuis la V22, la source du glisser était le **conteneur** de la photo, pas la
+photo. Or, quand un simple bloc est à l'origine d'un glisser, le navigateur ne joint
+aucune représentation d'image native — seulement la promesse de fichier ajoutée par
+l'outil. C'est précisément ce qui distingue ce cas du glisser d'une image depuis un site
+web vers Word, qui fonctionne : là, le navigateur joint ses propres formats image.
+
+La source est désormais l'**image** elle-même. Le navigateur joint donc ses formats
+natifs — ceux que Word sait coller — et l'outil y **ajoute** la promesse de fichier
+nommée et en pleine résolution, pour InDesign et l'Explorateur. Le conteneur ne reste
+source que pour une vignette sans photo, où seul le texte a un intérêt.
+
+**Non vérifiable ici** : la réception native, faute d'applications Windows dans
+l'environnement de test. Ce qui est vérifié, c'est que la source est bien l'image, que la
+promesse porte le fichier pleine résolution, qu'aucun format texte ne vient concurrencer,
+et que le gestionnaire du conteneur ne double pas celui de l'image. Le bouton ⧉ reste la
+voie garantie.
+
+
 ## V28 — un catalogue web qui ne perd plus ses visuels
 
 La version en dossier (`index.html` + `images/`) est correcte pour une mise en ligne,

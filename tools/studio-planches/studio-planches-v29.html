@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V28)</title>
+<title>Studio Planches Contacts — NPC (V29)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -479,8 +479,8 @@ function buildCard(sec, code, grid){
   card.innerHTML=`
     <button class="del-card" title="Supprimer cette vignette">✕</button>
     <button class="copy-card" title="Copier la photo dans le presse-papier, puis Ctrl+V dans Word, InDesign, PowerPoint…">⧉</button>
-    <div class="photo-slot" draggable="true" title="Clic : choisir une photo · Glisser : déposer la photo dans InDesign, Illustrator, Word…">
-      <img class="prod-img" alt="${escA(code)}">
+    <div class="photo-slot" draggable="true" title="Clic : choisir une photo · Glisser la photo : la déposer dans InDesign, Illustrator, Word…">
+      <img class="prod-img" draggable="true" alt="${escA(code)}">
       <div class="ph-fallback"><span class="photo-code">${esc(code.startsWith('SLOT')?'—':code)}</span><span class="photo-file">${esc(photoFileName(p.photo)||'clique pour choisir')}</span></div>
       <div class="ph-edit">📷 changer · ↗ glisser</div>
     </div>
@@ -537,8 +537,18 @@ function buildCard(sec, code, grid){
     (PRODUCTS[card.dataset.code]||(PRODUCTS[card.dataset.code]={})).remise=el.textContent.trim();
   });
   card.querySelector('.photo-slot').addEventListener('click', ()=>{ currentEditCode=card.dataset.code; currentEditCard=card; $('singleInput').click(); });
-  // glisser la vignette vers une application externe (InDesign, Illustrator, Word…)
-  card.querySelector('.photo-slot').addEventListener('dragstart', e=>dragOutStart(e, card));
+  // ⚠️ La source du glisser est l'IMAGE elle-même, pas son conteneur.
+  // V22-V28 : le conteneur était la source. Or, quand un simple bloc est à l'origine d'un
+  // glisser, le navigateur ne joint AUCUNE représentation d'image native — seulement la
+  // promesse de fichier que nous ajoutons. Word, qui ne sait pas la résoudre, insérait
+  // alors un cadre gris vide. Une IMAGE comme source, en revanche, fait joindre au
+  // navigateur ses propres formats image, que Word et consorts savent coller.
+  card.querySelector('.prod-img').addEventListener('dragstart', e=>dragOutStart(e, card));
+  // le conteneur ne sert de source que pour une vignette SANS photo : seul le texte part
+  card.querySelector('.photo-slot').addEventListener('dragstart', e=>{
+    if (e.target && e.target.classList.contains('prod-img')) return;   // déjà traité
+    dragOutStart(e, card);
+  });
   // …ou copier la photo dans le presse-papier, si l'application réceptrice accepte mal
   // le glisser-déposer depuis un navigateur
   card.querySelector('.copy-card').addEventListener('click', async ev=>{
@@ -1436,13 +1446,11 @@ function dragOutStart(e, card){
   }
   const nom=dragFileName(code);
   const mime=file.type||'image/jpeg';
+  // On AJOUTE la promesse de fichier — nommée et en pleine résolution, pour InDesign et
+  // l'Explorateur — sans toucher aux formats que le navigateur joint déjà de lui-même
+  // depuis une image : ce sont eux que Word utilise.
   try{ dt.setData('DownloadURL', mime+':'+nom+':'+url); }catch(err){}
   dt.effectAllowed='copy';
-  // vignette d'accompagnement pendant le déplacement
-  const img=card.querySelector('.prod-img');
-  if (img && img.style.display!=='none' && dt.setDragImage){
-    try{ dt.setDragImage(img, 40, 40); }catch(err){}
-  }
 }
 // ============ CONTRÔLE DES FONDS PHOTO (V27) ============
 // Le rendu « type Checkers » repose entièrement sur des visuels détourés ou sur fond
