@@ -1,5 +1,33 @@
 # Studio Planches Contacts — journal des versions
 
+## V23 — export « Fusion de données » pour InDesign
+
+Glisser 483 produits un par un n'est pas une méthode. InDesign sait composer les pages
+seul à partir d'un fichier source : on place les champs une fois sur un gabarit, et
+« Créer un document fusionné » génère tout.
+
+Nouveau bouton **🧩 Fusion InDesign** : une ligne par produit, avec planche, position,
+code, référence fournisseur, désignation, prix, prix initial, prix promo, remise,
+présence de la photo, et le chemin de l'image dans une colonne `@Photo` — le préfixe `@`
+étant ce qui désigne un champ image pour InDesign.
+
+Le chemin de l'image suit trois règles, dans l'ordre : le chemin donné par le fichier
+source s'il existe ; sinon le dossier indiqué plus le **nom réel du fichier importé**
+(une photo `105143.png` ne devient pas `105143.jpg`) ; sinon le dossier plus le code.
+InDesign sait lier une image par chemin réseau, le dossier peut donc rester le partage.
+
+Deux choix de format, contre deux pièges classiques :
+
+- **séparateur tabulation** plutôt que virgule ou point-virgule — les désignations
+  contiennent des virgules (`POUSSEUR BÉBÉ, 2 en 1`), et le point-virgule dépend des
+  réglages régionaux ;
+- **encodage UTF-16 LE avec BOM**, l'« Unicode » qu'InDesign détecte de façon fiable.
+  En UTF-8, les accents des désignations ressortent en caractères parasites.
+
+Marche à suivre dans InDesign : Fenêtre → Utilitaires → Fusion de données → Sélectionner
+la source de données → placer les champs sur le gabarit → Créer un document fusionné.
+
+
 ## V22 — glisser une vignette vers InDesign, Illustrator ou Word
 
 Les vignettes deviennent glissables hors du navigateur. Le fichier déposé est la

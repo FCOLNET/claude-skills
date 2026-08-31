@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V22)</title>
+<title>Studio Planches Contacts — NPC (V23)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -161,6 +161,7 @@
     <button class="btn green" id="makeFolder">🗂 Dossier prod HD</button>
     <button class="btn blue" id="makeHtml">📤 Export HTML</button>
     <button class="btn green" id="makeXlsx" title="Exporter le catalogue final en Excel (une ligne par produit)">📊 Excel</button>
+    <button class="btn gold" id="makeMerge" title="Fichier source pour la Fusion de données d'InDesign : une ligne par produit, avec le chemin de l'image. InDesign place ensuite les pages tout seul.">🧩 Fusion InDesign</button>
     <button class="btn ghost" id="makeZip">📦 Zip</button>
     <button class="btn ghost" id="exportMissing">📋 Manquants</button>
     <button class="btn ghost" onclick="window.print()">🖨</button>
@@ -2075,6 +2076,102 @@ $('makeFolder').addEventListener('click', async ()=>{
     btn.textContent='✅ Zip ('+n+')';
   }
 });
+// ============ EXPORT FUSION DE DONNÉES INDESIGN (V23) ============
+// InDesign (Fenêtre → Utilitaires → Fusion de données) attend un fichier texte avec une
+// ligne d'en-têtes ; une colonne dont le nom commence par « @ » est traitée comme une
+// IMAGE, et sa valeur doit être un chemin de fichier. On place les champs une fois sur
+// un gabarit, « Créer un document fusionné » génère toutes les pages.
+//
+// Choix de format, deux pièges classiques :
+//   · séparateur TABULATION plutôt que virgule ou point-virgule : les désignations
+//     contiennent des virgules, et le point-virgule dépend des réglages régionaux ;
+//   · encodage UTF-16 LE avec BOM : c'est l'« Unicode » qu'InDesign détecte de façon
+//     fiable. En UTF-8, les accents des désignations ressortent en caractères parasites.
+function utf16leBlob(texte){
+  const buf=new ArrayBuffer(2+texte.length*2);
+  const vue=new DataView(buf);
+  vue.setUint8(0,0xFF); vue.setUint8(1,0xFE);          // BOM little-endian
+  for (let i=0;i<texte.length;i++) vue.setUint16(2+i*2, texte.charCodeAt(i), true);
+  return new Blob([buf], {type:'text/plain'});
+}
+// une valeur ne doit contenir ni tabulation ni retour à la ligne : ce sont les séparateurs
+function champ(v){ return String(v==null?'':v).replace(/[\t\r\n]+/g,' ').trim(); }
+
+// Chemin de l'image tel qu'InDesign devra le résoudre.
+// 1) le chemin donné par le fichier source, s'il existe (il est déjà complet) ;
+// 2) sinon le dossier indiqué + le nom réel du fichier importé ;
+// 3) sinon le dossier indiqué + le code.
+function mergeImagePath(code, dossier){
+  const p=(PRODUCTS[code]||{}).photo;
+  if (p && photoFolder(p)) return p;
+  if (!dossier) return '';
+  const base=dossier.replace(/[\\/]+$/,'');
+  const f=matchedFiles[code];
+  if (f && f.name) return base+'\\'+f.name;
+  return base+'\\'+code+'.jpg';
+}
+
+function buildMergeFile(dossier){
+  const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
+  const codeToFourn={};
+  for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) codeToFourn[c]=arr[0]; }
+  for (const [fKey,c] of Object.entries(REF_FOURN||{})){ if(!(c in codeToFourn)) codeToFourn[c]=fKey; }
+  const lignes=[[
+    'Planche','Position','Code','RefFournisseur','Designation',
+    'Prix','PrixInitial','PrixPromo','Remise','PhotoPresente','@Photo'
+  ].join('\t')];
+  let avecPhoto=0;
+  for (const sec of PAGES){
+    let pos=0;
+    for (const code of sec.codes){
+      pos++;
+      const p=PRODUCTS[code]||{};
+      const isSlot=String(code).startsWith('SLOT');
+      const hasInit=String(p.prixInit||'').trim()!=='';
+      const rem=hasInit?parseRemise(p.remise||'', numFromPrix(p.prixInit), numFromPrix(p.prixPromo||p.prix)):{pct:null,val:null};
+      const chemin=mergeImagePath(code, dossier);
+      const dispo=!!matchedFiles[code];
+      if (dispo) avecPhoto++;
+      lignes.push([
+        champ(sec.pg), pos, champ(isSlot?'':code), champ(codeToFourn[code]||''), champ(p.lib||''),
+        champ(p.prix||''), champ(hasInit?p.prixInit:''), champ(hasInit?(p.prixPromo||p.prix):''),
+        champ(hasInit?fmtRemiseText(rem,fmt).replace(/\u00a0|\u202f/g,' '):''),
+        dispo?'Oui':'Non',
+        champ(chemin)
+      ].join('\t'));
+    }
+  }
+  return {texte:lignes.join('\r\n')+'\r\n', total:lignes.length-1, avecPhoto};
+}
+
+$('makeMerge').addEventListener('click', ()=>{
+  if (!allCodes().length){ alert('Construis d\'abord les planches.'); return; }
+  // Dossier où InDesign ira chercher les images. Inutile de le demander si le fichier
+  // source donne déjà les chemins complets.
+  const cheminsFournis=[...new Set(allCodes())].every(c=>{
+    const p=(PRODUCTS[c]||{}).photo; return p && photoFolder(p);
+  });
+  let dossier=PHOTO_SRC_DIR||'';
+  if (!cheminsFournis){
+    const saisi=prompt(
+      "Dossier où InDesign trouvera les images.\n\n"
+      +"Le dossier local créé par la commande de copie, ou directement le partage réseau —\n"
+      +"InDesign sait lier une image sur un chemin réseau.\n\n"
+      +"Exemples :\n"
+      +"  C:\\Users\\<toi>\\PHOTOS_PLANCHES\n"
+      +"  \\\\10.10.101.52\\SMRC_photo",
+      dossier);
+    if (saisi===null) return;
+    dossier=saisi.trim();
+    if (dossier){ PHOTO_SRC_DIR=dossier; idbSet('photoSrcDir', dossier).catch(()=>{}); }
+  }
+  const m=buildMergeFile(dossier);
+  const stamp=new Date().toISOString().slice(0,10);
+  showDownload(utf16leBlob(m.texte), 'fusion-indesign-'+stamp+'.txt',
+    'Fichier de fusion prêt — '+m.total+' produit(s), '+m.avecPhoto+' avec photo. '
+    +'Dans InDesign : Fenêtre → Utilitaires → Fusion de données → Sélectionner la source de données.');
+});
+
 // ---------- export EXCEL du catalogue final (1 ligne par produit) ----------
 $('makeXlsx').addEventListener('click', ()=>{
   const btn=$('makeXlsx'); const oldTxt=btn.textContent;
