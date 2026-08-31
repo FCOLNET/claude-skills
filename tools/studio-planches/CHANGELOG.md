@@ -1,5 +1,27 @@
 # Studio Planches Contacts — journal des versions
 
+## V22 — glisser une vignette vers InDesign, Illustrator ou Word
+
+Les vignettes deviennent glissables hors du navigateur. Le fichier déposé est la
+**photo d'origine pleine résolution**, pas la copie de travail : c'est une maquette qui
+la reçoit, pas un aperçu. Vérifié — 34 Ko partent là où la copie de travail en pèse 1.
+
+Le mécanisme est le type de presse-papier `DownloadURL` de Chromium, au format
+`<mime>:<nom de fichier>:<url>` : pendant le dépôt, le navigateur écrit le fichier sur le
+disque et remet un vrai chemin à l'application réceptrice. C'est ce qu'utilisent Google
+Drive ou Photopea pour sortir un fichier d'une page web. Sur un navigateur qui l'ignore,
+le glisser retombe sans erreur sur le comportement habituel.
+
+Le fichier est nommé pour être reconnaissable en maquette — code + désignation, par
+exemple `105143_AXE_GEL_DOUCHE_250ML_AFRICA.jpg`. Deux formats accompagnent le fichier :
+`text/plain` (code · désignation · prix) pour un dépôt dans un bloc de texte, et
+`text/html` pour les traitements de texte. Une vignette sans photo ne dépose que le texte.
+
+**Non vérifié** : la réception effective dans InDesign, faute d'application native dans
+l'environnement de test. Ce qui est vérifié, c'est que la page émet bien le fichier
+attendu, en pleine résolution et correctement nommé.
+
+
 ## V21 — la copie des photos ne dépend plus d'une colonne facultative
 
 Défaut de conception de la V20 : la seule méthode d'import qui fonctionne sur un partage

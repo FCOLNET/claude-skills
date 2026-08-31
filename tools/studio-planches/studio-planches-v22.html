@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V21)</title>
+<title>Studio Planches Contacts — NPC (V22)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -182,7 +182,7 @@
   <div class="formbox hidden" id="photoFolders" style="max-width:900px;margin:10px auto 0;padding:14px 18px"></div>
   <div class="pdfprog" id="pdfProg"></div>
   <div style="text-align:center"><button class="btn ghost hidden" id="cancelImport" style="padding:6px 18px;font-size:.75rem">✖ Interrompre l'import</button></div>
-  <p class="subhint">📚 <b>Base articles</b> : charge l'export complet de ta base (tous rayons) — stockage illimité, mémorisé entre sessions. Recharge le même export pour mettre les prix à jour → toute photo posée remplit automatiquement code, libellé et prix (mémorisé pour les prochaines sessions).<br>Fenêtre "dossier" = n'affiche QUE les dossiers (normal, clique "Sélectionner" même si ça semble vide) — c'est la méthode à privilégier sur un partage réseau. À l'inverse, <b>ne fais pas Ctrl+A dans "🖼 Quelques images"</b> : cette fenêtre affiche les miniatures de chaque photo et c'est leur rendu depuis le réseau qui fige le navigateur. Clic sur une photo = la remplacer. Codes, libellés, prix et titres de pages sont éditables directement (clic sur le texte).</p>
+  <p class="subhint">📚 <b>Base articles</b> : charge l'export complet de ta base (tous rayons) — stockage illimité, mémorisé entre sessions. Recharge le même export pour mettre les prix à jour → toute photo posée remplit automatiquement code, libellé et prix (mémorisé pour les prochaines sessions).<br>Fenêtre "dossier" = n'affiche QUE les dossiers (normal, clique "Sélectionner" même si ça semble vide) — c'est la méthode à privilégier sur un partage réseau. À l'inverse, <b>ne fais pas Ctrl+A dans "🖼 Quelques images"</b> : cette fenêtre affiche les miniatures de chaque photo et c'est leur rendu depuis le réseau qui fige le navigateur. Clic sur une photo = la remplacer. <b>Glisser une photo hors de la fenêtre</b> = déposer le fichier pleine résolution dans InDesign, Illustrator, Photoshop, Word… Codes, libellés, prix et titres de pages sont éditables directement (clic sur le texte).</p>
   <div id="planches"></div>
 </div>
 
@@ -450,10 +450,10 @@ function buildCard(sec, code, grid){
   card._sec = sec;
   card.innerHTML=`
     <button class="del-card" title="Supprimer cette vignette">✕</button>
-    <div class="photo-slot" title="Clic : choisir une photo">
+    <div class="photo-slot" draggable="true" title="Clic : choisir une photo · Glisser : déposer la photo dans InDesign, Illustrator, Word…">
       <img class="prod-img" alt="${escA(code)}">
       <div class="ph-fallback"><span class="photo-code">${esc(code.startsWith('SLOT')?'—':code)}</span><span class="photo-file">${esc(photoFileName(p.photo)||'clique pour choisir')}</span></div>
-      <div class="ph-edit">📷 changer</div>
+      <div class="ph-edit">📷 changer · ↗ glisser</div>
     </div>
     <div class="card-body">
       <div class="card-code" contenteditable>${esc(code.startsWith('SLOT')?'':code)}</div>
@@ -507,6 +507,8 @@ function buildCard(sec, code, grid){
     (PRODUCTS[card.dataset.code]||(PRODUCTS[card.dataset.code]={})).remise=el.textContent.trim();
   });
   card.querySelector('.photo-slot').addEventListener('click', ()=>{ currentEditCode=card.dataset.code; currentEditCard=card; $('singleInput').click(); });
+  // glisser la vignette vers une application externe (InDesign, Illustrator, Word…)
+  card.querySelector('.photo-slot').addEventListener('dragstart', e=>dragOutStart(e, card));
   card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('dragover');});
   card.addEventListener('dragleave',()=>card.classList.remove('dragover'));
   card.addEventListener('drop',e=>{
@@ -1235,6 +1237,68 @@ function fillCardFromBase(card, code, force){
   renderRemise(card);
   return true;
 }
+
+// ============ GLISSER UNE VIGNETTE VERS UNE APPLICATION EXTERNE (V22) ============
+// Chromium accepte un type de presse-papier non standard, "DownloadURL", au format
+//   <type mime>:<nom de fichier>:<url absolue>
+// Pendant le dépôt, le navigateur écrit le fichier sur le disque et remet un VRAI chemin
+// à l'application réceptrice — InDesign, Illustrator, Word, l'Explorateur… C'est le
+// mécanisme utilisé par Google Drive ou Photopea pour sortir un fichier d'une page web.
+//
+// On fournit en plus :
+//   · text/plain — code, désignation et prix, pour un dépôt dans un bloc de texte
+//   · text/html  — une image, pour les traitements de texte qui préfèrent du HTML
+//
+// À noter : c'est propre à Chromium. Sur un navigateur qui l'ignore, le glisser retombe
+// sur le comportement habituel (image + texte), sans erreur.
+const dragUrls = new Map();   // code -> URL blob maintenue en vie le temps du dépôt
+
+function dragFileName(code){
+  const f=matchedFiles[code];
+  const nom=f && f.name ? baseName(f.name) : String(code);
+  const ext=f ? photoExt(f) : '.jpg';
+  // nom lisible en maquette : code + désignation courte
+  const lib=((PRODUCTS[code]||{}).lib||'').trim();
+  const base=lib ? safeName(nom+' '+lib.slice(0,28)) : safeName(nom);
+  return (base||String(code))+ext;
+}
+
+function dragOutStart(e, card){
+  const code=card.dataset.code;
+  const p=PRODUCTS[code]||{};
+  const dt=e.dataTransfer;
+  if (!dt) return;
+  // texte : utile pour déposer la référence dans un bloc de texte
+  const txt=[code.startsWith('SLOT')?'':code, p.lib||'', p.prixPromo||p.prix||''].filter(Boolean).join(' · ');
+  try{ dt.setData('text/plain', txt); }catch(err){}
+
+  // On envoie le fichier D'ORIGINE pleine résolution : c'est une maquette qui le reçoit,
+  // pas un aperçu. Si seule la copie de travail existe, on l'envoie plutôt que rien.
+  const file=matchedFiles[code]||localBlobs[code];
+  if (!file){ dt.effectAllowed='copy'; return; }   // pas de photo : seul le texte part
+
+  let url=dragUrls.get(code);
+  if (!url){
+    try{ url=URL.createObjectURL(file); dragUrls.set(code, url); }
+    catch(err){ return; }
+  }
+  const nom=dragFileName(code);
+  const mime=file.type||'image/jpeg';
+  try{ dt.setData('DownloadURL', mime+':'+nom+':'+url); }catch(err){}
+  try{ dt.setData('text/html', '<img src="'+escA(url)+'" alt="'+escA(code)+'">'); }catch(err){}
+  dt.effectAllowed='copy';
+  // vignette d'accompagnement pendant le déplacement
+  const img=card.querySelector('.prod-img');
+  if (img && img.style.display!=='none' && dt.setDragImage){
+    try{ dt.setDragImage(img, 40, 40); }catch(err){}
+  }
+}
+// Les URL créées pour le glisser sont libérées quand on quitte la page : les révoquer
+// à la fin du glisser casserait le dépôt, le navigateur lisant le fichier après coup.
+window.addEventListener('pagehide', ()=>{
+  for (const u of dragUrls.values()){ try{ URL.revokeObjectURL(u); }catch(e){} }
+  dragUrls.clear();
+});
 
 function setCardImage(code,file,manual,bulk,cardEl){
   // cardEl = la vignette précisément visée (clic / drop). Sans elle on retombe sur la
