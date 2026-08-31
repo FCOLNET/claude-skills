@@ -1,5 +1,39 @@
 # Studio Planches Contacts — journal des versions
 
+## V33 — table de travail : la sélection devient mobile
+
+Les planches ne sont pas un état final mais un **vivier** : une sélection large qu'on
+affine. Nouveau bouton **🗂 Table de travail**, un espace où la sélection se manipule.
+
+**Écarter n'est pas supprimer.** Un produit sorti part en **réserve**, avec le nom de sa
+planche d'origine. Rien n'est perdu, on peut le remettre d'un glisser — un arbitrage doit
+pouvoir se rejouer. La réserve est conservée dans la sauvegarde de projet.
+
+**Deux vues, au choix.** *Pages réelles* découpe chaque planche en grilles de 9
+emplacements — on voit exactement quels produits seront voisins à l'impression, et les
+pages au-delà de la pagination attribuée sont signalées en rouge. *Plan d'ensemble*
+affiche tout le groupe d'un bloc, pour un premier dégrossissage.
+
+**Taille réglable** par curseur, de 90 à 260 px : compact pour répartir, grand pour juger
+si deux visuels se tiennent côte à côte.
+
+Le glisser fonctionne dans une page, entre pages, entre planches, et depuis ou vers la
+réserve. Le niveau héros reste visible pour composer la page.
+
+### Bug d'ordre corrigé
+
+La mise en réserve relisait le modèle depuis l'affichage **avant** de retirer la vignette :
+le produit restait dans la planche tout en entrant en réserve. Il aurait été compté deux
+fois et serait réapparu au rendu suivant. L'ordre est désormais retirer, relire, ranger.
+
+### Deux échecs de banc de test, pas de l'outil
+
+Le glisser entre planches semblait ne rien faire : la planche de destination se trouvait
+sous la ligne de flottaison et le lâcher se faisait hors de la fenêtre. Même cause que
+lors du diagnostic du glisser vers Word. Le banc utilise maintenant une fenêtre assez
+haute et une sélection compacte pour que source et cible soient visibles ensemble.
+
+
 ## V32 — retirer les formats « adresse »
 
 La V31 avait fait tomber le cadre gris : avec l'image incorporée dans le format HTML,

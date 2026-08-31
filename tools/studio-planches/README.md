@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v32.html` | **version courante**, à utiliser |
+| `studio-planches-v33.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -32,17 +32,20 @@ l'historique git.
 4. **Contrôle des fonds** — « 🔍 Fonds photo » classe les visuels en détouré / uni /
    varié et indique la direction graphique atteignable. À faire avant d'arrêter la
    direction artistique.
-5. **Calage éditorial** — renseigner le nombre de pages de chaque planche et le nombre de
+5. **Table de travail** — « 🗂 Table de travail » : réorganiser la sélection par
+   glisser-déposer, tester les voisinages page par page, écarter en réserve
+   (récupérable). C'est là que la sélection large devient la sélection finale.
+6. **Calage éditorial** — renseigner le nombre de pages de chaque planche et le nombre de
    produits par page : la jauge dit si la sélection tient. Marquer les héros de chaque
    page d'un clic sur le niveau de la vignette.
-6. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
+7. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
    récapitulatif, HTML pour diffusion.
-7. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand, au choix en
+8. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand, au choix en
    fichier unique (visuels incorporés, rien à décompresser) ou en dossier
    `index.html` + `images/` pour une mise en ligne. Imprimable en PDF (Ctrl+P).
    Une archive doit être décompressée avant d'ouvrir la page, sinon les visuels
    manquent — le catalogue le signale lui-même.
-8. **Maquette** — deux voies vers InDesign :
+9. **Maquette** — deux voies vers InDesign :
    - bouton « ⧉ Copier » sur la vignette, puis Ctrl+V dans Word, InDesign ou PowerPoint —
      méthode fiable, vérifiée de bout en bout ; le glisser-déposer d'une photo est laissé
      au comportement natif du navigateur et transmet la copie d'affichage ;
@@ -55,7 +58,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v32.mjs ../studio-planches-v32.html
+node verif-v33.mjs ../studio-planches-v33.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et

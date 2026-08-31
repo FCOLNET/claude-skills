@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V32)</title>
+<title>Studio Planches Contacts — NPC (V33)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -98,6 +98,43 @@
   .promo-toggle label { font-size:.75rem; font-weight:700; color:#444; }
   .promo-toggle select { padding:6px 10px; border:1px solid #ccc; border-radius:8px; font-size:.78rem; font-family:'DM Sans',sans-serif; background:#fff; }
   .hidden { display:none !important; }
+  /* ============ TABLE DE TRAVAIL (V33) ============ */
+  #worktable { --wt:150px; max-width:1500px; margin:0 auto; padding:0 16px 60px; }
+  .wt-bar { position:sticky; top:0; z-index:40; background:rgba(245,243,240,.97); backdrop-filter:blur(6px); padding:10px 12px; border-bottom:1px solid #E5E0D8; display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 -16px 14px; }
+  .wt-bar .btn { padding:8px 16px; font-size:.78rem; }
+  .wt-seg { display:flex; border:1px solid #ccc; border-radius:20px; overflow:hidden; }
+  .wt-seg button { border:none; background:#fff; color:#666; font-family:'DM Sans',sans-serif; font-size:.75rem; font-weight:700; padding:7px 14px; cursor:pointer; }
+  .wt-seg button.on { background:#1B4332; color:#fff; }
+  .wt-size { display:flex; align-items:center; gap:7px; font-size:.72rem; color:#777; font-weight:700; }
+  .wt-tot { font-size:.8rem; color:#555; margin-left:auto; font-weight:700; }
+  .wt-planche { margin-bottom:26px; }
+  .wt-head { display:flex; align-items:center; gap:12px; border-left:5px solid #8B1A2B; padding:7px 13px; background:#fff; border-radius:0 10px 10px 0; box-shadow:0 1px 8px rgba(0,0,0,.05); flex-wrap:wrap; }
+  .wt-head h3 { font-size:.95rem; font-weight:700; flex-grow:1; }
+  .wt-pages { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .wt-page { border:2px solid #E5E0D8; border-radius:12px; padding:10px; background:#fff; }
+  .wt-page.hors { border-color:#B00020; background:#FFF6F6; }
+  .wt-page-t { font-size:.68rem; font-weight:700; color:#888; margin-bottom:7px; letter-spacing:.03em; }
+  .wt-page.hors .wt-page-t { color:#B00020; }
+  .wt-grid { display:grid; gap:8px; min-height:60px; }
+  .wt-flow { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--wt),1fr)); gap:8px; margin-top:10px; min-height:60px; }
+  .wt-item { background:#fff; border:1px solid #E5E0D8; border-radius:9px; overflow:hidden; cursor:grab; position:relative; }
+  .wt-item:active { cursor:grabbing; }
+  .wt-item.dragging { opacity:.35; }
+  .wt-item .wt-img { aspect-ratio:1; background:#FAF8F5; display:flex; align-items:center; justify-content:center; }
+  .wt-item .wt-img img { width:100%; height:100%; object-fit:contain; pointer-events:none; }
+  .wt-item .wt-vide { font-size:.55rem; color:#bbb; font-weight:700; }
+  .wt-item .wt-txt { padding:5px 6px 6px; }
+  .wt-item .wt-code { font-size:.55rem; color:#aaa; font-family:monospace; }
+  .wt-item .wt-lib { font-size:.6rem; line-height:1.2; height:2.4em; overflow:hidden; }
+  .wt-item .wt-prix { font-size:.68rem; font-weight:800; color:#8B1A2B; margin-top:2px; }
+  .wt-item .wt-out { position:absolute; top:4px; right:4px; width:19px; height:19px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff; font-size:.7rem; line-height:1; cursor:pointer; opacity:0; display:flex; align-items:center; justify-content:center; }
+  .wt-item:hover .wt-out { opacity:1; }
+  .wt-item .wt-out:hover { background:#8B1A2B; }
+  .wt-item.niv-hero { outline:2px solid #C8A951; }
+  .wt-drop { outline:2px dashed #C8A951; outline-offset:2px; }
+  #wtReserve { border:2px dashed #C8A951; border-radius:14px; padding:12px 14px; background:#FFFDF5; margin-top:24px; }
+  #wtReserve h3 { font-size:.9rem; font-weight:700; margin-bottom:3px; }
+  #wtReserve p { font-size:.72rem; color:#888; margin-bottom:9px; }
   .topbar-mini { position:sticky; top:0; z-index:50; background:rgba(245,243,240,.95); backdrop-filter:blur(6px); padding:8px; border-bottom:1px solid #E5E0D8; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
   .topbar-mini .btn { padding:8px 16px; font-size:.78rem; }
   @media print {
@@ -171,6 +208,7 @@
 <div id="builder" class="hidden">
   <div class="topbar-mini">
     <button class="btn ghost" id="backBtn">↩ Structure</button>
+    <button class="btn gold" id="wtBtn" title="Table de travail : réorganiser la sélection, tester les voisinages, écarter en réserve">🗂 Table de travail</button>
     <button class="btn green" id="saveProj" title="Sauvegarder le projet dans un fichier (.json) pour reprendre plus tard">💾 Sauvegarder</button>
     <button class="btn ghost" id="openProj" title="Ouvrir un projet sauvegardé (.json)">📂 Ouvrir projet</button>
     <button class="btn ghost" id="refBtn" title="Charger un Excel code→libellé→prix pour l'auto-remplissage">📚 Référentiel</button>
@@ -212,6 +250,7 @@
   <div style="text-align:center"><button class="btn ghost hidden" id="cancelImport" style="padding:6px 18px;font-size:.75rem">✖ Interrompre l'import</button></div>
   <p class="subhint">📚 <b>Base articles</b> : charge l'export complet de ta base (tous rayons) — stockage illimité, mémorisé entre sessions. Recharge le même export pour mettre les prix à jour → toute photo posée remplit automatiquement code, libellé et prix (mémorisé pour les prochaines sessions).<br>Fenêtre "dossier" = n'affiche QUE les dossiers (normal, clique "Sélectionner" même si ça semble vide) — c'est la méthode à privilégier sur un partage réseau. À l'inverse, <b>ne fais pas Ctrl+A dans "🖼 Quelques images"</b> : cette fenêtre affiche les miniatures de chaque photo et c'est leur rendu depuis le réseau qui fige le navigateur. Clic sur une photo = la remplacer. <b>Envoyer une photo dans un document</b> : bouton <b>⧉ Copier</b> en haut à gauche de la vignette, puis Ctrl+V dans Word, InDesign ou PowerPoint — c'est la méthode fiable. Le glisser-déposer fonctionne aussi vers les applications qui l'acceptent, mais il transmet la copie d'affichage ; pour de la pleine résolution, utilise « 🗂 Dossier prod HD » ou « 🧩 Fusion InDesign ». Codes, libellés, prix et titres de pages sont éditables directement (clic sur le texte).</p>
   <div id="planches"></div>
+  <div id="worktable" class="hidden"></div>
 </div>
 
 <input type="file" id="refInput" accept=".xlsx,.xls,.csv" style="display:none">
@@ -1508,6 +1547,197 @@ function _dragOutInutilise(e, card){
   try{ dt.setData('DownloadURL', mime+':'+nom+':'+url); }catch(err){}
   dt.effectAllowed='copy';
 }
+// ============ TABLE DE TRAVAIL (V33) ============
+// Les planches ne sont pas un état final : c'est une sélection large qu'on affine.
+// Ici on réorganise, on teste les voisinages tels qu'ils seront sur la page, et on écarte
+// EN RÉSERVE — jamais en supprimant : un arbitrage doit pouvoir se rejouer.
+let RESERVE = [];           // [{code, pg}] — pg = planche d'origine, pour le retour
+let WT_MODE = 'pages';      // 'pages' (découpage réel) | 'plan' (tout d'un coup)
+let WT_SIZE = 150;
+
+function wtCols(){ const n=perPage(); return Math.max(1, Math.ceil(Math.sqrt(n))); }
+
+function wtItem(code, sec){
+  const p=PRODUCTS[code]||{};
+  const el=document.createElement('div');
+  el.className='wt-item'+(sec&&nivOf(sec,code)==='hero'?' niv-hero':'');
+  el.draggable=true;
+  el.dataset.code=code;
+  const f=workFile(code);
+  let vis='<div class="wt-vide">sans visuel</div>';
+  if (f){
+    let u=wtUrls.get(code);
+    if (!u){ try{ u=URL.createObjectURL(f); wtUrls.set(code,u); }catch(e){} }
+    if (u) vis='<img src="'+escA(u)+'" loading="lazy" alt="">';
+  }
+  el.innerHTML='<button class="wt-out" title="Mettre en réserve">✕</button>'
+    +'<div class="wt-img">'+vis+'</div>'
+    +'<div class="wt-txt"><div class="wt-code">'+esc(String(code).startsWith('SLOT')?'':code)+'</div>'
+    +'<div class="wt-lib">'+esc(p.lib||'')+'</div>'
+    +'<div class="wt-prix">'+esc(p.prixPromo||p.prix||'')+'</div></div>';
+  el.querySelector('.wt-out').addEventListener('click', ev=>{
+    ev.stopPropagation();
+    // ⚠️ ORDRE : retirer la vignette AVANT de relire le modèle depuis le DOM.
+    // L'inverse laissait le produit dans la planche tout en l'ajoutant à la réserve —
+    // il aurait été compté deux fois et serait réapparu au rendu suivant.
+    el.remove();
+    wtSync();
+    RESERVE.push({code, pg:(sec&&sec.pg)||''});
+    renderWorktable();
+    scheduleAutosave();
+  });
+  el.addEventListener('dragstart', ev=>{
+    ev.stopPropagation();                       // ne pas déclencher le glisser vers l'extérieur
+    wtDragged=el; el.classList.add('dragging');
+    try{ ev.dataTransfer.setData('text/plain', code); ev.dataTransfer.effectAllowed='move'; }catch(e){}
+  });
+  el.addEventListener('dragend', ()=>{
+    el.classList.remove('dragging'); wtDragged=null;
+    document.querySelectorAll('.wt-drop').forEach(x=>x.classList.remove('wt-drop'));
+    wtSync(); renderWorktable(); scheduleAutosave();
+  });
+  return el;
+}
+const wtUrls=new Map();
+let wtDragged=null;
+
+// Insère l'élément glissé à l'endroit visé : avant ou après la vignette survolée selon
+// que le pointeur est à gauche ou à droite de son milieu.
+function wtPlacer(conteneur, x, y){
+  if (!wtDragged) return;
+  const cibles=[...conteneur.querySelectorAll('.wt-item:not(.dragging)')];
+  let avant=null, meilleure=Infinity;
+  for (const c of cibles){
+    const b=c.getBoundingClientRect();
+    const d=Math.hypot(x-(b.left+b.width/2), y-(b.top+b.height/2));
+    if (d<meilleure){ meilleure=d; avant = (x < b.left+b.width/2) ? c : c.nextElementSibling; }
+  }
+  if (avant) conteneur.insertBefore(wtDragged, avant); else conteneur.appendChild(wtDragged);
+}
+function wtZoneDepot(el){
+  el.addEventListener('dragover', e=>{
+    if (!wtDragged) return;
+    e.preventDefault(); e.stopPropagation();
+    el.classList.add('wt-drop');
+    wtPlacer(el, e.clientX, e.clientY);
+  });
+  el.addEventListener('dragleave', ()=>el.classList.remove('wt-drop'));
+  el.addEventListener('drop', e=>{ if(wtDragged){ e.preventDefault(); e.stopPropagation(); } el.classList.remove('wt-drop'); });
+  return el;
+}
+
+// Le DOM fait foi pendant la manipulation : on relit l'ordre affiché pour reconstruire
+// le modèle. Plus sûr que de calculer des index à chaque déplacement.
+function wtSync(){
+  const wt=$('worktable');
+  if (!wt || wt.classList.contains('hidden')) return;
+  wt.querySelectorAll('.wt-planche').forEach(secEl=>{
+    const i=+secEl.dataset.idx;
+    const sec=PAGES[i]; if(!sec) return;
+    sec.codes=[...secEl.querySelectorAll('.wt-item')].map(x=>x.dataset.code);
+  });
+  const res=wt.querySelector('#wtReserveGrid');
+  if (res){
+    const vus=[...res.querySelectorAll('.wt-item')].map(x=>x.dataset.code);
+    const anciens=new Map(RESERVE.map(r=>[r.code,r]));
+    RESERVE=vus.map(c=>anciens.get(c)||{code:c, pg:''});
+  }
+}
+
+function renderWorktable(){
+  const wt=$('worktable'); if(!wt) return;
+  wt.innerHTML='';
+  const cols=wtCols(), pp=perPage();
+
+  // barre d'outils
+  const bar=document.createElement('div'); bar.className='wt-bar';
+  const seg=document.createElement('div'); seg.className='wt-seg';
+  [['pages','Pages réelles'],['plan','Plan d\'ensemble']].forEach(([m,lab])=>{
+    const b=document.createElement('button');
+    b.textContent=lab; if(WT_MODE===m) b.classList.add('on');
+    b.onclick=()=>{ wtSync(); WT_MODE=m; renderWorktable(); };
+    seg.appendChild(b);
+  });
+  const taille=document.createElement('div'); taille.className='wt-size';
+  taille.innerHTML='<span>Taille</span>';
+  const rng=document.createElement('input');
+  rng.type='range'; rng.min='90'; rng.max='260'; rng.step='10'; rng.value=String(WT_SIZE);
+  rng.oninput=()=>{ WT_SIZE=+rng.value; wt.style.setProperty('--wt', WT_SIZE+'px'); };
+  taille.appendChild(rng);
+  const retour=document.createElement('button');
+  retour.className='btn ghost'; retour.textContent='↩ Retour aux planches';
+  retour.onclick=()=>{ wtSync(); fermerWorktable(); };
+  const tot=document.createElement('div'); tot.className='wt-tot';
+  tot.textContent=allCodes().length+' retenu(s) · '+RESERVE.length+' en réserve';
+  bar.appendChild(retour); bar.appendChild(seg); bar.appendChild(taille); bar.appendChild(tot);
+  wt.appendChild(bar);
+  wt.style.setProperty('--wt', WT_SIZE+'px');
+
+  PAGES.forEach((sec,i)=>{
+    const secEl=document.createElement('section');
+    secEl.className='wt-planche'; secEl.dataset.idx=i;
+    const cap=sec.pages?sec.pages*pp:0;
+    const ecart=cap?sec.codes.length-cap:null;
+    secEl.innerHTML='<div class="wt-head"><h3>'+esc(sec.pg)+'</h3>'
+      +'<span class="pg-cap '+(cap?(ecart>0?'over':(ecart<0?'under':'ok')):'none')+'">'
+      +(cap?sec.codes.length+' / '+cap+(ecart>0?' (+'+ecart+')':''):'capacité ?')+'</span></div>';
+    if (WT_MODE==='plan'){
+      const flow=wtZoneDepot(document.createElement('div'));
+      flow.className='wt-flow';
+      for (const c of sec.codes) flow.appendChild(wtItem(c, sec));
+      secEl.appendChild(flow);
+    } else {
+      const box=document.createElement('div'); box.className='wt-pages';
+      const nbPages=Math.max(sec.pages||0, Math.ceil(sec.codes.length/pp)) || 1;
+      for (let pg=0; pg<nbPages; pg++){
+        const page=document.createElement('div');
+        page.className='wt-page'+(sec.pages && pg>=sec.pages ? ' hors':'');
+        page.innerHTML='<div class="wt-page-t">'+(sec.pages&&pg>=sec.pages?'⚠ hors pagination · page ':'Page ')+(pg+1)+'</div>';
+        const g=wtZoneDepot(document.createElement('div'));
+        g.className='wt-grid';
+        g.style.gridTemplateColumns='repeat('+cols+', var(--wt))';
+        for (const c of sec.codes.slice(pg*pp, (pg+1)*pp)) g.appendChild(wtItem(c, sec));
+        page.appendChild(g);
+        box.appendChild(page);
+      }
+      secEl.appendChild(box);
+    }
+    wt.appendChild(secEl);
+  });
+
+  // réserve
+  const res=document.createElement('div'); res.id='wtReserve';
+  res.innerHTML='<h3>🗃 Réserve — '+RESERVE.length+' produit(s) écarté(s)</h3>'
+    +'<p>Rien n\'est perdu : glisse un produit d\'ici vers une page pour le remettre dans la sélection.</p>';
+  const rg=wtZoneDepot(document.createElement('div'));
+  rg.className='wt-flow'; rg.id='wtReserveGrid';
+  for (const r of RESERVE) rg.appendChild(wtItem(r.code, null));
+  res.appendChild(rg);
+  wt.appendChild(res);
+}
+
+function ouvrirWorktable(){
+  if (!allCodes().length && !RESERVE.length){ alert('Construis d\'abord les planches.'); return; }
+  $('planches').classList.add('hidden');
+  $('worktable').classList.remove('hidden');
+  document.querySelectorAll('.topbar-mini .btn, .topbar-mini .promo-toggle, .topbar-mini .density-box').forEach(b=>{
+    if (b.id!=='wtBtn' && b.id!=='backBtn') b.classList.add('hidden');
+  });
+  $('wtBtn').textContent='↩ Retour aux planches';
+  renderWorktable();
+}
+function fermerWorktable(){
+  $('worktable').classList.add('hidden');
+  $('planches').classList.remove('hidden');
+  document.querySelectorAll('.topbar-mini .btn, .topbar-mini .promo-toggle, .topbar-mini .density-box').forEach(b=>b.classList.remove('hidden'));
+  $('wtBtn').textContent='🗂 Table de travail';
+  renderBuilder();          // la sélection a pu changer
+}
+$('wtBtn').addEventListener('click', ()=>{
+  if ($('worktable').classList.contains('hidden')) ouvrirWorktable();
+  else { wtSync(); fermerWorktable(); }
+});
+
 // ============ CONTRÔLE DES FONDS PHOTO (V27) ============
 // Le rendu « type Checkers » repose entièrement sur des visuels détourés ou sur fond
 // blanc : c'est ce qui autorise la densité, les chevauchements et les pastilles posées
@@ -3177,6 +3407,7 @@ async function buildProject(includePhotos, opts){
     // V26 : nb de pages de catalogue et niveaux de mise en avant appartiennent à la planche
     pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice(), pages:s.pages||0, niveaux:Object.assign({}, s.niveaux||{})})),
     perPage: perPage(),
+    reserve: RESERVE.map(r=>({code:r.code, pg:r.pg})),
     products:JSON.parse(JSON.stringify(PRODUCTS)),
     manual:[...manualSet],
     remiseFormat: ($('remiseFormat')&&$('remiseFormat').value)||'pct',
@@ -3195,6 +3426,7 @@ function applyProject(proj){
   if (!proj || proj._type!=='studio-planches-projet'){ alert('Fichier projet non reconnu.'); return false; }
   PAGES=(proj.pages||[]).map(s=>({pg:s.pg, codes:(s.codes||[]).slice(), pages:s.pages||0, niveaux:Object.assign({}, s.niveaux||{})}));
   if (proj.perPage && $('perPage')) $('perPage').value=proj.perPage;
+  RESERVE = Array.isArray(proj.reserve) ? proj.reserve.map(r=>({code:r.code, pg:r.pg||''})) : [];
   PRODUCTS=proj.products||{};
   // restaure la base articles embarquée dans le projet (fusion : ne pas perdre une base déjà chargée)
   if (proj.ref && Object.keys(proj.ref).length){
