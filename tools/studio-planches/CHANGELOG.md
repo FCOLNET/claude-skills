@@ -1,5 +1,30 @@
 # Studio Planches Contacts — journal des versions
 
+## V37 — plusieurs projets, nommés, qu'on met de côté et qu'on reprend
+
+Mettre un catalogue de côté pour en commencer un autre était possible, mais fragile :
+
+- la reprise automatique n'avait **qu'un seul emplacement** — démarrer un second
+  catalogue effaçait la mémoire du premier, sans un mot ;
+- tous les fichiers s'appelaient `projet-planches-<date>.json`, si bien que deux projets
+  enregistrés le même jour se télescopaient dans le dossier de téléchargements.
+
+Chaque projet porte désormais un **nom**. Il tient son propre emplacement en mémoire, et
+le bouton **📁 Projets** affiche celui en cours, liste les autres avec leur date et leurs
+compteurs, et permet de basculer, renommer, créer ou retirer de la mémoire.
+
+Le projet en cours est **mémorisé avant tout changement** : on ne quitte jamais un
+catalogue sans qu'il soit rangé. Le nom entre dans le fichier `.json`, qui devient
+`projet-Catalogue_Jouets-2026-08-31.json`.
+
+La barre de reprise au démarrage nomme le projet retrouvé et, s'il y en a plusieurs,
+propose d'ouvrir la liste. Un emplacement unique hérité d'une version antérieure est
+migré en projet nommé, sans manipulation.
+
+**Retirer un projet de la mémoire ne touche pas au fichier `.json`** que tu aurais
+enregistré : il reste ouvrable par « 📂 Ouvrir projet ». Le message le rappelle.
+
+
 ## V36 — le fichier projet dit avec quelle version il a été écrit
 
 Le fichier de sauvegarde portait `_version: 2` depuis l'origine, alors que le format n'a

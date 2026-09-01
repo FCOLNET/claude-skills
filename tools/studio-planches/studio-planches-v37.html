@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V36)</title>
+<title>Studio Planches Contacts — NPC (V37)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -218,6 +218,7 @@
   <div class="topbar-mini">
     <button class="btn ghost" id="backBtn">↩ Structure</button>
     <button class="btn gold" id="wtBtn" title="Table de travail : réorganiser la sélection, tester les voisinages, écarter en réserve">🗂 Table de travail</button>
+    <button class="btn gold" id="projetsBtn" title="Projets en mémoire : mettre celui-ci de côté, en ouvrir un autre, revenir">📁 Projets</button>
     <button class="btn green" id="saveProj" title="Sauvegarder le projet dans un fichier (.json) pour reprendre plus tard">💾 Sauvegarder</button>
     <button class="btn ghost" id="openProj" title="Ouvrir un projet sauvegardé (.json)">📂 Ouvrir projet</button>
     <button class="btn ghost" id="refBtn" title="Charger un Excel code→libellé→prix pour l'auto-remplissage">📚 Référentiel</button>
@@ -929,6 +930,10 @@ function idb(){ return new Promise((res,rej)=>{
 });}
 async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{
   const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k);
+  tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
+});}
+async function idbDel(k){ const db=await idb(); return new Promise((res,rej)=>{
+  const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').delete(k);
   tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
 });}
 async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{
@@ -3621,7 +3626,8 @@ async function buildProject(includePhotos, opts){
     }
   }
   return {
-    _type:'studio-planches-projet', _version:PROJET_VERSION, _outil:'V36',
+    _type:'studio-planches-projet', _version:PROJET_VERSION, _outil:'V37',
+    nom: PROJET_NOM,
     date:new Date().toISOString(),
     // V26 : nb de pages de catalogue et niveaux de mise en avant appartiennent à la planche
     pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice(), pages:s.pages||0,
@@ -3663,6 +3669,7 @@ function applyProject(proj){
     pagesContenu: Array.isArray(s.pagesContenu)?s.pagesContenu.map(x=>x.slice()):null}));
   if (proj.perPage && $('perPage')) $('perPage').value=proj.perPage;
   RESERVE = Array.isArray(proj.reserve) ? proj.reserve.map(r=>({code:r.code, pg:r.pg||''})) : [];
+  if (proj.nom) { PROJET_NOM=proj.nom; if(typeof majTitreProjet==='function') majTitreProjet(); }
   POOL = Array.isArray(proj.pool) ? proj.pool.slice() : [];
   PRODUCTS=proj.products||{};
   // restaure la base articles embarquée dans le projet (fusion : ne pas perdre une base déjà chargée)
@@ -3732,7 +3739,10 @@ $('saveProj').addEventListener('click', async ()=>{
     const proj=await buildProject(true, {progress:(i,n)=>{ btn.textContent='💾 '+i+'/'+n; }});
     const blob=new Blob([JSON.stringify(proj)],{type:'application/json'});
     const stamp=new Date().toISOString().slice(0,10);
-    showDownload(blob, 'projet-planches-'+stamp+'.json', 'Fichier projet prêt (à rouvrir avec « Ouvrir projet »)');
+    // le nom du projet entre dans le nom du fichier : deux catalogues enregistrés le même
+    // jour ne se télescopent plus dans le dossier de téléchargements
+    const base='projet-'+(safeName(PROJET_NOM)||'planches')+'-'+stamp+'.json';
+    showDownload(blob, base, 'Fichier projet prêt (à rouvrir avec « Ouvrir projet »)');
     _dirty=false;
     btn.textContent='✅ Sauvegardé';
   }catch(e){ alert('Erreur sauvegarde : '+e.message); btn.textContent=old; return; }
@@ -3751,6 +3761,155 @@ $('projInput').addEventListener('change', async e=>{
   $('projInput').value='';
 });
 
+// ============ PLUSIEURS PROJETS EN MÉMOIRE (V37) ============
+// La reprise automatique n'avait qu'UN emplacement : démarrer un second catalogue
+// effaçait la mémoire du premier, sans un mot. Et tous les fichiers de sauvegarde
+// s'appelaient « projet-planches-<date>.json » : deux projets du même jour se
+// télescopaient dans le dossier de téléchargements.
+// Chaque projet porte donc un nom ; il tient son propre emplacement en mémoire, et on
+// passe de l'un à l'autre.
+let PROJET_NOM = '';
+const CLE_INDEX = 'projetsIndex';
+const cleProjet = nom => 'projet:'+nom;
+
+async function lireIndex(){ try{ return (await idbGet(CLE_INDEX)) || {}; }catch(e){ return {}; } }
+async function ecrireIndex(idx){ try{ await idbSet(CLE_INDEX, idx); }catch(e){} }
+
+function nomParDefaut(){
+  const d=new Date();
+  return 'Catalogue du '+d.toLocaleDateString('fr-FR');
+}
+function majTitreProjet(){
+  const b=$('projetsBtn'); if(!b) return;
+  b.textContent = PROJET_NOM ? '📁 '+PROJET_NOM : '📁 Projets';
+  b.title = PROJET_NOM
+    ? 'Projet en cours : '+PROJET_NOM+'\n Cliquer pour changer de projet, en créer un autre, ou revenir.'
+    : 'Projets en mémoire';
+}
+
+async function enregistrerProjetMemoire(){
+  if (!PROJET_NOM) return;
+  let proj;
+  try{ proj=await buildProject(true, {blobs:true}); }
+  catch(e){ proj=await buildProject(false); proj._noPhotos=true; }
+  proj.nom=PROJET_NOM;
+  await idbSet(cleProjet(PROJET_NOM), proj);
+  const idx=await lireIndex();
+  idx[PROJET_NOM]={date:new Date().toISOString(), refs:allCodes().length,
+                   planches:PAGES.length, vivier:POOL.length, reserve:RESERVE.length,
+                   photos:!proj._noPhotos};
+  await ecrireIndex(idx);
+  return proj;
+}
+
+async function ouvrirProjetMemoire(nom){
+  const proj=await idbGet(cleProjet(nom));
+  if (!proj){ alert('Projet introuvable en mémoire : '+nom); return false; }
+  PROJET_NOM=nom;
+  applyProject(proj);
+  majTitreProjet();
+  _dirty=false;
+  return true;
+}
+
+async function nouveauProjet(){
+  const nom=prompt('Nom du nouveau projet :', nomParDefaut());
+  if (nom===null) return;
+  const propre=nom.trim()||nomParDefaut();
+  const idx=await lireIndex();
+  if (idx[propre] && !confirm('Un projet « '+propre+' » est déjà en mémoire.\n\nLe remplacer ?')) return;
+  // le projet en cours est mémorisé avant de le quitter : rien ne se perd
+  if (PROJET_NOM && allCodes().length) await enregistrerProjetMemoire();
+  PROJET_NOM=propre;
+  resetWorkspace(); POOL=[]; RESERVE=[];
+  $('builder').classList.add('hidden');
+  $('step1').classList.remove('hidden');
+  setPill(1);
+  majTitreProjet();
+  await enregistrerProjetMemoire();
+}
+
+async function montrerProjets(){
+  const idx=await lireIndex();
+  const noms=Object.keys(idx).sort((a,b)=>String(idx[b].date).localeCompare(String(idx[a].date)));
+  let ov=document.getElementById('projOverlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='projOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(13,27,42,.75);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px;max-width:620px;width:100%;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.4);max-height:90vh;overflow:auto';
+  box.innerHTML='<div style="font-family:\'Playfair Display\',serif;font-size:1.2rem;font-weight:700;color:#1B4332;margin-bottom:4px">Projets en mémoire</div>'
+    +'<div style="font-size:.78rem;color:#666;margin-bottom:16px">'
+    +'Chaque projet garde ses planches, ses photos, son vivier et sa réserve. '
+    +'Le projet en cours est mémorisé automatiquement avant tout changement.</div>';
+  if (!noms.length){
+    box.innerHTML+='<div style="font-size:.82rem;color:#888;padding:14px 0">Aucun projet en mémoire pour l\'instant.</div>';
+  }
+  for (const nom of noms){
+    const m=idx[nom];
+    const ligne=document.createElement('div');
+    const courant = nom===PROJET_NOM;
+    ligne.style.cssText='border:2px solid '+(courant?'#1B4332':'#E5E0D8')+';border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+    ligne.innerHTML='<div style="flex:1;min-width:200px">'
+      +'<div style="font-weight:700;font-size:.88rem">'+esc(nom)+(courant?' <span style="color:#1B4332;font-size:.7rem">· en cours</span>':'')+'</div>'
+      +'<div style="font-size:.72rem;color:#888">'+(m.refs||0)+' réf. · '+(m.planches||0)+' planche(s)'
+      +(m.vivier?' · '+m.vivier+' au vivier':'')+(m.reserve?' · '+m.reserve+' en réserve':'')
+      +' · '+new Date(m.date).toLocaleString('fr-FR')
+      +(m.photos===false?' · <span style="color:#B00020">sans photos</span>':'')+'</div></div>';
+    if (!courant){
+      const ouvrir=document.createElement('button');
+      ouvrir.className='btn red'; ouvrir.style.cssText='padding:7px 15px;font-size:.76rem';
+      ouvrir.textContent='Ouvrir';
+      ouvrir.onclick=async ()=>{
+        if (PROJET_NOM && allCodes().length) await enregistrerProjetMemoire();
+        ov.remove();
+        await ouvrirProjetMemoire(nom);
+      };
+      ligne.appendChild(ouvrir);
+    }
+    const suppr=document.createElement('button');
+    suppr.className='btn ghost'; suppr.style.cssText='padding:7px 12px;font-size:.74rem';
+    suppr.textContent='🗑';
+    suppr.title='Retirer ce projet de la mémoire du navigateur';
+    suppr.onclick=async ()=>{
+      if (!confirm('Retirer « '+nom+' » de la mémoire ?\n\n'
+        +'Le fichier .json que tu aurais enregistré n\'est pas touché — tu pourras le rouvrir avec « 📂 Ouvrir projet ».')) return;
+      const i2=await lireIndex(); delete i2[nom]; await ecrireIndex(i2);
+      try{ await idbDel(cleProjet(nom)); }catch(e){}
+      if (nom===PROJET_NOM) PROJET_NOM='';
+      majTitreProjet(); ov.remove(); montrerProjets();
+    };
+    ligne.appendChild(suppr);
+    box.appendChild(ligne);
+  }
+  const actions=document.createElement('div');
+  actions.style.cssText='display:flex;gap:10px;margin-top:14px;flex-wrap:wrap';
+  const bNouveau=document.createElement('button');
+  bNouveau.className='btn green'; bNouveau.style.cssText='padding:10px 18px;font-size:.8rem';
+  bNouveau.textContent='➕ Nouveau projet';
+  bNouveau.onclick=async ()=>{ ov.remove(); await nouveauProjet(); };
+  const bRenommer=document.createElement('button');
+  bRenommer.className='btn ghost'; bRenommer.style.cssText='padding:10px 16px;font-size:.8rem';
+  bRenommer.textContent='✏️ Renommer celui-ci';
+  bRenommer.onclick=async ()=>{
+    const n=prompt('Nouveau nom :', PROJET_NOM||nomParDefaut());
+    if (n===null) return;
+    const propre=n.trim(); if(!propre) return;
+    const i2=await lireIndex();
+    if (PROJET_NOM && i2[PROJET_NOM]){ delete i2[PROJET_NOM]; await ecrireIndex(i2); try{ await idbDel(cleProjet(PROJET_NOM)); }catch(e){} }
+    PROJET_NOM=propre; majTitreProjet(); await enregistrerProjetMemoire();
+    ov.remove(); montrerProjets();
+  };
+  const bFermer=document.createElement('button');
+  bFermer.className='btn ghost'; bFermer.style.cssText='padding:10px 18px;font-size:.8rem';
+  bFermer.textContent='Fermer'; bFermer.onclick=()=>ov.remove();
+  actions.appendChild(bNouveau); actions.appendChild(bRenommer); actions.appendChild(bFermer);
+  box.appendChild(actions);
+  ov.appendChild(box);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+$('projetsBtn').addEventListener('click', montrerProjets);
+
 // --- AUTO-REPRISE : sauvegarde continue dans IndexedDB (sans les photos si trop lourd) ---
 let _autosaveTimer=null;
 let _autosaveRunning=false;
@@ -3760,19 +3919,25 @@ async function autosave(){
   try{
     // on tente AVEC photos, mais SEULEMENT sous le seuil de sécurité ;
     // au-delà on sauve la structure sans les images (l'onglet survit).
+    if (!PROJET_NOM) PROJET_NOM=nomParDefaut();   // un projet sans nom ne peut pas cohabiter
     let proj;
     try{
       // V13 : photos stockées en Blob, sans ré-encodage ni plafond de sécurité
       proj=await buildProject(true, {blobs:true});
-      await idbSet('autosaveProjet', proj);
+      await idbSet(cleProjet(PROJET_NOM), proj);
       _dirty=false;         // photos comprises : rien à perdre en fermant
     }catch(e){
       proj=await buildProject(false);
       proj._noPhotos=true;
-      await idbSet('autosaveProjet', proj);
+      await idbSet(cleProjet(PROJET_NOM), proj);
       // structure sauvée mais PAS les photos -> on garde l'avertissement de fermeture
     }
-    await idbSet('autosaveMeta', {date:new Date().toISOString(), pages:PAGES.length, codes:allCodes().length});
+    const idx=await lireIndex();
+    idx[PROJET_NOM]={date:new Date().toISOString(), refs:allCodes().length,
+                     planches:PAGES.length, vivier:POOL.length, reserve:RESERVE.length,
+                     photos:!proj._noPhotos};
+    await ecrireIndex(idx);
+    majTitreProjet();
   }catch(e){ /* silencieux */ }
   finally{ _autosaveRunning=false; }
 }
@@ -3790,19 +3955,41 @@ function scheduleAutosave(){
 // --- proposition de reprise au chargement ---
 (async ()=>{
   try{
-    const meta=await idbGet('autosaveMeta');
-    if (meta && meta.codes>0){
-      const when=new Date(meta.date).toLocaleString('fr-FR');
-      const bar=document.createElement('div');
-      bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:200;background:#1B4332;color:#fff;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:.85rem;box-shadow:0 -2px 12px rgba(0,0,0,.2)';
-      bar.innerHTML='↩️ Un projet en cours a été trouvé ('+meta.codes+' réf. · '+meta.pages+' planche(s) · '+when+'). ';
-      const yes=document.createElement('button'); yes.className='btn gold'; yes.textContent='Reprendre'; yes.style.cssText='padding:8px 18px';
-      const no=document.createElement('button'); no.className='btn ghost'; no.textContent='Ignorer'; no.style.cssText='padding:8px 18px';
-      bar.appendChild(yes); bar.appendChild(no);
-      document.body.appendChild(bar);
-      yes.onclick=async ()=>{ const proj=await idbGet('autosaveProjet'); if(proj){ applyProject(proj); if(proj._noPhotos) setTimeout(()=>alert('Projet repris. ⚠️ Les photos n ont pas pu être mémorisées automatiquement (trop volumineuses) — recharge-les, ou utilise 💾 Sauvegarder pour un fichier projet complet.'),300); } bar.remove(); };
-      no.onclick=()=>bar.remove();
+    let idx=await lireIndex();
+    // migration : l'ancien emplacement unique devient un projet nommé
+    if (!Object.keys(idx).length){
+      const vieux=await idbGet('autosaveProjet');
+      const meta=await idbGet('autosaveMeta');
+      if (vieux && meta && meta.codes>0){
+        const nom=vieux.nom || 'Projet repris';
+        await idbSet(cleProjet(nom), vieux);
+        idx={[nom]:{date:meta.date, refs:meta.codes, planches:meta.pages,
+                    vivier:0, reserve:0, photos:!vieux._noPhotos}};
+        await ecrireIndex(idx);
+        await idbDel('autosaveProjet'); await idbDel('autosaveMeta');
+      }
     }
+    const noms=Object.keys(idx).sort((a,b)=>String(idx[b].date).localeCompare(String(idx[a].date)));
+    if (!noms.length) return;
+    const dernier=noms[0], m=idx[dernier];
+    const bar=document.createElement('div');
+    bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:200;background:#1B4332;color:#fff;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:.85rem;box-shadow:0 -2px 12px rgba(0,0,0,.2)';
+    bar.innerHTML='↩️ <b style="margin:0 4px">'+esc(dernier)+'</b> — '+(m.refs||0)+' réf. · '
+      +(m.planches||0)+' planche(s) · '+new Date(m.date).toLocaleString('fr-FR')+' ';
+    const yes=document.createElement('button'); yes.className='btn gold'; yes.textContent='Reprendre'; yes.style.cssText='padding:8px 18px';
+    const autres=document.createElement('button'); autres.className='btn ghost'; autres.textContent='Autres projets ('+noms.length+')'; autres.style.cssText='padding:8px 18px';
+    const no=document.createElement('button'); no.className='btn ghost'; no.textContent='Ignorer'; no.style.cssText='padding:8px 18px';
+    if (noms.length>1) bar.appendChild(yes), bar.appendChild(autres); else bar.appendChild(yes);
+    bar.appendChild(no);
+    document.body.appendChild(bar);
+    yes.onclick=async ()=>{
+      const ok=await ouvrirProjetMemoire(dernier);
+      const proj=await idbGet(cleProjet(dernier));
+      if (ok && proj && proj._noPhotos) setTimeout(()=>alert('Projet repris. ⚠️ Les photos n ont pas pu être mémorisées automatiquement (trop volumineuses) — recharge-les, ou utilise 💾 Sauvegarder pour un fichier projet complet.'),300);
+      bar.remove();
+    };
+    autres.onclick=()=>{ bar.remove(); montrerProjets(); };
+    no.onclick=()=>bar.remove();
   }catch(e){}
 })();
 

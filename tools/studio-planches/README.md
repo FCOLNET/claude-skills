@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v36.html` | **version courante**, à utiliser |
+| `studio-planches-v37.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -62,13 +62,28 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v36.mjs ../studio-planches-v36.html
+node verif-v37.mjs ../studio-planches-v37.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et
 s'exécute sur la version courante — ils servent de tests de non-régression cumulés.
 Adapter `executablePath` au chemin local de Chromium, ou passer la variable
 d'environnement `CHROME`.
+
+## Plusieurs projets
+
+Bouton **📁 Projets** : chaque catalogue porte un nom et son propre emplacement en
+mémoire. On bascule de l'un à l'autre, on renomme, on crée, on retire de la mémoire.
+Le projet en cours est mémorisé avant tout changement.
+
+Mettre un projet de côté et en commencer un autre :
+
+1. **📁 Projets → ➕ Nouveau projet**, on lui donne un nom. L'ancien est rangé tout seul.
+2. On travaille sur le nouveau.
+3. **📁 Projets → Ouvrir** sur l'ancien pour y revenir.
+
+Pour une mise de côté longue, ou un changement de machine, doubler par un
+**💾 Sauvegarder** : la mémoire du navigateur peut être vidée, pas un fichier.
 
 ## Sauvegarde et reprise
 
