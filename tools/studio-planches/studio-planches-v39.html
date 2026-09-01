@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V38)</title>
+<title>Studio Planches Contacts — NPC (V39)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -133,6 +133,11 @@
   .wt-act .wt-del:hover { background:#B00020; }
   .wt-item [contenteditable]:focus { outline:2px solid #C8A951; border-radius:3px; background:#fff; }
   .wt-page-add { border:none; background:#EFEAE1; color:#555; font-size:.62rem; font-weight:700; padding:2px 8px; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; margin-left:auto; }
+  .wt-page-del { border:none; background:#EFEAE1; color:#555; font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; }
+  .wt-page-del:hover { background:#B00020; color:#fff; }
+  .wt-poignee { cursor:grab; color:#bbb; font-size:.8rem; letter-spacing:-2px; user-select:none; }
+  .wt-page.pagedrag { opacity:.4; }
+  .wt-pages.wt-drop-page { outline:2px dashed #1B4332; outline-offset:4px; border-radius:14px; }
   .wt-page-add:hover { background:#C8A951; color:#1A1A1A; }
   .wt-page-t { display:flex; align-items:center; gap:6px; }
   .wt-item.niv-hero { outline:2px solid #C8A951; }
@@ -1702,6 +1707,44 @@ function wtItem(code, sec){
 }
 const wtUrls=new Map();
 let wtDragged=null;
+let wtPageDragged=null;
+
+// Dépôt d'une PAGE entière : on insère avant ou après la page survolée, dans la même
+// planche ou dans une autre. wtSync relit ensuite l'ordre affiché, donc déplacer le
+// bloc dans le DOM suffit à réordonner le modèle.
+function wtZonePage(el){
+  el.addEventListener('dragover', e=>{
+    if (!wtPageDragged) return;
+    e.preventDefault(); e.stopPropagation();
+    el.classList.add('wt-drop-page');
+    const pages=[...el.querySelectorAll('.wt-page')].filter(x=>x!==wtPageDragged);
+    let avant=null, meilleure=Infinity;
+    for (const c of pages){
+      const b=c.getBoundingClientRect();
+      const d=Math.hypot(e.clientX-(b.left+b.width/2), e.clientY-(b.top+b.height/2));
+      if (d<meilleure){ meilleure=d; avant = (e.clientX < b.left+b.width/2) ? c : c.nextElementSibling; }
+    }
+    if (avant) el.insertBefore(wtPageDragged, avant); else el.appendChild(wtPageDragged);
+  });
+  el.addEventListener('dragleave', ()=>el.classList.remove('wt-drop-page'));
+  el.addEventListener('drop', e=>{ if(wtPageDragged){ e.preventDefault(); e.stopPropagation(); } el.classList.remove('wt-drop-page'); });
+  return el;
+}
+
+// Suppression d'une page. Son contenu n'est jamais jeté : il part au vivier.
+function supprimerPage(sec, pageIdx){
+  wtSync();
+  const contenu=pagesDe(sec).map(x=>x.slice());
+  const dedans=contenu[pageIdx]||[];
+  if (dedans.length && !confirm(
+      'Supprimer la page '+(pageIdx+1)+' de « '+sec.pg+' » ?\n\n'
+      +'Ses '+dedans.length+' produit(s) partent au vivier, ils ne sont pas perdus.')) return;
+  contenu.splice(pageIdx,1);
+  POOL=POOL.concat(dedans);
+  sec.pagesContenu = contenu.length?contenu:[[]];
+  aplatir(sec);
+  renderWorktable(); scheduleAutosave();
+}
 
 // Insère l'élément glissé à l'endroit visé : avant ou après la vignette survolée selon
 // que le pointeur est à gauche ou à droite de son milieu.
@@ -1905,7 +1948,7 @@ function renderWorktable(){
       for (const c of sec.codes) flow.appendChild(wtItem(c, sec));
       secEl.appendChild(flow);
     } else {
-      const box=document.createElement('div'); box.className='wt-pages';
+      const box=wtZonePage(document.createElement('div')); box.className='wt-pages';
       const contenu=pagesDe(sec);
       const nbPages=Math.max(contenu.length, sec.pages||0);
       for (let pg=0; pg<nbPages; pg++){
@@ -1916,12 +1959,28 @@ function renderWorktable(){
         // Le nombre de produits par page est un REPÈRE, pas une limite. Une page à 10
         // sur un repère de 9 est un choix légitime : on l'indique en ambre, jamais en
         // rouge, et l'infobulle le dit.
-        page.innerHTML='<div class="wt-page-t"><span>Page '+(pg+1)+'</span>'
-          +'<span style="font-weight:700;color:'+(trop?'#8A6100':'#bbb')+'" title="'
+        page.innerHTML='<div class="wt-page-t" draggable="true" title="Glisser cet en-tête déplace la page entière">'
+          +'<span class="wt-poignee">⠿</span><span>Page '+(pg+1)+'</span>'
+          +'<span class="wt-page-n" style="font-weight:700;color:'+(trop?'#8A6100':'#bbb')+'" title="'
           +(trop?(dedans.length-pp)+' produit(s) au-delà du repère de '+pp+' — c\'est permis, le repère n\'est pas une limite.':'Repère : '+pp+' produits par page.')
           +'">'+dedans.length+'/'+pp+'</span>'
-          +'<button class="wt-page-add" title="Ajouter un article à cette page">➕ Article</button></div>';
+          +'<button class="wt-page-add" title="Ajouter un article à cette page">➕ Article</button>'
+          +'<button class="wt-page-del" title="Supprimer cette page">✕</button></div>';
         page.querySelector('.wt-page-add').onclick=()=>ajouterArticle(sec, pg);
+        page.querySelector('.wt-page-del').onclick=()=>supprimerPage(sec, pg);
+        // la page entière se déplace par son en-tête : le glisser d'un produit et celui
+        // d'une page ne peuvent ainsi jamais être confondus
+        const tete=page.querySelector('.wt-page-t');
+        tete.addEventListener('dragstart', ev=>{
+          ev.stopPropagation();
+          wtPageDragged=page; page.classList.add('pagedrag');
+          try{ ev.dataTransfer.setData('text/plain','page'); ev.dataTransfer.effectAllowed='move'; }catch(e){}
+        });
+        tete.addEventListener('dragend', ()=>{
+          page.classList.remove('pagedrag'); wtPageDragged=null;
+          document.querySelectorAll('.wt-drop-page').forEach(x=>x.classList.remove('wt-drop-page'));
+          wtSync(); renderWorktable(); scheduleAutosave();
+        });
         const g=wtZoneDepot(document.createElement('div'));
         g.className='wt-grid';
         g.style.gridTemplateColumns='repeat('+cols+', var(--wt))';

@@ -1,5 +1,38 @@
 # Studio Planches Contacts — journal des versions
 
+## V39 — déplacer une page entière
+
+Les produits se déplaçaient un par un ; les pages, elles, restaient figées dans leur
+ordre. On peut désormais **saisir une page par son en-tête** — une poignée `⠿` l'indique —
+et la déposer ailleurs dans sa planche, ou dans une autre planche.
+
+Le geste est distinct de celui des produits : le glisser d'une page part de son **titre**,
+celui d'un produit de sa **vignette**. Aucune confusion possible, et un produit déposé sur
+une page ne déplace jamais la page.
+
+Nouveau bouton **✕** sur chaque page. Son contenu n'est jamais jeté : les produits partent
+au vivier, avec confirmation quand la page n'est pas vide.
+
+Comme ailleurs dans la table de travail, c'est l'affichage qui fait foi : déplacer le bloc
+suffit, le modèle est relu ensuite. Vérifié qu'aucun produit ne se perd lors d'un
+déplacement entre planches.
+
+### Trois leçons de banc de test
+
+Quatre contrôles ont d'abord échoué — tous imputables au test, aucun à l'outil :
+
+- je fermais puis rouvrais la table de travail après avoir remonté le décor, ce qui
+  resynchronisait le modèle depuis un **affichage périmé**. Chaque scénario part
+  maintenant d'une page fraîche ;
+- la planche de destination se retrouvait **sous la ligne de flottaison** : le banc
+  vérifie désormais que source et cible sont visibles avant de glisser, et rend la main
+  avec un message clair sinon ;
+- deux contrôles visaient le compteur de page par sa **position** dans l'en-tête ;
+  l'ajout de la poignée l'a décalé. Le compteur porte maintenant un nom de classe et les
+  tests le désignent par ce nom — même correction que pour les colonnes du fichier de
+  fusion en V23.
+
+
 ## V38 — le repère de 9 n'est pas une limite, et l'outil cesse de le faire croire
 
 Sur une planche de 339 références avec **1 page attribuée**, la table de travail pavait

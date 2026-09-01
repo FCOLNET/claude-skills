@@ -55,9 +55,9 @@ const ap = await p.evaluate(c => ({
   tailles: PAGES[0].pagesContenu.map(x => x.length),
   total: PAGES[0].codes.length,
   present: PAGES[0].pagesContenu[0].includes(c),
-  compteur: document.querySelector('.wt-page .wt-page-t span:nth-child(2)').textContent,
-  couleur: document.querySelector('.wt-page .wt-page-t span:nth-child(2)').style.color,
-  info: document.querySelector('.wt-page .wt-page-t span:nth-child(2)').title
+  compteur: document.querySelector('.wt-page .wt-page-n').textContent,
+  couleur: document.querySelector('.wt-page .wt-page-n').style.color,
+  info: document.querySelector('.wt-page .wt-page-n').title
 }), codeDeplace);
 ck('la page passe à 10 sans chasser personne',
   ap.tailles[0] === 10 && ap.tailles[1] === 8 && ap.total === 27 && ap.present, JSON.stringify(ap.tailles) + ' total=' + ap.total);

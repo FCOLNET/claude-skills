@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v38.html` | **version courante**, à utiliser |
+| `studio-planches-v39.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -65,7 +65,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v38.mjs ../studio-planches-v38.html
+node verif-v39.mjs ../studio-planches-v39.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et
