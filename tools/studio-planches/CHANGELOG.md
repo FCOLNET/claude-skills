@@ -1,5 +1,37 @@
 # Studio Planches Contacts — journal des versions
 
+## V38 — le repère de 9 n'est pas une limite, et l'outil cesse de le faire croire
+
+Sur une planche de 339 références avec **1 page attribuée**, la table de travail pavait
+38 pages et les barrait **toutes** de rouge, « ⚠ hors pagination ». L'outil criait
+l'erreur là où l'utilisateur était simplement en train de composer.
+
+Le glisser, lui, n'a jamais chassé personne — déposer un dixième produit dans une page de
+neuf donnait bien une page de dix. Mais rien ne le disait, et le rouge laissait croire au
+refus. C'était un problème de **langage**, pas de mécanique.
+
+**Ce qui change :**
+
+- plus aucune page barrée. Le décalage se dit **une seule fois**, sur l'en-tête de la
+  planche : `38 page(s) composée(s) · 1 attribuée` ;
+- le compteur d'une page en dépassement passe en **ambre** et non en rouge, avec
+  l'infobulle « 2 produits au-delà du repère de 9 — c'est permis, le repère n'est pas une
+  limite » ;
+- nouveau bouton **⇢ Caler la pagination** : attribue à la planche le nombre de pages
+  réellement composées, ce qui résout le décalage d'un clic quand la composition est
+  arrêtée ;
+- la vue planches emploie le même langage et affiche aussi le nombre de pages composées.
+
+Vérifié : déposer un produit dans une page pleine la fait passer à 10, la page de départ
+tombe à 8, et le total reste inchangé — aucune référence n'est chassée ni perdue.
+
+### Une assertion de test qui ne testait rien
+
+Le contrôle « compteur en ambre, pas en rouge » comportait une condition ternaire mal
+écrite qui le faisait passer quelle que soit la couleur. Réécrit pour comparer réellement
+les deux teintes.
+
+
 ## V37 — plusieurs projets, nommés, qu'on met de côté et qu'on reprend
 
 Mettre un catalogue de côté pour en commencer un autre était possible, mais fragile :

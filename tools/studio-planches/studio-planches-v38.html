@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V37)</title>
+<title>Studio Planches Contacts — NPC (V38)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -112,9 +112,8 @@
   .wt-head h3 { font-size:.95rem; font-weight:700; flex-grow:1; }
   .wt-pages { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
   .wt-page { border:2px solid #E5E0D8; border-radius:12px; padding:10px; background:#fff; }
-  .wt-page.hors { border-color:#B00020; background:#FFF6F6; }
+
   .wt-page-t { font-size:.68rem; font-weight:700; color:#888; margin-bottom:7px; letter-spacing:.03em; }
-  .wt-page.hors .wt-page-t { color:#B00020; }
   .wt-grid { display:grid; gap:8px; min-height:60px; }
   .wt-flow { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--wt),1fr)); gap:8px; margin-top:10px; min-height:60px; }
   .wt-item { background:#fff; border:1px solid #E5E0D8; border-radius:9px; overflow:hidden; cursor:grab; position:relative; }
@@ -740,10 +739,12 @@ function renderCapacity(sec, sectionEl){
     return;
   }
   const cap=sec.pages*perPage();
+  const composees=pagesDe(sec).length;
   const ecart=n-cap;
-  el.textContent=n+' / '+cap+(ecart>0?'  (+'+ecart+')':(ecart<0?'  ('+ecart+')':''));
+  el.textContent=n+' / '+cap+(ecart>0?'  (+'+ecart+')':(ecart<0?'  ('+ecart+')':''))
+    +' · '+composees+' page(s) composée(s)';
   el.className='pg-cap '+(ecart>0?'over':(ecart<0?'under':'ok'));
-  el.title = ecart>0 ? ecart+' référence(s) de trop : la maquette ne pourra pas les placer.'
+  el.title = ecart>0 ? ecart+' référence(s) au-delà de la pagination attribuée : soit réduire la sélection, soit attribuer '+composees+' page(s).'
            : ecart<0 ? Math.abs(ecart)+' emplacement(s) libre(s) sur cette planche.'
            : 'La planche tombe juste.';
 }
@@ -1851,11 +1852,19 @@ function renderWorktable(){
   PAGES.forEach((sec,i)=>{
     const secEl=document.createElement('section');
     secEl.className='wt-planche'; secEl.dataset.idx=i;
-    const cap=sec.pages?sec.pages*pp:0;
-    const ecart=cap?sec.codes.length-cap:null;
+    // V38 — on compare ce qui est COMPOSÉ à ce qui est ATTRIBUÉ.
+    // Avant, chaque page au-delà de l'allocation était barrée de rouge : sur 339 réf.
+    // pour 1 page attribuée, 37 pages criaient l'erreur alors que l'utilisateur était
+    // simplement en train de composer. Le décalage se dit une fois, sur la planche.
+    const nbComposees=pagesDe(sec).length;
+    const attribuees=sec.pages||0;
+    const etat = !attribuees ? 'none' : (nbComposees>attribuees ? 'over' : (nbComposees<attribuees ? 'under' : 'ok'));
     secEl.innerHTML='<div class="wt-head"><h3>'+esc(sec.pg)+'</h3>'
-      +'<span class="pg-cap '+(cap?(ecart>0?'over':(ecart<0?'under':'ok')):'none')+'">'
-      +(cap?sec.codes.length+' / '+cap+(ecart>0?' (+'+ecart+')':''):'capacité ?')+'</span></div>';
+      +'<span class="count">'+sec.codes.length+' réf.</span>'
+      +'<span class="pg-cap '+etat+'" title="'
+      +(attribuees?'Pagination composée / attribuée. Un écart n\'est pas une erreur : c\'est l\'arbitrage qui reste à faire.':'Aucune pagination attribuée à cette planche.')
+      +'">'+nbComposees+' page(s) composée(s)'
+      +(attribuees?' · '+attribuees+' attribuée(s)':' · pagination libre')+'</span></div>';
     // boutons de composition, sur l'en-tête de la planche
     const tete=secEl.querySelector('.wt-head');
     const bAjout=document.createElement('button');
@@ -1879,7 +1888,16 @@ function renderWorktable(){
       sec.pagesContenu=[[]];
       aplatir(sec); renderWorktable(); scheduleAutosave();
     };
-    tete.appendChild(bAjout); tete.appendChild(bVider);
+    const bCaler=document.createElement('button');
+    bCaler.className='btn ghost'; bCaler.style.cssText='padding:5px 12px;font-size:.7rem';
+    bCaler.textContent='⇢ Caler la pagination';
+    bCaler.title='Attribuer à cette planche le nombre de pages réellement composées';
+    bCaler.onclick=()=>{
+      wtSync();
+      sec.pages=pagesDe(sec).length;
+      renderWorktable(); scheduleAutosave();
+    };
+    tete.appendChild(bAjout); tete.appendChild(bVider); tete.appendChild(bCaler);
 
     if (WT_MODE==='plan'){
       const flow=wtZoneDepot(document.createElement('div'));
@@ -1893,11 +1911,15 @@ function renderWorktable(){
       for (let pg=0; pg<nbPages; pg++){
         const dedans=contenu[pg]||[];
         const page=document.createElement('div');
-        page.className='wt-page'+(sec.pages && pg>=sec.pages ? ' hors':'');
+        page.className='wt-page';
         const trop=dedans.length>pp;
-        page.innerHTML='<div class="wt-page-t"><span>'
-          +(sec.pages&&pg>=sec.pages?'⚠ hors pagination · page ':'Page ')+(pg+1)
-          +'</span><span style="font-weight:400;color:'+(trop?'#B00020':'#bbb')+'">'+dedans.length+'/'+pp+'</span>'
+        // Le nombre de produits par page est un REPÈRE, pas une limite. Une page à 10
+        // sur un repère de 9 est un choix légitime : on l'indique en ambre, jamais en
+        // rouge, et l'infobulle le dit.
+        page.innerHTML='<div class="wt-page-t"><span>Page '+(pg+1)+'</span>'
+          +'<span style="font-weight:700;color:'+(trop?'#8A6100':'#bbb')+'" title="'
+          +(trop?(dedans.length-pp)+' produit(s) au-delà du repère de '+pp+' — c\'est permis, le repère n\'est pas une limite.':'Repère : '+pp+' produits par page.')
+          +'">'+dedans.length+'/'+pp+'</span>'
           +'<button class="wt-page-add" title="Ajouter un article à cette page">➕ Article</button></div>';
         page.querySelector('.wt-page-add').onclick=()=>ajouterArticle(sec, pg);
         const g=wtZoneDepot(document.createElement('div'));
