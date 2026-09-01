@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V39)</title>
+<title>Studio Planches Contacts — NPC (V40)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -239,6 +239,7 @@
     <button class="btn ghost" id="checkFonds" title="Analyse le fond de chaque photo : détouré / fond blanc, fond uni, ou décor. Décide de la direction graphique possible.">🔍 Fonds photo</button>
     <button class="btn ghost" id="exportMissing">📋 Manquants</button>
     <button class="btn ghost" onclick="window.print()">🖨</button>
+    <button class="btn red" id="livrerBtn" title="Contrôler la sélection et produire tout ce qui part en production">✅ Livrer</button>
     <div class="density-box" title="Nombre de produits par page de catalogue. Sert à calculer la capacité de chaque planche.">
       <label class="pg-lab" for="perPage">📐 Produits / page</label>
       <input type="number" id="perPage" value="9" min="1" max="40">
@@ -1888,7 +1889,13 @@ function renderWorktable(){
     PAGES.push({pg:nom.trim()||('Planche '+(PAGES.length+1)), codes:[], pages:1, niveaux:{}, pagesContenu:[[]]});
     renderWorktable(); scheduleAutosave();
   };
-  bar.appendChild(retour); bar.appendChild(seg); bar.appendChild(taille); bar.appendChild(bPlanche); bar.appendChild(tot);
+  const bLivrer=document.createElement('button');
+  bLivrer.className='btn red'; bLivrer.style.cssText='padding:8px 16px;font-size:.78rem';
+  bLivrer.textContent='✅ Valider et livrer';
+  bLivrer.title='Enregistrer la sélection telle qu\'elle est composée et produire les livrables';
+  bLivrer.onclick=()=>{ wtSync(); fermerWorktable(); scheduleAutosave(); montrerLivraison(); };
+  bar.appendChild(retour); bar.appendChild(seg); bar.appendChild(taille); bar.appendChild(bPlanche);
+  bar.appendChild(bLivrer); bar.appendChild(tot);
   wt.appendChild(bar);
   wt.style.setProperty('--wt', WT_SIZE+'px');
 
@@ -2036,6 +2043,109 @@ $('wtBtn').addEventListener('click', ()=>{
   if ($('worktable').classList.contains('hidden')) ouvrirWorktable();
   else { wtSync(); fermerWorktable(); }
 });
+
+// ============ LIVRAISON (V40) ============
+// Une fois la sélection arrêtée, il fallait sortir de la table de travail puis retrouver
+// les bons boutons dans la barre. C'était un parcours, pas une action. Ici : un contrôle
+// avant départ, puis tout ce qui part en production au même endroit.
+function bilanLivraison(){
+  const codes=[...new Set(allCodes())];
+  const sansPhoto=codes.filter(c=>!matchedFiles[c] && !localBlobs[c] && !String(c).startsWith('SLOT'));
+  const sansPrix=codes.filter(c=>{ const p=PRODUCTS[c]||{}; return !String(p.prixPromo||p.prix||'').trim(); });
+  const sansLib=codes.filter(c=>!String((PRODUCTS[c]||{}).lib||'').trim());
+  const pagesComposees=PAGES.reduce((n,s)=>n+pagesDe(s).length,0);
+  const sansPagination=PAGES.filter(s=>!s.pages).length;
+  const ecartPagination=PAGES.filter(s=>s.pages && pagesDe(s).length!==s.pages).length;
+  return {codes, sansPhoto, sansPrix, sansLib, pagesComposees, sansPagination, ecartPagination};
+}
+
+function montrerLivraison(){
+  if (!allCodes().length){ alert('Aucune référence dans la sélection.'); return; }
+  const b=bilanLivraison();
+  let ov=document.getElementById('livOverlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='livOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(13,27,42,.78);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px;max-width:660px;width:100%;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.4);max-height:92vh;overflow:auto';
+
+  const alertes=[];
+  if (POOL.length) alertes.push({t:'grave', m:'<b>'+POOL.length+' produit(s) au vivier</b> — ils ne sont dans aucune page et <b>ne partiront pas</b> en livraison.'});
+  if (b.sansPhoto.length) alertes.push({t:'grave', m:'<b>'+b.sansPhoto.length+' référence(s) sans visuel</b> — leur emplacement restera vide dans la maquette.'});
+  if (b.sansPrix.length) alertes.push({t:'grave', m:'<b>'+b.sansPrix.length+' référence(s) sans prix</b> — à compléter avant impression.'});
+  if (b.sansLib.length) alertes.push({t:'doux', m:b.sansLib.length+' référence(s) sans désignation.'});
+  if (b.sansPagination) alertes.push({t:'doux', m:b.sansPagination+' planche(s) sans nombre de pages attribué.'});
+  if (b.ecartPagination) alertes.push({t:'doux', m:b.ecartPagination+' planche(s) dont la pagination composée diffère de celle attribuée — « ⇢ Caler la pagination » les aligne.'});
+  if (RESERVE.length) alertes.push({t:'info', m:RESERVE.length+' produit(s) en réserve — écartés volontairement, ils ne partent pas.'});
+
+  box.innerHTML='<div style="font-family:\'Playfair Display\',serif;font-size:1.25rem;font-weight:700;color:#1B4332;margin-bottom:4px">Livrer la sélection</div>'
+    +'<div style="font-size:.82rem;color:#555;margin-bottom:14px">'
+    +'<b>'+b.codes.length+' référence(s)</b> · '+PAGES.length+' planche(s) · '+b.pagesComposees+' page(s) composée(s) · '
+    +(b.codes.length-b.sansPhoto.length)+' avec visuel</div>';
+
+  if (alertes.length){
+    const bloc=document.createElement('div');
+    bloc.style.cssText='border-radius:10px;padding:12px 14px;margin-bottom:16px;background:#FFF9F0;border-left:5px solid #E0A800';
+    bloc.innerHTML='<div style="font-weight:700;font-size:.82rem;margin-bottom:7px">Avant de livrer</div>'
+      +alertes.map(a=>'<div style="font-size:.78rem;line-height:1.5;color:'
+        +(a.t==='grave'?'#8A2A16':(a.t==='doux'?'#6E5A00':'#666'))+'">• '+a.m+'</div>').join('');
+    box.appendChild(bloc);
+  } else {
+    const ok=document.createElement('div');
+    ok.style.cssText='border-radius:10px;padding:12px 14px;margin-bottom:16px;background:#F0F8F3;border-left:5px solid #1B4332;font-size:.82rem;color:#1B4332;font-weight:700';
+    ok.textContent='✅ Rien à signaler : chaque référence a un visuel, un prix et une place.';
+    box.appendChild(ok);
+  }
+
+  const item=(titre,desc,cls,fn)=>{
+    const d=document.createElement('div');
+    d.style.cssText='display:flex;gap:12px;align-items:center;border:2px solid #E5E0D8;border-radius:12px;padding:13px 15px;margin-bottom:10px;flex-wrap:wrap';
+    d.innerHTML='<div style="flex:1;min-width:230px">'
+      +'<div style="font-weight:700;font-size:.86rem">'+titre+'</div>'
+      +'<div style="font-size:.75rem;color:#666;line-height:1.4">'+desc+'</div></div>';
+    const btn=document.createElement('button');
+    btn.className='btn '+cls; btn.style.cssText='padding:9px 17px;font-size:.79rem';
+    btn.textContent='Produire';
+    btn.onclick=fn;
+    d.appendChild(btn); box.appendChild(d);
+  };
+
+  const t=document.createElement('div');
+  t.style.cssText='font-weight:700;font-size:.8rem;color:#888;margin:4px 0 9px;letter-spacing:.03em';
+  t.textContent='POUR LA CRÉATION';
+  box.appendChild(t);
+  item('🧩 Dossier de fusion InDesign',
+    'Le livrable principal : fichier de fusion, visuels et mode d\'emploi dans un dossier autonome. Elle décompresse et compose ses pages.',
+    'red', ()=>{ ov.remove(); showMergeChoice(); });
+  item('🛍 Catalogue web',
+    'Le catalogue mis en pages, à faire valider en interne ou à mettre en ligne. Imprimable en PDF.',
+    'gold', ()=>{ ov.remove(); $('makeCatalogue').click(); });
+  item('🗂 Dossier prod HD',
+    'Les photos d\'origine pleine résolution, rangées par planche, pour l\'imprimeur.',
+    'green', ()=>{ ov.remove(); $('makeFolder').click(); });
+
+  const t2=document.createElement('div');
+  t2.style.cssText='font-weight:700;font-size:.8rem;color:#888;margin:16px 0 9px;letter-spacing:.03em';
+  t2.textContent='POUR TOI';
+  box.appendChild(t2);
+  item('💾 Fichier projet (.json)',
+    'Ton archive de travail : tout est dedans, planches, pages, vivier, réserve et photos. À garder, et à rouvrir avec « 📂 Ouvrir projet ».',
+    'green', ()=>{ ov.remove(); $('saveProj').click(); });
+  item('📊 Récapitulatif Excel',
+    'Une ligne par produit : planche, page, niveau, code, désignation, prix, remise, présence du visuel.',
+    'ghost', ()=>{ ov.remove(); $('makeXlsx').click(); });
+  item('📋 Références sans visuel',
+    'La liste de ce qu\'il reste à photographier, avec le chemin attendu quand il est connu.',
+    'ghost', ()=>{ ov.remove(); $('exportMissing').click(); });
+
+  const fermer=document.createElement('button');
+  fermer.className='btn ghost'; fermer.style.cssText='padding:10px 20px;font-size:.82rem;margin-top:6px';
+  fermer.textContent='Fermer'; fermer.onclick=()=>ov.remove();
+  box.appendChild(fermer);
+  ov.appendChild(box);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+$('livrerBtn').addEventListener('click', montrerLivraison);
 
 // ============ CONTRÔLE DES FONDS PHOTO (V27) ============
 // Le rendu « type Checkers » repose entièrement sur des visuels détourés ou sur fond

@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v39.html` | **version courante**, à utiliser |
+| `studio-planches-v40.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -45,14 +45,17 @@ l'historique git.
 6. **Calage éditorial** — renseigner le nombre de pages de chaque planche et le nombre de
    produits par page : la jauge dit si la sélection tient. Marquer les héros de chaque
    page d'un clic sur le niveau de la vignette.
-7. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
+7. **Livraison** — « ✅ Livrer », ou « ✅ Valider et livrer » depuis la table de travail :
+   contrôle avant départ (vivier non placé, visuels et prix manquants, pagination), puis
+   les livrables rangés par destinataire.
+8. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
    récapitulatif, HTML pour diffusion.
-8. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand, au choix en
+9. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand, au choix en
    fichier unique (visuels incorporés, rien à décompresser) ou en dossier
    `index.html` + `images/` pour une mise en ligne. Imprimable en PDF (Ctrl+P).
    Une archive doit être décompressée avant d'ouvrir la page, sinon les visuels
    manquent — le catalogue le signale lui-même.
-9. **Maquette** — deux voies vers InDesign :
+10. **Maquette** — deux voies vers InDesign :
    - bouton « ⧉ Copier » sur la vignette, puis Ctrl+V dans Word, InDesign ou PowerPoint —
      méthode fiable, vérifiée de bout en bout ; le glisser-déposer d'une photo est laissé
      au comportement natif du navigateur et transmet la copie d'affichage ;
@@ -65,7 +68,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v39.mjs ../studio-planches-v39.html
+node verif-v40.mjs ../studio-planches-v40.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et

@@ -1,5 +1,30 @@
 # Studio Planches Contacts — journal des versions
 
+## V40 — une étape de livraison, avec contrôle avant départ
+
+Une fois la sélection arrêtée dans la table de travail, il fallait en sortir, puis
+retrouver les bons boutons dans la barre — un parcours, pas une action. Et rien ne
+vérifiait que ce qui partait était complet.
+
+Nouveau bouton **✅ Livrer**, doublé d'un **✅ Valider et livrer** dans la table de travail
+qui enregistre la composition, revient aux planches et ouvre la même fenêtre.
+
+**Contrôle avant départ.** La fenêtre commence par le récapitulatif — références,
+planches, pages composées, visuels — puis signale ce qui cloche :
+
+- les produits **restés au vivier**, qui ne partiront pas ;
+- les références **sans visuel** et **sans prix** ;
+- les planches sans pagination attribuée, ou dont la composition en diffère ;
+- la réserve, rappelée comme un écart volontaire.
+
+Quand tout est en ordre, elle le dit : « Rien à signaler : chaque référence a un visuel,
+un prix et une place. »
+
+**Puis les livrables, rangés par destinataire.** Pour la création : dossier de fusion
+InDesign, catalogue web, dossier prod HD. Pour soi : fichier projet `.json`, récapitulatif
+Excel, liste des références sans visuel.
+
+
 ## V39 — déplacer une page entière
 
 Les produits se déplaçaient un par un ; les pages, elles, restaient figées dans leur
