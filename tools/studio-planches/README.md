@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v40.html` | **version courante**, à utiliser |
+| `studio-planches-v41.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -41,7 +41,9 @@ l'historique git.
    compter 10 pour un repère de 9, le compteur passe en ambre. « ⇢ Caler la pagination »
    attribue à la planche le nombre de pages réellement composées.
    Libellé et prix se saisissent directement sur la vignette.
-   C'est là que la sélection large devient la sélection finale.
+   C'est là que la sélection large devient la sélection finale — **et la pagination
+   composée ici est celle qui sort** : fusion InDesign, Excel, dossier prod HD et
+   catalogue web reprennent l'ordre et le découpage en pages tels qu'ils ont été calés.
 6. **Calage éditorial** — renseigner le nombre de pages de chaque planche et le nombre de
    produits par page : la jauge dit si la sélection tient. Marquer les héros de chaque
    page d'un clic sur le niveau de la vignette.
@@ -49,7 +51,9 @@ l'historique git.
    contrôle avant départ (vivier non placé, visuels et prix manquants, pagination), puis
    les livrables rangés par destinataire.
 8. **Exports** — PDF pour validation, dossier prod HD pour l'imprimeur, Excel pour le
-   récapitulatif, HTML pour diffusion.
+   récapitulatif, HTML pour diffusion. Le dossier prod HD range les photos par page —
+   `PLANCHES_PHOTOS_PAR_PAGE/<Planche>/Page 02/03_b3.jpg`, le rang en préfixe — et
+   l'Excel porte les colonnes *Page catalogue*, *Page dans planche*, *Rang dans page*.
 9. **Catalogue web** — « 🛍 Catalogue web » produit le catalogue marchand, au choix en
    fichier unique (visuels incorporés, rien à décompresser) ou en dossier
    `index.html` + `images/` pour une mise en ligne. Imprimable en PDF (Ctrl+P).
@@ -61,20 +65,23 @@ l'historique git.
      au comportement natif du navigateur et transmet la copie d'affichage ;
    - « 🧩 Fusion InDesign » produit un dossier autonome — fichier de fusion, photos et
      mode d'emploi — à transmettre à la personne qui fait la maquette. Les chemins y
-     sont relatifs : elle décompresse où elle veut, sans accès au serveur.
+     sont relatifs : elle décompresse où elle veut, sans accès au serveur. Les colonnes
+     `PageCatalogue`, `PageDansPlanche` et `PositionDansPage` lui donnent la pagination
+     composée dans la table de travail.
 
 ## Vérifications
 
 ```bash
 cd test
 npm i playwright-core
-node verif-v40.mjs ../studio-planches-v40.html
+node verif-v41.mjs ../studio-planches-v41.html node_modules/jszip/dist/jszip.min.js
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et
 s'exécute sur la version courante — ils servent de tests de non-régression cumulés.
 Adapter `executablePath` au chemin local de Chromium, ou passer la variable
-d'environnement `CHROME`.
+d'environnement `CHROME`. Certaines vérifications prennent un second argument : le
+chemin d'un `jszip.min.js` local, les CDN n'étant pas joignables hors ligne.
 
 ## Plusieurs projets
 

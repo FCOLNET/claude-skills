@@ -38,7 +38,9 @@ const r = await p.evaluate(async () => {
   const m = buildMergeFile('', true);
   const l = m.texte.split('\r\n').filter(Boolean);
   const cols = l[0].split('\t');
-  const r1 = l[1].split('\t');
+  // lecture PAR NOM de colonne : l'ajout de colonnes ne casse plus le test
+  const col = (ligne, nom) => ligne.split('\t')[cols.indexOf(nom)];
+  const r1 = l[1];
 
   // aller-retour projet
   const proj = await buildProject(false, {});
@@ -46,7 +48,8 @@ const r = await p.evaluate(async () => {
   applyProject(proj);
   const apres = { pages: PAGES[0].pages, niv: nivOf(PAGES[0], cartes[0].dataset.code), perPage: $('perPage').value };
 
-  return { total, jauges, niveaux, classes, cols, r1, apres, nRefs: allCodes().length };
+  return { total, jauges, niveaux, classes, cols, apres, nRefs: allCodes().length,
+           pagesPlanche: col(r1,'PagesPlanche'), niveau: col(r1,'Niveau') };
 });
 
 ck('total : 481 références pour 342 emplacements',
@@ -62,7 +65,8 @@ ck('niveau cyclique standard → héros → petit', r.niveaux.a === 'hero' && r.
 ck('héros mis en avant visuellement', /niv-hero/.test(r.classes.a) && /niv-petit/.test(r.classes.b), JSON.stringify(r.classes));
 ck('colonnes Niveau et PagesPlanche exportées',
   r.cols.includes('Niveau') && r.cols.includes('PagesPlanche'), JSON.stringify(r.cols));
-ck('valeurs exportées justes', r.r1[1] === '6' && r.r1[3] === 'héros', JSON.stringify(r.r1.slice(0, 5)));
+ck('valeurs exportées justes', r.pagesPlanche === '6' && r.niveau === 'héros',
+  JSON.stringify({ pages: r.pagesPlanche, niveau: r.niveau }));
 ck('pages, niveaux et densité conservés à la reprise',
   r.apres.pages === 6 && r.apres.niv === 'hero' && r.apres.perPage === '9', JSON.stringify(r.apres));
 console.log('  info  | ' + r.total.replace(/\s+/g, ' ').trim().slice(0, 200));

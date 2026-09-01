@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V40)</title>
+<title>Studio Planches Contacts — NPC (V41)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -2044,6 +2044,36 @@ $('wtBtn').addEventListener('click', ()=>{
   else { wtSync(); fermerWorktable(); }
 });
 
+// ============ PARCOURS DE LA COMPOSITION (V41) ============
+// Jusqu'ici, tous les exports lisaient la liste à plat de chaque planche : l'ordre des
+// produits partait bien, mais PAS le découpage en pages. Composer des pages dans la table
+// de travail ne servait donc qu'à l'écran.
+// Ce parcours unique restitue la composition — numéro de page dans le catalogue, numéro
+// de page dans la planche, rang dans la page — et alimente désormais les quatre sorties.
+function parcoursCompose(){
+  const out=[]; let pageGlobale=0;
+  PAGES.forEach((sec,si)=>{
+    pagesDe(sec).forEach((pg,pi)=>{
+      pageGlobale++;
+      pg.forEach((code,ci)=>{
+        out.push({sec, secIdx:si, code, pageLocale:pi+1, pageGlobale, pos:ci+1});
+      });
+    });
+  });
+  return out;
+}
+// même parcours, mais groupé par page : [{sec, pageLocale, pageGlobale, codes:[…]}]
+function pagesComposees(){
+  const out=[]; let pageGlobale=0;
+  PAGES.forEach(sec=>{
+    pagesDe(sec).forEach((pg,pi)=>{
+      pageGlobale++;
+      out.push({sec, pageLocale:pi+1, pageGlobale, codes:pg.slice()});
+    });
+  });
+  return out;
+}
+
 // ============ LIVRAISON (V40) ============
 // Une fois la sélection arrêtée, il fallait sortir de la table de travail puis retrouver
 // les bons boutons dans la barre. C'était un parcours, pas une action. Ici : un contrôle
@@ -3003,14 +3033,22 @@ function hdWarning(){
 $('makeFolder').addEventListener('click', async ()=>{
   const btn=$('makeFolder');
   if (!hdWarning()) return;
+  // V41 : un sous-dossier PAR PAGE, dans l'ordre de composition. Les photos arrivent
+  // rangées comme la maquette, préfixées de leur rang pour rester dans l'ordre à l'écran.
   const write = async (rootHandle)=>{
     let n=0;
-    for (const sec of PAGES){
-      const dir=await rootHandle.getDirectoryHandle(safeName(sec.pg)||'page',{create:true});
-      for (const code of sec.codes){
+    for (const pageInfo of pagesComposees()){
+      if (!pageInfo.codes.length) continue;
+      const dirPlanche=await rootHandle.getDirectoryHandle(safeName(pageInfo.sec.pg)||'planche',{create:true});
+      const nomPage='Page '+String(pageInfo.pageGlobale).padStart(2,'0');
+      const dir=await dirPlanche.getDirectoryHandle(nomPage,{create:true});
+      let rang=0;
+      for (const code of pageInfo.codes){
+        rang++;
         const f=matchedFiles[code];if(!f)continue;   // fichier d'ORIGINE, pleine résolution
         const ext=photoExt(f);
-        const fh=await dir.getFileHandle((code.startsWith('SLOT')?safeName(baseName(f.name)):code)+ext,{create:true});
+        const base=String(rang).padStart(2,'0')+'_'+(code.startsWith('SLOT')?safeName(baseName(f.name)):code);
+        const fh=await dir.getFileHandle(base+ext,{create:true});
         const w=await fh.createWritable();await w.write(f);await w.close();n++;
         btn.textContent='🗂 '+n;
       }
@@ -3026,12 +3064,17 @@ $('makeFolder').addEventListener('click', async ()=>{
     }catch(e){if(e.name!=='AbortError')alert(e.message);btn.textContent='🗂 Dossier prod HD';}
   } else {
     const zip=new JSZip();const root=zip.folder('PLANCHES_PHOTOS_PAR_PAGE');let n=0;
-    for (const sec of PAGES){
-      const dir=root.folder(safeName(sec.pg)||'page');
-      for (const code of sec.codes){
+    for (const pageInfo of pagesComposees()){
+      if (!pageInfo.codes.length) continue;
+      const dir=root.folder(safeName(pageInfo.sec.pg)||'planche')
+                    .folder('Page '+String(pageInfo.pageGlobale).padStart(2,'0'));
+      let rang=0;
+      for (const code of pageInfo.codes){
+        rang++;
         const f=matchedFiles[code];if(!f)continue;   // fichier d'ORIGINE, pleine résolution
         const ext=photoExt(f);
-        dir.file((code.startsWith('SLOT')?safeName(baseName(f.name)):code)+ext,f,{compression:'STORE'});n++;
+        const base=String(rang).padStart(2,'0')+'_'+(code.startsWith('SLOT')?safeName(baseName(f.name)):code);
+        dir.file(base+ext,f,{compression:'STORE'});n++;
       }
     }
     const blob=await zip.generateAsync({type:'blob'});
@@ -3087,14 +3130,18 @@ function buildMergeFile(dossier, relatif){
   for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) codeToFourn[c]=arr[0]; }
   for (const [fKey,c] of Object.entries(REF_FOURN||{})){ if(!(c in codeToFourn)) codeToFourn[c]=fKey; }
   const lignes=[[
-    'Planche','PagesPlanche','Position','Niveau','Code','RefFournisseur','Designation',
+    'Planche','PagesPlanche','PageCatalogue','PageDansPlanche','PositionDansPage',
+    'Position','Niveau','Code','RefFournisseur','Designation',
     'Prix','PrixInitial','PrixPromo','Remise','PhotoPresente','@Photo'
   ].join('\t')];
   let avecPhoto=0;
-  for (const sec of PAGES){
-    let pos=0;
-    for (const code of sec.codes){
-      pos++;
+  // parcours dans l'ordre de composition : les lignes sortent page par page
+  let secCourante=null, pos=0;
+  for (const it of parcoursCompose()){
+    const sec=it.sec, code=it.code;
+    if (sec!==secCourante){ secCourante=sec; pos=0; }
+    pos++;
+    {
       const p=PRODUCTS[code]||{};
       const isSlot=String(code).startsWith('SLOT');
       const hasInit=String(p.prixInit||'').trim()!=='';
@@ -3108,7 +3155,8 @@ function buildMergeFile(dossier, relatif){
         : mergeImagePath(code, dossier);
       if (dispo) avecPhoto++;
       lignes.push([
-        champ(sec.pg), sec.pages||'', pos, NIV_LABEL[nivOf(sec,code)].replace(/[★▪]\s*/,''),
+        champ(sec.pg), sec.pages||'', it.pageGlobale, it.pageLocale, it.pos,
+        pos, NIV_LABEL[nivOf(sec,code)].replace(/[★▪]\s*/,''),
         champ(isSlot?'':code), champ(codeToFourn[code]||''), champ(p.lib||''),
         champ(p.prix||''), champ(hasInit?p.prixInit:''), champ(hasInit?(p.prixPromo||p.prix):''),
         champ(hasInit?fmtRemiseText(rem,fmt).replace(/\u00a0|\u202f/g,' '):''),
@@ -3160,6 +3208,9 @@ function lisezMoi(nb, avecPhoto, mode){
     'COLONNES DISPONIBLES',
     '  Planche         nom de la planche du catalogue',
     '  PagesPlanche    nombre de pages attribuees a cette planche',
+    '  PageCatalogue   numero de page dans le catalogue entier',
+    '  PageDansPlanche numero de page a l interieur de la planche',
+    '  PositionDansPage rang du produit sur sa page',
     '  Position        rang du produit dans sa planche',
     '  Niveau          heros / standard / petit — taille de mise en avant voulue',
     '  Code            code article',
@@ -3334,13 +3385,16 @@ $('makeXlsx').addEventListener('click', ()=>{
     for (const [c,arr] of Object.entries(REF_FOURN_RAW||{})){ if(arr&&arr.length) codeToFourn[c]=arr[0]; }
     for (const [fKey,c] of Object.entries(REF_FOURN||{})){ if(!(c in codeToFourn)) codeToFourn[c]=fKey; }
     const rows=[[
-      'Page','Pages catalogue','N° page','Niveau','Code article','Réf. fournisseur','Libellé',
+      'Planche','Pages attribuées','Page catalogue','Page dans planche','Rang dans page',
+      'N° dans planche','Niveau','Code article','Réf. fournisseur','Libellé',
       'Prix','Prix initial','Prix promo','Remise %','Remise (F)','Remise (affichée)','Photo'
     ]];
-    for (const sec of PAGES){
-      let pos=0;
-      for (const code of sec.codes){
-        pos++;
+    let secCourante=null, pos=0;
+    for (const it of parcoursCompose()){
+      const sec=it.sec, code=it.code;
+      if (sec!==secCourante){ secCourante=sec; pos=0; }
+      pos++;
+      {
         const p=PRODUCTS[code]||{};
         const isSlot=String(code).startsWith('SLOT');
         const codeAff=isSlot?'':code;
@@ -3352,6 +3406,9 @@ $('makeXlsx').addEventListener('click', ()=>{
         rows.push([
           sec.pg||'',
           sec.pages||'',
+          it.pageGlobale,
+          it.pageLocale,
+          it.pos,
           pos,
           NIV_LABEL[nivOf(sec,code)].replace(/[★▪]\s*/,''),
           codeAff,
@@ -3369,10 +3426,10 @@ $('makeXlsx').addEventListener('click', ()=>{
     }
     const ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=[
-      {wch:22},{wch:14},{wch:7},{wch:10},{wch:14},{wch:16},{wch:40},
+      {wch:22},{wch:14},{wch:13},{wch:15},{wch:12},{wch:14},{wch:10},{wch:14},{wch:16},{wch:40},
       {wch:10},{wch:11},{wch:11},{wch:9},{wch:11},{wch:18},{wch:11}
     ];
-    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:13}})};
+    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:16}})};
     ws['!freeze']={xSplit:0,ySplit:1};
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Catalogue');
@@ -3466,23 +3523,32 @@ async function buildCatalogueWeb(mode){
     const id='pl'+i;
     sommaire+='<a class="som-item" href="#'+id+'" style="border-color:'+u.bande+'"><span class="som-pastille" style="background:'+u.bande+'"></span>'
       +esc(sec.pg)+'<span class="som-n">'+sec.codes.length+'</span></a>';
-    let cartes='';
-    for (const code of sec.codes){
-      const p=PRODUCTS[code]||{};
-      const niv=nivOf(sec, code);
-      const img=srcImg[code]
-        ? '<img src="'+srcImg[code]+'" alt="'+esc(p.lib||code)+'" loading="lazy">'
-        : '<div class="sans-photo">visuel à venir</div>';
-      cartes+='<article class="prod n-'+niv+'">'
-        +'<div class="prod-img">'+img+'</div>'
-        +'<h3>'+esc(p.lib||'')+'</h3>'
-        +blocPrixHtml(p, fmt, esc)
-        +'</article>';
-    }
+    // V41 : le catalogue respecte la composition — une grille PAR PAGE, et non plus
+    // toute la planche d'un bloc. C'est ce qui rend l'aperçu fidèle à la maquette et le
+    // PDF paginé comme prévu.
+    let pagesHtml='';
+    pagesDe(sec).forEach((codesPage, pi)=>{
+      if (!codesPage.length) return;
+      let cartes='';
+      for (const code of codesPage){
+        const p=PRODUCTS[code]||{};
+        const niv=nivOf(sec, code);
+        const img=srcImg[code]
+          ? '<img src="'+srcImg[code]+'" alt="'+esc(p.lib||code)+'" loading="lazy">'
+          : '<div class="sans-photo">visuel à venir</div>';
+        cartes+='<article class="prod n-'+niv+'">'
+          +'<div class="prod-img">'+img+'</div>'
+          +'<h3>'+esc(p.lib||'')+'</h3>'
+          +blocPrixHtml(p, fmt, esc)
+          +'</article>';
+      }
+      pagesHtml+='<div class="x-page"><div class="x-page-n">Page '+(pi+1)+'</div>'
+        +'<div class="grille">'+cartes+'</div></div>';
+    });
     sections+='<section class="planche" id="'+id+'" style="background:'+u.fond+'">'
       +'<div class="pl-bande" style="background:'+u.bande+'"><h2>'+esc(sec.pg)+'</h2>'
-      +'<span class="pl-n">'+sec.codes.length+' produits</span></div>'
-      +'<div class="grille">'+cartes+'</div>'
+      +'<span class="pl-n">'+sec.codes.length+' produits · '+pagesDe(sec).length+' page(s)</span></div>'
+      +pagesHtml
       +'</section>';
   });
 
@@ -3527,9 +3593,12 @@ async function buildCatalogueWeb(mode){
 '#alerteImg{display:none;position:fixed;left:0;right:0;bottom:0;z-index:99;background:#B00020;color:#fff;padding:16px 20px;font-size:.85rem;line-height:1.5;text-align:center;box-shadow:0 -3px 16px rgba(0,0,0,.3)}',
 '#alerteImg b{display:block;font-size:1rem;margin-bottom:5px}',
 '#alerteImg button{margin-left:12px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:16px;padding:4px 14px;font-size:.75rem;cursor:pointer;font-family:inherit}',
+'.x-page{padding-bottom:6px}',
+'.x-page-n{max-width:1400px;margin:0 auto;padding:14px 22px 0;font-size:.68rem;font-weight:800;letter-spacing:.09em;color:rgba(0,0,0,.32);text-transform:uppercase}',
 '@media print{',
 '  .som{display:none}',
-'  .planche{break-after:page;background:#fff !important}',
+'  .x-page{break-after:page}',
+'  .planche{background:#fff !important}',
 '  .pl-bande{-webkit-print-color-adjust:exact;print-color-adjust:exact}',
 '  .prod{box-shadow:none;border:1px solid #eee}',
 '  .eco,.pv.promo .pv-n{-webkit-print-color-adjust:exact;print-color-adjust:exact}',

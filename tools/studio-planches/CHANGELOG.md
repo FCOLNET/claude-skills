@@ -1,5 +1,36 @@
 # Studio Planches Contacts — journal des versions
 
+## V41 — la pagination composée arrive jusqu'aux exports
+
+Jusqu'ici, la table de travail servait à **choisir** : on en ressortait avec la bonne
+sélection, mais les exports la redécoupaient eux-mêmes en tranches de N produits. Le
+travail de voisinage — ce produit à côté de celui-là, cette page qui s'arrête ici — se
+perdait au moment de livrer. La V41 fait de la composition la **source de vérité** :
+ce qui est composé dans la table de travail est ce qui sort.
+
+Deux parcours communs à tous les exports, `parcoursCompose()` (produit par produit) et
+`pagesComposees()` (page par page), remplacent les découpages locaux. Chaque produit
+connaît désormais sa planche, sa page dans le catalogue, sa page dans la planche et son
+rang dans la page.
+
+**Fusion InDesign.** Trois colonnes nouvelles — `PageCatalogue`, `PageDansPlanche`,
+`PositionDansPage` — et les lignes émises page par page, dans l'ordre composé.
+`Position` reste le rang dans la planche. Le LISEZ-MOI les documente : la personne qui
+fait la maquette sait sur quelle page poser quoi, sans avoir à le déduire.
+
+**Excel.** En-tête complété : *Page catalogue*, *Page dans planche*, *Rang dans page*,
+à côté du *N° dans planche*. Largeurs et filtre automatique étendus.
+
+**Dossier prod HD.** Un sous-dossier par page, avec le rang en préfixe :
+`PLANCHES_PHOTOS_PAR_PAGE/ÉVEIL/Page 02/03_b3.jpg`. L'imprimeur reçoit la pagination
+dans l'arborescence elle-même. Vrai des deux chemins de génération (accès dossier
+natif et repli ZIP).
+
+**Catalogue web.** Une grille par page composée, chacune marquée « Page N », et le saut
+de page à l'impression posé sur la page — plus sur la planche. Le PDF sorti du
+navigateur a donc la pagination voulue.
+
+
 ## V40 — une étape de livraison, avec contrôle avant départ
 
 Une fois la sélection arrêtée dans la table de travail, il fallait en sortir, puis
