@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v35.html` | **version courante**, à utiliser |
+| `studio-planches-v36.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -62,13 +62,25 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v35.mjs ../studio-planches-v35.html
+node verif-v36.mjs ../studio-planches-v36.html
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et
 s'exécute sur la version courante — ils servent de tests de non-régression cumulés.
 Adapter `executablePath` au chemin local de Chromium, ou passer la variable
 d'environnement `CHROME`.
+
+## Sauvegarde et reprise
+
+- **💾 Sauvegarder** produit un `projet-planches-<date>.json` : fichier de travail, à
+  rouvrir avec **📂 Ouvrir projet** dans l'outil lui-même. Aucun autre logiciel ne
+  l'exploite.
+- Il contient planches, pages composées, vivier, réserve, niveaux, prix édités, photos et
+  base articles — la reprise sur une autre machine ne demande pas le dossier photos.
+- Le rouvrir avec une version **antérieure** à celle qui l'a écrit fait perdre ce que
+  cette version ignore ; depuis la V36 l'outil prévient et nomme ce qui est en jeu.
+- Une barre de reprise apparaît au démarrage : c'est la sauvegarde automatique en
+  IndexedDB, indépendante du `.json`.
 
 ## Contraintes connues
 

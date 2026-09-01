@@ -1,5 +1,26 @@
 # Studio Planches Contacts — journal des versions
 
+## V36 — le fichier projet dit avec quelle version il a été écrit
+
+Le fichier de sauvegarde portait `_version: 2` depuis l'origine, alors que le format n'a
+cessé de grossir : composition des pages, vivier, réserve, niveaux, nombre de pages par
+planche. Une version ancienne de l'outil relisait donc un projet récent en **ignorant
+silencieusement** ce qu'elle ne connaissait pas — la composition disparaissait sans le
+moindre message.
+
+Le projet porte désormais une version de format tenue à jour et le nom de la version
+d'outil qui l'a produit. À l'ouverture d'un projet plus récent, l'outil prévient, **nomme
+ce qui risque d'être perdu** — vivier, réserve, composition des pages — et laisse le choix
+de continuer ou d'annuler. Un projet plus ancien s'ouvre sans rien demander.
+
+### Rappel d'usage
+
+Le `.json` est un fichier de travail, pas un livrable : il se rouvre avec l'outil lui-même,
+bouton **📂 Ouvrir projet**. Il contient tout — planches, pages composées, vivier, réserve,
+niveaux, prix édités, photos et base articles — ce qui permet de reprendre sur une autre
+machine sans le dossier photos.
+
+
 ## V35 — ajouter, saisir et supprimer depuis la table de travail
 
 La table de travail ne savait que déplacer ce qui existait déjà. Trois manques comblés.

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V35)</title>
+<title>Studio Planches Contacts — NPC (V36)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -3581,6 +3581,12 @@ function syncProductsFromDOM(){
 //   sinon              -> dataURL base64, pour le fichier projet .json (JSON = texte)
 // opts.limit ne sert plus qu'à protéger le mode dataURL si on devait le réutiliser
 // pour une sauvegarde automatique.
+// Version du FORMAT de projet. À incrémenter dès qu'un champ apparaît.
+// Sans ce repère, une version ancienne de l'outil relisait un projet récent en ignorant
+// silencieusement ce qu'elle ne connaissait pas — pages composées, vivier, réserve
+// disparaissaient sans le moindre message.
+const PROJET_VERSION = 3;
+
 async function buildProject(includePhotos, opts){
   opts=opts||{};
   syncProductsFromDOM();
@@ -3615,7 +3621,7 @@ async function buildProject(includePhotos, opts){
     }
   }
   return {
-    _type:'studio-planches-projet', _version:2,
+    _type:'studio-planches-projet', _version:PROJET_VERSION, _outil:'V36',
     date:new Date().toISOString(),
     // V26 : nb de pages de catalogue et niveaux de mise en avant appartiennent à la planche
     pages:PAGES.map(s=>({pg:s.pg, codes:s.codes.slice(), pages:s.pages||0,
@@ -3640,6 +3646,18 @@ async function buildProject(includePhotos, opts){
 // applique un projet chargé (reconstruit planches + produits + photos)
 function applyProject(proj){
   if (!proj || proj._type!=='studio-planches-projet'){ alert('Fichier projet non reconnu.'); return false; }
+  if ((proj._version||0) > PROJET_VERSION){
+    const manque=[];
+    if (proj.pool) manque.push('le vivier');
+    if (proj.reserve) manque.push('la réserve');
+    if ((proj.pages||[]).some(x=>x && x.pagesContenu)) manque.push('la composition des pages');
+    if (!confirm(
+      'Ce projet a été enregistré avec une version PLUS RÉCENTE de l\'outil'
+      +(proj._outil?' ('+proj._outil+')':'')+'.\n\n'
+      +'Cette version-ci ne sait pas tout relire'
+      +(manque.length?' — '+manque.join(', ')+' risquent d\'être perdus':'')+'.\n\n'
+      +'Ouvre-le de préférence avec la version qui l\'a produit.\n\nContinuer quand même ?')) return false;
+  }
   PAGES=(proj.pages||[]).map(s=>({pg:s.pg, codes:(s.codes||[]).slice(), pages:s.pages||0,
     niveaux:Object.assign({}, s.niveaux||{}),
     pagesContenu: Array.isArray(s.pagesContenu)?s.pagesContenu.map(x=>x.slice()):null}));
