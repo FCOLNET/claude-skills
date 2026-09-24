@@ -2,21 +2,100 @@
   "category": "kinetic-type",
   "duration_s": 10,
   "fps": 30,
-  "canvas": { "w": 1920, "h": 1080, "aspect": "16:9" },
-  "style": "Bold retail promo: deep navy stage, punchy yellow accent, condensed display type (Anton) + Inter for support copy. Flat top-down game-table illustrations.",
-  "palette": ["#FFC629", "#E8433A", "#2E9A4E", "#1F5FA8", "#F7F7F2", "#0E1A3A"],
+  "canvas": {
+    "w": 1920,
+    "h": 1080,
+    "aspect": "16:9"
+  },
+  "style": "Punchy retail promo: smash-cut colour panels, then the real product photo (cut into its 4 stacked tops) deploying and folding per game on saturated per-game backgrounds; yellow end card with the full exploded product. Anton + Inter.",
+  "palette": [
+    "#ffd400",
+    "#1fae5b",
+    "#1f6fe0",
+    "#e8433a",
+    "#19c6e6",
+    "#f7f7f2",
+    "#0a0b10"
+  ],
   "font": "Anton (display) + Inter (body), local woff2 from @fontsource",
-  "beats": [0.15, 2.0, 3.35, 4.7, 6.05, 7.4, 8.4],
+  "beats": [
+    0.15,
+    2.0,
+    3.35,
+    4.7,
+    6.05,
+    7.4,
+    8.4
+  ],
   "export": "mp4",
-  "asset_needs": [],
+  "asset_needs": [
+    {
+      "role": "hero",
+      "kind": "image",
+      "source": "user-supplied exploded product photo (488x625)",
+      "treatment": "cutout + split into 4 layers (babyfoot, ping-pong, air hockey, billard base)"
+    }
+  ],
   "block": null,
   "customize": {},
-  "notes": "Source page noumeapascher.nc was unreachable (egress policy), so no-capture mode: no product photo, no price. Game list = the standard 4-in-1 set (babyfoot, billard, ping-pong, air hockey) — verify against the real product.",
+  "notes": "Game order follows the product stack top to bottom. Source photo is low-res (488x625); a higher-res version would sharpen every product shot. Site noumeapascher.nc blocked by egress policy, so no price.",
   "content": {
     "scenes": [
-      { "id": "hook", "start": 0, "end": 2.0, "text": "4 JEUX — EN 1 SEULE TABLE", "emphasis_words": ["4"], "emotion": "impact", "motion": "slam + shake on '4 JEUX', word_reveal on the line, underline_sweep, scale_out exit", "beats": [0.15, 0.7] },
-      { "id": "games", "start": 2.0, "end": 7.4, "text": "01 Babyfoot · 02 Billard · 03 Ping-pong · 04 Air hockey", "emphasis_words": ["Babyfoot", "Billard", "Ping-pong", "Air hockey"], "emotion": "build", "motion": "one motif: the table surface flips (scaleY) to the next game every 1.35s while the numbered label slides; a ball/puck moves on each surface", "beats": [2.0, 3.35, 4.7, 6.05] },
-      { "id": "resolve", "start": 7.4, "end": 10, "text": "Table de jeux 4 en 1 — noumeapascher.nc", "emphasis_words": ["4 en 1"], "emotion": "resolve", "motion": "slide_bottom title, scale_punch icon row stagger, url pill pop + glow, hold", "beats": [7.45, 7.8, 8.4] }
+      {
+        "id": "hook",
+        "start": 0,
+        "end": 2.2,
+        "text": "BABYFOOT / PING-PONG / AIR HOCKEY / BILLARD — 4 JEUX. UNE SEULE TABLE.",
+        "emphasis_words": [
+          "4"
+        ],
+        "emotion": "impact",
+        "motion": "hard smash cuts every 0.35s on full-bleed colour, each with its real product layer popping in; mask-reveal tagline",
+        "beats": [
+          0,
+          0.35,
+          0.7,
+          1.05,
+          1.4
+        ]
+      },
+      {
+        "id": "deploy",
+        "start": 2.2,
+        "end": 7.4,
+        "text": "Jeu 1-4: Babyfoot, Ping-pong, Air hockey, Billard",
+        "emphasis_words": [
+          "Babyfoot",
+          "Ping-pong",
+          "Air hockey",
+          "Billard"
+        ],
+        "emotion": "build",
+        "motion": "one motif: the folded table deploys (tops above the featured game lift off) then folds back, every 1.3s; bg colour + marquee per game",
+        "beats": [
+          2.2,
+          3.5,
+          4.8,
+          6.1
+        ]
+      },
+      {
+        "id": "resolve",
+        "start": 7.2,
+        "end": 10,
+        "text": "Table de jeux 4 en 1 — noumeapascher.nc",
+        "emphasis_words": [
+          "4 en 1"
+        ],
+        "emotion": "resolve",
+        "motion": "yellow wipe, folded table rises and fully deploys, 4 EN 1 slam + shake, URL pill pop",
+        "beats": [
+          7.2,
+          7.62,
+          7.95,
+          8.4
+        ]
+      }
     ]
   }
 }
