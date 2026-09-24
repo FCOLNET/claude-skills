@@ -1,0 +1,22 @@
+{
+  "category": "kinetic-type",
+  "duration_s": 10,
+  "fps": 30,
+  "canvas": { "w": 1920, "h": 1080, "aspect": "16:9" },
+  "style": "Bold retail promo: deep navy stage, punchy yellow accent, condensed display type (Anton) + Inter for support copy. Flat top-down game-table illustrations.",
+  "palette": ["#FFC629", "#E8433A", "#2E9A4E", "#1F5FA8", "#F7F7F2", "#0E1A3A"],
+  "font": "Anton (display) + Inter (body), local woff2 from @fontsource",
+  "beats": [0.15, 2.0, 3.35, 4.7, 6.05, 7.4, 8.4],
+  "export": "mp4",
+  "asset_needs": [],
+  "block": null,
+  "customize": {},
+  "notes": "Source page noumeapascher.nc was unreachable (egress policy), so no-capture mode: no product photo, no price. Game list = the standard 4-in-1 set (babyfoot, billard, ping-pong, air hockey) — verify against the real product.",
+  "content": {
+    "scenes": [
+      { "id": "hook", "start": 0, "end": 2.0, "text": "4 JEUX — EN 1 SEULE TABLE", "emphasis_words": ["4"], "emotion": "impact", "motion": "slam + shake on '4 JEUX', word_reveal on the line, underline_sweep, scale_out exit", "beats": [0.15, 0.7] },
+      { "id": "games", "start": 2.0, "end": 7.4, "text": "01 Babyfoot · 02 Billard · 03 Ping-pong · 04 Air hockey", "emphasis_words": ["Babyfoot", "Billard", "Ping-pong", "Air hockey"], "emotion": "build", "motion": "one motif: the table surface flips (scaleY) to the next game every 1.35s while the numbered label slides; a ball/puck moves on each surface", "beats": [2.0, 3.35, 4.7, 6.05] },
+      { "id": "resolve", "start": 7.4, "end": 10, "text": "Table de jeux 4 en 1 — noumeapascher.nc", "emphasis_words": ["4 en 1"], "emotion": "resolve", "motion": "slide_bottom title, scale_punch icon row stagger, url pill pop + glow, hold", "beats": [7.45, 7.8, 8.4] }
+    ]
+  }
+}
