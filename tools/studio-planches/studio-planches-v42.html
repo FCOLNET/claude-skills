@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V41)</title>
+<title>Studio Planches Contacts — NPC (V42)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -139,9 +139,27 @@
   .wt-page.pagedrag { opacity:.4; }
   .wt-pages.wt-drop-page { outline:2px dashed #1B4332; outline-offset:4px; border-radius:14px; }
   .wt-page-add:hover { background:#C8A951; color:#1A1A1A; }
-  .wt-page-t { display:flex; align-items:center; gap:6px; }
+  .wt-page-t { display:flex; align-items:center; gap:6px; cursor:grab; }
   .wt-item.niv-hero { outline:2px solid #C8A951; }
   .wt-drop { outline:2px dashed #C8A951; outline-offset:2px; }
+  /* V42 — le geste repose sur les événements de pointeur, pas sur le glisser-déposer
+     HTML5. Pendant le déplacement on neutralise la sélection de texte, sinon le
+     navigateur surligne les libellés survolés. touch-action est coupé sur les deux
+     prises (l'image d'une vignette, la poignée d'une page) pour que le tactile ne
+     confonde pas déplacement et défilement ; le reste de la page défile normalement. */
+  body.wt-glisse { user-select:none; cursor:grabbing; }
+  body.wt-glisse .wt-item, body.wt-glisse .wt-page-t, body.wt-glisse .wt-poignee { cursor:grabbing; }
+  /* Le bloc déplacé suit le pointeur : s'il restait sensible au survol, la zone
+     trouvée sous le curseur serait toujours la sienne — il ne quitterait jamais sa
+     page. On le rend transparent au pointage le temps du geste. */
+  .wt-item.dragging, .wt-page.pagedrag { pointer-events:none; }
+  .wt-item .wt-img, .wt-poignee { touch-action:none; }
+  .wt-vers { border:none; background:#EFEAE1; color:#555; font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; }
+  .wt-vers:hover { background:#C8A951; color:#1A1A1A; }
+  .wt-act .wt-move:hover { background:#1B4332; }
+  .wt-cible { display:block; width:100%; text-align:left; border:1px solid #E5E0D8; background:#fff; border-radius:9px; padding:8px 11px; margin-bottom:6px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:.8rem; }
+  .wt-cible:hover { border-color:#C8A951; background:#FFFDF7; }
+  .wt-cible .ou { display:block; font-size:.66rem; color:#888; margin-top:2px; }
   #wtPool { border:2px dashed #1B4332; border-radius:14px; padding:12px 14px; background:#F4FAF6; margin-top:24px; }
   #wtPool h3 { font-size:.9rem; font-weight:700; margin-bottom:3px; }
   #wtPool p { font-size:.72rem; color:#688; margin-bottom:9px; }
@@ -1630,7 +1648,10 @@ function wtItem(code, sec){
   const p=PRODUCTS[code]||{};
   const el=document.createElement('div');
   el.className='wt-item'+(sec&&nivOf(sec,code)==='hero'?' niv-hero':'');
-  el.draggable=true;
+  // V42 — plus d'attribut draggable : le déplacement passe par les événements de
+  // pointeur (voir wtPrise). Un élément « draggable » qui contient des champs éditables
+  // se dispute le pointeur avec eux, et le glisser-déposer natif se comporte
+  // différemment selon le navigateur.
   el.dataset.code=code;
   const f=workFile(code);
   let vis='<div class="wt-vide">sans visuel</div>';
@@ -1640,12 +1661,17 @@ function wtItem(code, sec){
     if (u) vis='<img src="'+escA(u)+'" loading="lazy" alt="">';
   }
   el.innerHTML='<div class="wt-act">'
+    +'<button class="wt-move" title="Déplacer vers une autre page — sans glisser">⇄</button>'
     +'<button class="wt-out" title="Mettre en réserve — récupérable">✕</button>'
     +'<button class="wt-del" title="Supprimer définitivement de la sélection">🗑</button></div>'
     +'<div class="wt-img">'+vis+'</div>'
     +'<div class="wt-txt"><div class="wt-code">'+esc(String(code).startsWith('SLOT')?'':code)+'</div>'
     +'<div class="wt-lib" contenteditable>'+esc(p.lib||'')+'</div>'
     +'<div class="wt-prix" contenteditable>'+esc(p.prixPromo||p.prix||'')+'</div></div>';
+  el.querySelector('.wt-move').addEventListener('click', ev=>{
+    ev.stopPropagation();
+    choisirDestination(code);
+  });
   el.querySelector('.wt-out').addEventListener('click', ev=>{
     ev.stopPropagation();
     // ⚠️ ORDRE : retirer la vignette AVANT de relire le modèle depuis le DOM.
@@ -1679,14 +1705,14 @@ function wtItem(code, sec){
     scheduleAutosave();
   });
   // saisie sur place : indispensable pour un article ajouté ici et absent de la base.
-  // Un champ éditable dans un élément déplaçable ne prend pas le curseur : on suspend le
-  // glisser le temps de la saisie.
+  // V42 — plus rien à suspendre : wtPrise ignore tout geste parti d'un champ éditable
+  // ou d'un bouton. Avant, on basculait draggable=false au mousedown et on ne le
+  // rétablissait qu'au blur — un clic suivi d'un départ immédiat, sans focus, laissait
+  // la vignette définitivement non déplaçable.
   el.querySelectorAll('[contenteditable]').forEach(ch=>{
-    ch.addEventListener('mousedown', ev=>{ ev.stopPropagation(); el.draggable=false; });
-    ch.addEventListener('focus', ()=>{ el.draggable=false; });
+    ch.addEventListener('mousedown', ev=>{ ev.stopPropagation(); });
     ch.addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); ch.blur(); } });
     ch.addEventListener('blur', ()=>{
-      el.draggable=true;
       const pr=PRODUCTS[code]||(PRODUCTS[code]={lib:'',prix:'',prixInit:'',prixPromo:'',remise:''});
       const v=ch.textContent.trim();
       if (ch.classList.contains('wt-lib')) pr.lib=v;
@@ -1694,42 +1720,119 @@ function wtItem(code, sec){
       scheduleAutosave();
     });
   });
-  el.addEventListener('dragstart', ev=>{
-    ev.stopPropagation();                       // ne pas déclencher le glisser vers l'extérieur
-    wtDragged=el; el.classList.add('dragging');
-    try{ ev.dataTransfer.setData('text/plain', code); ev.dataTransfer.effectAllowed='move'; }catch(e){}
-  });
-  el.addEventListener('dragend', ()=>{
-    el.classList.remove('dragging'); wtDragged=null;
-    document.querySelectorAll('.wt-drop').forEach(x=>x.classList.remove('wt-drop'));
-    wtSync(); renderWorktable(); scheduleAutosave();
-  });
+  wtPrise(el, el, 'item');
   return el;
 }
 const wtUrls=new Map();
 let wtDragged=null;
 let wtPageDragged=null;
 
+// ============ GLISSER DANS LA TABLE DE TRAVAIL (V42) ============
+// Le glisser-déposer HTML5 (draggable + dragstart/dragover/drop) a deux défauts ici :
+//  - il dépend du moteur. Déplacer en direct le nœud glissé pendant le survol — ce que
+//    fait wtPlacer pour montrer la place prise — est toléré par Chromium mais interrompt
+//    le geste ailleurs. Et un élément déplaçable qui contient des champs éditables se
+//    dispute le pointeur avec eux.
+//  - il n'atteint pas ce qui est hors écran : avec une sélection réelle, la page visée
+//    est souvent plus bas que la fenêtre, et le geste n'a nulle part où aller.
+// Le geste repose donc sur les événements de pointeur, identiques partout, souris comme
+// tactile, avec un seuil de départ pour ne pas gêner le clic et un défilement
+// automatique près des bords. Aucun dataTransfer : rien à négocier avec le navigateur.
+// Les zones se déclarent par data-zone ; wtPlacer et wtSync sont inchangés.
+
+// Déclare une zone de dépôt. Plus aucun écouteur : c'est le geste en cours qui cherche
+// la zone sous le pointeur.
+function wtZonePage(el){ el.dataset.zone='page'; return el; }
+function wtZoneDepotMarque(el){ el.dataset.zone='item'; return el; }
+
+let wtGeste=null;   // { type:'item'|'page', el }
+
+// Attache une prise à `prise` ; le bloc réellement déplacé est `cible`.
+function wtPrise(prise, cible, type){
+  prise.addEventListener('pointerdown', ev=>{
+    if (ev.button!==0) return;
+    // un bouton, un champ éditable : ce n'est pas une prise
+    if (ev.target.closest && ev.target.closest('button,[contenteditable],input,select,textarea')) return;
+    const x0=ev.clientX, y0=ev.clientY;
+    let parti=false;
+    const bouger=e=>{
+      if (!parti){
+        if (Math.hypot(e.clientX-x0, e.clientY-y0) < 5) return;   // seuil : un clic reste un clic
+        parti=true;
+        wtGeste={type, el:cible};
+        wtBord={haut:false, bas:false};
+        if (type==='item'){ wtDragged=cible; cible.classList.add('dragging'); }
+        else { wtPageDragged=cible; cible.classList.add('pagedrag'); }
+        document.body.classList.add('wt-glisse');
+      }
+      e.preventDefault();
+      wtSurvol(e.clientX, e.clientY);
+    };
+    const lacher=()=>{
+      window.removeEventListener('pointermove', bouger);
+      window.removeEventListener('pointerup', lacher);
+      window.removeEventListener('pointercancel', lacher);
+      if (parti) wtFinGeste();
+    };
+    window.addEventListener('pointermove', bouger);
+    window.addEventListener('pointerup', lacher);
+    window.addEventListener('pointercancel', lacher);
+  });
+}
+
+// Défilement automatique quand le pointeur approche le haut ou le bas de la fenêtre :
+// sans lui, une page située hors écran est inatteignable.
+// Chaque bord doit d'abord être ARMÉ, c'est-à-dire que le pointeur doit en être sorti
+// une fois depuis le début du geste. Sinon, attraper une vignette qui se trouve déjà
+// dans la bande du bas déclenchait le défilement au premier millimètre : le produit
+// partait tout seul vers la planche suivante.
+let wtBord={haut:false, bas:false};
+function wtDefiler(y){
+  const h=window.innerHeight, marge=100;
+  const dansHaut=y<marge, dansBas=y>h-marge;
+  if (!dansHaut) wtBord.haut=true;
+  if (!dansBas) wtBord.bas=true;
+  if (dansHaut && wtBord.haut) window.scrollBy(0, -Math.ceil((marge-y)/4) - 3);
+  else if (dansBas && wtBord.bas) window.scrollBy(0, Math.ceil((y-(h-marge))/4) + 3);
+}
+
+function wtSurvol(x, y){
+  if (!wtGeste) return;
+  wtDefiler(y);
+  const vise = wtGeste.type==='item' ? 'item' : 'page';
+  const zone = document.elementsFromPoint(x, y)
+    .find(e=>e.dataset && e.dataset.zone===vise);
+  const marque = wtGeste.type==='item' ? 'wt-drop' : 'wt-drop-page';
+  document.querySelectorAll('.'+marque).forEach(e=>{ if(e!==zone) e.classList.remove(marque); });
+  if (!zone) return;
+  zone.classList.add(marque);
+  if (wtGeste.type==='item') wtPlacer(zone, x, y);
+  else wtPlacerPage(zone, x, y);
+}
+
+function wtFinGeste(){
+  const g=wtGeste; wtGeste=null;
+  document.body.classList.remove('wt-glisse');
+  document.querySelectorAll('.wt-drop, .wt-drop-page').forEach(e=>e.classList.remove('wt-drop','wt-drop-page'));
+  if (!g) return;
+  if (g.type==='item'){ g.el.classList.remove('dragging'); wtDragged=null; }
+  else { g.el.classList.remove('pagedrag'); wtPageDragged=null; }
+  wtSync(); renderWorktable(); scheduleAutosave();
+}
+
 // Dépôt d'une PAGE entière : on insère avant ou après la page survolée, dans la même
 // planche ou dans une autre. wtSync relit ensuite l'ordre affiché, donc déplacer le
 // bloc dans le DOM suffit à réordonner le modèle.
-function wtZonePage(el){
-  el.addEventListener('dragover', e=>{
-    if (!wtPageDragged) return;
-    e.preventDefault(); e.stopPropagation();
-    el.classList.add('wt-drop-page');
-    const pages=[...el.querySelectorAll('.wt-page')].filter(x=>x!==wtPageDragged);
-    let avant=null, meilleure=Infinity;
-    for (const c of pages){
-      const b=c.getBoundingClientRect();
-      const d=Math.hypot(e.clientX-(b.left+b.width/2), e.clientY-(b.top+b.height/2));
-      if (d<meilleure){ meilleure=d; avant = (e.clientX < b.left+b.width/2) ? c : c.nextElementSibling; }
-    }
-    if (avant) el.insertBefore(wtPageDragged, avant); else el.appendChild(wtPageDragged);
-  });
-  el.addEventListener('dragleave', ()=>el.classList.remove('wt-drop-page'));
-  el.addEventListener('drop', e=>{ if(wtPageDragged){ e.preventDefault(); e.stopPropagation(); } el.classList.remove('wt-drop-page'); });
-  return el;
+function wtPlacerPage(conteneur, x, y){
+  if (!wtPageDragged) return;
+  const pages=[...conteneur.querySelectorAll('.wt-page')].filter(e=>e!==wtPageDragged);
+  let avant=null, meilleure=Infinity;
+  for (const c of pages){
+    const b=c.getBoundingClientRect();
+    const d=Math.hypot(x-(b.left+b.width/2), y-(b.top+b.height/2));
+    if (d<meilleure){ meilleure=d; avant = (x < b.left+b.width/2) ? c : c.nextElementSibling; }
+  }
+  if (avant) conteneur.insertBefore(wtPageDragged, avant); else conteneur.appendChild(wtPageDragged);
 }
 
 // Suppression d'une page. Son contenu n'est jamais jeté : il part au vivier.
@@ -1747,6 +1850,118 @@ function supprimerPage(sec, pageIdx){
   renderWorktable(); scheduleAutosave();
 }
 
+// ============ DÉPLACER SANS GLISSER (V42) ============
+// Un glisser suppose que le départ et l'arrivée soient visibles en même temps. Sur une
+// sélection réelle — plusieurs planches, des dizaines de pages — c'est rarement le cas,
+// et aucun défilement automatique ne rend agréable un geste de deux écrans. Le bouton ⇄
+// nomme la destination au lieu de la viser : une liste, un clic.
+function choixOverlay(titre, intro, options){
+  let ov=document.getElementById('choixOverlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='choixOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(13,27,42,.78);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#FAF8F5;border-radius:16px;padding:22px 24px;max-width:540px;width:100%;max-height:82vh;overflow:auto';
+  const h=document.createElement('h3');
+  h.style.cssText='font-size:1.05rem;font-weight:800;margin-bottom:4px'; h.textContent=titre;
+  const p=document.createElement('p');
+  p.style.cssText='font-size:.76rem;color:#666;margin-bottom:14px'; p.textContent=intro;
+  box.appendChild(h); box.appendChild(p);
+  for (const o of options){
+    const b=document.createElement('button');
+    b.className='wt-cible';
+    b.innerHTML=esc(o.label)+(o.sub?'<span class="ou">'+esc(o.sub)+'</span>':'');
+    b.onclick=()=>{ ov.remove(); o.fn(); };
+    box.appendChild(b);
+  }
+  const cl=document.createElement('button');
+  cl.className='btn ghost'; cl.style.cssText='margin-top:10px'; cl.textContent='Annuler';
+  cl.onclick=()=>ov.remove();
+  box.appendChild(cl);
+  ov.appendChild(box);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+  return ov;
+}
+
+// Retire une référence de partout : pages composées, listes à plat, vivier, réserve.
+function retirerDeTout(code){
+  POOL=POOL.filter(c=>c!==code);
+  RESERVE=RESERVE.filter(r=>r.code!==code);
+  for (const sc of PAGES){
+    if (Array.isArray(sc.pagesContenu)) sc.pagesContenu=sc.pagesContenu.map(pg=>pg.filter(c=>c!==code));
+    sc.codes=sc.codes.filter(c=>c!==code);
+    aplatir(sc);
+  }
+}
+
+function choisirDestination(code){
+  wtSync();
+  const nom=(PRODUCTS[code]||{}).lib||code;
+  const opts=[];
+  PAGES.forEach((sec,si)=>{
+    pagesDe(sec).forEach((pg,pi)=>{
+      opts.push({
+        label: sec.pg+' · page '+(pi+1),
+        sub: pg.length+' produit(s)'+(pg.includes(code)?' — s\'y trouve déjà':''),
+        fn: ()=>{
+          retirerDeTout(code);
+          const s=PAGES[si]; const c=pagesDe(s).map(x=>x.slice());
+          (c[pi]||(c[pi]=[])).push(code);
+          s.pagesContenu=c; aplatir(s);
+          renderWorktable(); scheduleAutosave();
+        }
+      });
+    });
+    opts.push({
+      label: sec.pg+' · nouvelle page en fin de planche',
+      sub: 'crée une page de plus',
+      fn: ()=>{
+        retirerDeTout(code);
+        const s=PAGES[si]; const c=pagesDe(s).map(x=>x.slice());
+        c.push([code]); s.pagesContenu=c; aplatir(s);
+        renderWorktable(); scheduleAutosave();
+      }
+    });
+  });
+  opts.push({ label:'📥 Vivier', sub:'à placer plus tard', fn:()=>{ retirerDeTout(code); POOL.push(code); renderWorktable(); scheduleAutosave(); } });
+  opts.push({ label:'🗃 Réserve', sub:'écarté, récupérable', fn:()=>{ retirerDeTout(code); RESERVE.push({code, pg:''}); renderWorktable(); scheduleAutosave(); } });
+  choixOverlay('Déplacer « '+nom+' »', 'Choisis la destination. Le produit quitte sa place actuelle.', opts);
+}
+
+function deplacerPageVers(sec, pageIdx){
+  wtSync();
+  const src=PAGES.indexOf(sec);
+  const contenu=pagesDe(sec).map(x=>x.slice());
+  const dedans=contenu[pageIdx]||[];
+  const opts=[];
+  PAGES.forEach((dst,di)=>{
+    const n=pagesDe(dst).length;
+    for (let i=0;i<=n;i++){
+      if (di===src && (i===pageIdx || i===pageIdx+1)) continue;   // ne mène nulle part
+      opts.push({
+        label: dst.pg+' · '+(i>=n ? 'en fin de planche' : 'avant la page '+(i+1)),
+        sub: di===src ? 'dans la même planche' : 'change de planche',
+        fn: ()=>{
+          const c=pagesDe(PAGES[src]).map(x=>x.slice());
+          c.splice(pageIdx,1);
+          PAGES[src].pagesContenu = c.length?c:[[]];
+          aplatir(PAGES[src]);
+          const d=pagesDe(PAGES[di]).map(x=>x.slice());
+          // l'indice visé a pu glisser d'un cran si la page retirée le précédait
+          const k = (di===src && i>pageIdx) ? i-1 : i;
+          d.splice(Math.min(k, d.length), 0, dedans);
+          PAGES[di].pagesContenu=d;
+          aplatir(PAGES[di]);
+          renderWorktable(); scheduleAutosave();
+        }
+      });
+    }
+  });
+  if (!opts.length){ alert('Il n\'y a qu\'une page : nulle part où la déplacer.'); return; }
+  choixOverlay('Déplacer la page '+(pageIdx+1)+' de « '+sec.pg+' »',
+    dedans.length+' produit(s) suivent la page. Choisis sa nouvelle place.', opts);
+}
+
 // Insère l'élément glissé à l'endroit visé : avant ou après la vignette survolée selon
 // que le pointeur est à gauche ou à droite de son milieu.
 function wtPlacer(conteneur, x, y){
@@ -1760,17 +1975,7 @@ function wtPlacer(conteneur, x, y){
   }
   if (avant) conteneur.insertBefore(wtDragged, avant); else conteneur.appendChild(wtDragged);
 }
-function wtZoneDepot(el){
-  el.addEventListener('dragover', e=>{
-    if (!wtDragged) return;
-    e.preventDefault(); e.stopPropagation();
-    el.classList.add('wt-drop');
-    wtPlacer(el, e.clientX, e.clientY);
-  });
-  el.addEventListener('dragleave', ()=>el.classList.remove('wt-drop'));
-  el.addEventListener('drop', e=>{ if(wtDragged){ e.preventDefault(); e.stopPropagation(); } el.classList.remove('wt-drop'); });
-  return el;
-}
+function wtZoneDepot(el){ return wtZoneDepotMarque(el); }
 
 // Le DOM fait foi pendant la manipulation : on relit l'ordre affiché pour reconstruire
 // le modèle. Plus sûr que de calculer des index à chaque déplacement.
@@ -1966,28 +2171,20 @@ function renderWorktable(){
         // Le nombre de produits par page est un REPÈRE, pas une limite. Une page à 10
         // sur un repère de 9 est un choix légitime : on l'indique en ambre, jamais en
         // rouge, et l'infobulle le dit.
-        page.innerHTML='<div class="wt-page-t" draggable="true" title="Glisser cet en-tête déplace la page entière">'
+        page.innerHTML='<div class="wt-page-t" data-prise="page" title="Glisser cet en-tête déplace la page entière">'
           +'<span class="wt-poignee">⠿</span><span>Page '+(pg+1)+'</span>'
           +'<span class="wt-page-n" style="font-weight:700;color:'+(trop?'#8A6100':'#bbb')+'" title="'
           +(trop?(dedans.length-pp)+' produit(s) au-delà du repère de '+pp+' — c\'est permis, le repère n\'est pas une limite.':'Repère : '+pp+' produits par page.')
           +'">'+dedans.length+'/'+pp+'</span>'
           +'<button class="wt-page-add" title="Ajouter un article à cette page">➕ Article</button>'
+          +'<button class="wt-vers" title="Déplacer cette page — sans glisser">⇄</button>'
           +'<button class="wt-page-del" title="Supprimer cette page">✕</button></div>';
         page.querySelector('.wt-page-add').onclick=()=>ajouterArticle(sec, pg);
         page.querySelector('.wt-page-del').onclick=()=>supprimerPage(sec, pg);
+        page.querySelector('.wt-vers').onclick=()=>deplacerPageVers(sec, pg);
         // la page entière se déplace par son en-tête : le glisser d'un produit et celui
         // d'une page ne peuvent ainsi jamais être confondus
-        const tete=page.querySelector('.wt-page-t');
-        tete.addEventListener('dragstart', ev=>{
-          ev.stopPropagation();
-          wtPageDragged=page; page.classList.add('pagedrag');
-          try{ ev.dataTransfer.setData('text/plain','page'); ev.dataTransfer.effectAllowed='move'; }catch(e){}
-        });
-        tete.addEventListener('dragend', ()=>{
-          page.classList.remove('pagedrag'); wtPageDragged=null;
-          document.querySelectorAll('.wt-drop-page').forEach(x=>x.classList.remove('wt-drop-page'));
-          wtSync(); renderWorktable(); scheduleAutosave();
-        });
+        wtPrise(page.querySelector('.wt-page-t'), page, 'page');
         const g=wtZoneDepot(document.createElement('div'));
         g.className='wt-grid';
         g.style.gridTemplateColumns='repeat('+cols+', var(--wt))';

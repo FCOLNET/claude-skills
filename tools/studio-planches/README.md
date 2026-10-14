@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v41.html` | **version courante**, à utiliser |
+| `studio-planches-v42.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -37,6 +37,11 @@ l'historique git.
    (récupérable). Trois états : placé, vivier (à poser), réserve (écarté).
    Pour composer de zéro : « ↥ Tout au vivier », puis « ➕ Page » et on dépose.
    « ➕ Article » ajoute une référence à une page donnée ; ✕ met en réserve, 🗑 supprime.
+   Le déplacement se fait au doigt ou à la souris, sans dépendre du glisser-déposer du
+   navigateur : la fenêtre défile toute seule quand on approche le haut ou le bas, donc
+   une page hors écran reste atteignable. Et quand le départ et l'arrivée sont trop
+   éloignés pour un geste, **⇄** sur la vignette — ou sur l'en-tête d'une page — nomme la
+   destination dans une liste : un clic suffit.
    Le nombre de produits par page est un **repère**, pas une limite : une page peut en
    compter 10 pour un repère de 9, le compteur passe en ambre. « ⇢ Caler la pagination »
    attribue à la planche le nombre de pages réellement composées.
@@ -74,7 +79,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v41.mjs ../studio-planches-v41.html node_modules/jszip/dist/jszip.min.js
+node verif-v42.mjs ../studio-planches-v42.html node_modules/jszip/dist/jszip.min.js
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et

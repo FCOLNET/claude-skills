@@ -54,16 +54,26 @@ const a3 = await p.evaluate(() => PRODUCTS['999999']);
 ck('libellé et prix saisis sur la vignette',
   a3.lib === 'ARTICLE SAISI À LA MAIN' && a3.prix === '1 990 F', JSON.stringify(a3));
 
-// 4. le glisser est suspendu pendant la saisie puis rétabli
-const a4 = await p.evaluate(() => {
+// 4. la saisie et le déplacement ne se disputent pas la vignette
+// On vérifie le COMPORTEMENT, pas le mécanisme : en V35 le glisser était suspendu en
+// basculant l'attribut draggable ; depuis la V42 il n'y a plus d'attribut, c'est la
+// prise par événements de pointeur qui ignore les champs. Dans les deux cas : un geste
+// parti du champ ne déplace pas la vignette, et le champ prend bien le curseur.
+const a4 = await p.evaluate(async () => {
   const el = [...document.querySelectorAll('.wt-item')].find(x => x.dataset.code === '999999');
   const lib = el.querySelector('.wt-lib');
-  lib.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-  const pendant = el.draggable;
-  lib.dispatchEvent(new Event('blur'));
-  return { pendant, apres: el.draggable };
+  const avant = [...el.parentNode.children].indexOf(el);
+  const b = lib.getBoundingClientRect();
+  const env = (t, x, y) => lib.dispatchEvent(new PointerEvent(t, { bubbles: true, clientX: x, clientY: y, button: 0, pointerId: 1 }));
+  env('pointerdown', b.left + 4, b.top + 4);
+  for (let i = 1; i <= 8; i++) window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: b.left + 4 - i * 14, clientY: b.top + 4, button: 0, pointerId: 1 }));
+  window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: b.left - 100, clientY: b.top + 4, button: 0, pointerId: 1 }));
+  await new Promise(r => setTimeout(r, 120));
+  const el2 = [...document.querySelectorAll('.wt-item')].find(x => x.dataset.code === '999999');
+  return { avant, apres: [...el2.parentNode.children].indexOf(el2), editable: lib.isContentEditable };
 });
-ck('glisser suspendu pendant la saisie, rétabli après', a4.pendant === false && a4.apres === true, JSON.stringify(a4));
+ck('un geste parti du champ de saisie ne déplace pas la vignette',
+  a4.apres === a4.avant && a4.editable === true, JSON.stringify(a4));
 
 // 5. suppression définitive
 reponse = '';

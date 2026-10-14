@@ -1,5 +1,48 @@
 # Studio Planches Contacts — journal des versions
 
+## V42 — le déplacement ne dépend plus du navigateur
+
+Signalé en V41 : impossible de faire glisser les vignettes entre elles ni d'une page à
+l'autre. Le code du glisser n'avait pas bougé d'un caractère depuis la V39 — vérifié par
+comparaison — et de vrais glissers à la souris, mesurés en Chromium, passaient. La panne
+ne venait donc pas de la V41 mais du **mécanisme lui-même**, qui reposait sur le
+glisser-déposer HTML5 (`draggable` + `dragstart`/`dragover`/`drop`). Celui-ci a trois
+défauts ici :
+
+- **il dépend du moteur.** Pour montrer la place prise, l'outil déplaçait en direct le
+  bloc glissé pendant le survol. Chromium le tolère ; d'autres navigateurs interrompent
+  le geste à cet instant précis.
+- **il se dispute le pointeur avec les champs de saisie.** Une vignette déplaçable qui
+  contient des champs éditables ne leur donne pas le curseur. Le contournement
+  — basculer `draggable=false` au clic, le rétablir au `blur` — laissait la vignette
+  **définitivement non déplaçable** quand le clic n'était pas suivi d'un focus.
+- **il n'atteint pas ce qui est hors écran.** Avec une sélection réelle, la page visée
+  est souvent bien plus bas que la fenêtre, et le geste n'avait nulle part où aller.
+
+Le déplacement repose désormais sur les **événements de pointeur**, identiques sur tous
+les navigateurs, souris comme tactile. Plus aucun attribut `draggable`, plus aucun
+`dataTransfer` : rien à négocier. Le geste est le même à l'œil près.
+
+- **seuil de 5 px** avant de démarrer : un clic reste un clic, les boutons ✕ 🗑 ⇄ et les
+  champs de saisie répondent comme avant ;
+- **défilement automatique** près du haut et du bas de la fenêtre, pour atteindre une page
+  hors écran. Chaque bord doit d'abord être quitté une fois : attraper une vignette déjà
+  posée dans la bande du bas ne fait plus partir le produit tout seul ;
+- le bloc déplacé devient transparent au pointage, sinon la zone trouvée sous le curseur
+  était toujours la sienne et il ne quittait jamais sa page.
+
+**Et un chemin sans glisser.** Un glisser suppose que le départ et l'arrivée soient
+visibles ensemble — sur plusieurs planches et des dizaines de pages, c'est rare. Nouveau
+bouton **⇄** sur chaque vignette et sur chaque en-tête de page : il **nomme** la
+destination au lieu de la viser. Une liste de toutes les pages (plus le vivier, la
+réserve, ou une nouvelle page en fin de planche), un clic, c'est déplacé.
+
+Côté vérifications, deux contrôles lisaient l'attribut `draggable` — l'implémentation,
+pas le geste. Réécrits pour mesurer le comportement : la vignette se déplace, le champ
+prend le curseur, et rien ne bouge quand le geste part d'un champ. Quatrième fois que
+cette leçon revient.
+
+
 ## V41 — la pagination composée arrive jusqu'aux exports
 
 Jusqu'ici, la table de travail servait à **choisir** : on en ressortait avec la bonne

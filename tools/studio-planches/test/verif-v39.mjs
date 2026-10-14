@@ -57,13 +57,16 @@ const lire = p => p.evaluate(() => ({
 
 // --- 1. l'interface est là -----------------------------------------------------
 let p = await scene([['a1'], ['b1'], ['c1']], [['z1']]);
+// On lit l'INTENTION offerte à l'œil et à la main — une poignée, un curseur de prise,
+// un bouton de suppression — jamais l'attribut qui l'implémente : « draggable » a
+// disparu en V42 au profit des événements de pointeur, sans rien changer au geste.
 const init = await p.evaluate(() => ({
   poignees: document.querySelectorAll('.wt-poignee').length,
-  glissable: document.querySelector('.wt-page-t').getAttribute('draggable'),
+  prise: getComputedStyle(document.querySelector('.wt-page-t')).cursor,
   suppr: document.querySelectorAll('.wt-page-del').length
 }));
 ck('poignée et bouton de suppression sur chaque page',
-  init.poignees === 4 && init.glissable === 'true' && init.suppr === 4, JSON.stringify(init));
+  init.poignees === 4 && init.prise === 'grab' && init.suppr === 4, JSON.stringify(init));
 
 // --- 2. réordonner une page dans sa planche ------------------------------------
 let g = await glisserPage(p, 0, 2, 0, 0, 'gauche');
