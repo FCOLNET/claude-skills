@@ -47,23 +47,27 @@ Crée `donnees/prix-nc/AAAA-MM-JJ/` (date de Nouméa) :
 | `manifeste.json` | Date de collecte, volumes, plage de dates des relevés |
 
 CSV en `;` et UTF-8 avec BOM : ils s'ouvrent directement dans Excel. Une collecte
-complète prend **8 à 10 minutes** (le serveur est lent) : la lancer en arrière-plan.
+complète prend **environ 15 minutes** (le serveur est lent) : la lancer en arrière-plan.
 Si un instantané existe déjà pour le jour, il est remplacé.
+
+Lire `manifeste.json` après chaque collecte : `magasins_hors_referentiel` liste les
+magasins qui publient des prix sans figurer dans `/magasins` (au 17/10/2026 : Auchan
+Savannah, L'Épicerie du coin, Korail Lifou…). Leurs prix sont gardés, sans commune ni type.
 
 **L'API ne garde pas d'historique.** Elle ne renvoie que le dernier prix connu. Sans
 archivage hebdomadaire de notre côté, aucune évolution n'est mesurable. Proposer de
 planifier la collecte (tâche planifiée, cron) dès la première utilisation.
 
-`donnees/` est exclu de git : environ 40 Mo par instantané.
+`donnees/` est exclu de git : environ 65 Mo par instantané.
 
 ### 2. Analyser
 
 Toutes les analyses acceptent les mêmes filtres : `--commune`, `--magasin`, `--type`,
-`--secteur`, `--sans-promo`, `--min-magasins`, `--top`, `--csv`.
+`--secteur`, `--sans-promo`, `--garder-aberrants`, `--min-magasins`, `--top`, `--csv`.
 
 | Question | Commande |
 |---|---|
-| Quel magasin est le moins cher ? | `indice INSTANTANE --type "grande surface"` |
+| Quel magasin est le moins cher ? | `indice INSTANTANE --sans-promo --min-magasins 10 --min-produits 1000` |
 | Sur quels produits les écarts sont-ils les plus forts ? | `ecarts INSTANTANE --secteur epicerie --min-magasins 5` |
 | Combien coûte ce panier dans chaque magasin ? | `panier INSTANTANE panier.csv --commune Nouméa` |
 | Qu'est-ce qui a bougé depuis la semaine dernière ? | `evolution INSTANTANE_AVANT INSTANTANE_APRES --seuil 10` |
@@ -72,6 +76,16 @@ Toutes les analyses acceptent les mêmes filtres : `--commune`, `--magasin`, `--
 prix médian vaut 100. L'indice d'un magasin est la moyenne géométrique de ses ratios
 prix / médiane. 95 veut dire « 5 % moins cher que le prix médian sur les produits qu'il
 vend ». Les magasins avec moins de `--min-produits` produits comparables sont écartés.
+
+**Ne pas sélectionner les magasins par `--type`.** Le type de commerce de l'API est peu
+fiable : Auchan Auteuil n'en a pas, la plupart des Discount et des Carrefour Market sont
+en « Moyenne surface ». Le bon critère est l'assortiment publié : `--min-produits 1000`
+retient la cinquantaine de magasins qui transmettent leurs prix en masse.
+
+**Prix aberrants** : par défaut, les prix à plus de 3× ou moins de 1/3 du prix médian du
+produit sont écartés (erreurs de saisie ou d'unité dans les fichiers transmis : une soupe
+à 750 F au lieu de 40 F, une conserve de pâté à 4 707 F). Le nombre écarté est affiché.
+`--garder-aberrants` les réintègre, par exemple pour signaler ces erreurs à la DAE.
 
 **Panier** : CSV avec une colonne `ean` (ou `id_produit`) et `quantite`. Seuls les
 magasins qui ont **tout** le panier sont classés ; les autres sont listés à part, car
@@ -98,7 +112,9 @@ Pour un tableau ou un graphique, partir de l'export `--csv`.
   absent ; il n'est pas remplacé par la médiane.
 - **Ne pas comparer grandes et petites surfaces sans le signaler.** Sous 350 m², les
   prix viennent des relevés terrain trimestriels : peu de produits, dates anciennes.
-  Filtrer avec `--type` ou le dire explicitement.
+  Filtrer par assortiment (`--min-produits`) ou le dire explicitement.
+- **Signaler les prix aberrants, ne pas les corriger.** Ils sont écartés des calculs,
+  jamais remplacés par une valeur supposée juste.
 - **Un indice n'est valable que sur un assortiment commun suffisant.** Indiquer le
   nombre de produits comparés ; ne pas conclure sous la centaine.
 - **Les promotions faussent les comparaisons de fond.** Pour un positionnement prix,

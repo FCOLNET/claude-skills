@@ -77,13 +77,27 @@ Routes éditoriales sans intérêt pour l'analyse : `/actualites`, `/faq`, `/lex
   trier par `id` (`sort=id,asc`) pour que les pages restent stables si la base change
   pendant la collecte, et dédoublonner par `id`.
 - **Lent** : environ 6 s et 1 Mo par page de relevés, côté serveur. Une collecte complète
-  fait ~250 appels ; le script en lance 3 en parallèle, pas plus, par égard pour un
-  service public.
+  fait ~250 appels et dure ~15 min ; le script en lance 3 en parallèle, pas plus, par
+  égard pour un service public.
 - **Pas d'historique** : `/relevesprix` ne garde que le dernier prix de chaque couple
   (environ 3 mois de dates). Toute analyse d'évolution exige d'**archiver un
   instantané par semaine** soi-même.
 - `/produitsprix` (liste complète) a coupé la connexion lors des tests : ne pas l'utiliser.
-- `typeCommerce` est vide pour une cinquantaine de magasins.
+- **`typeCommerce` n'est pas fiable** : vide pour une cinquantaine de magasins (dont
+  Auchan Auteuil, Discount Teari, Super U Koumac), et des magasins à gros assortiment
+  sont classés « Moyenne surface » (Discount, Carrefour Market, Casino) voire « Petite
+  surface » (Auchan Koné, Leader Price Koné). Sélectionner les magasins par le nombre de
+  prix publiés, pas par ce champ.
+- **Magasins hors référentiel** : des relevés pointent vers des `idMagasin` absents de
+  `/magasins` (404 en accès direct). Au 17/10/2026 : Auchan Savannah (3 692 prix),
+  L'Épicerie du coin, Korail Lifou, K-Gou Pouembout, Darty Centre Ville. Le nom du
+  magasin reste lisible dans le relevé ; la commune et le type manquent.
+- **Prix aberrants** : une centaine de prix sont à plus de 3× ou moins de 1/3 de la
+  médiane de leur produit (lot saisi comme l'unité, erreur de frappe). Les écarter des
+  indices et des écarts, et les signaler plutôt que les corriger.
+- **Prix identiques au sein d'une enseigne** : Géant Sainte-Marie et Géant Dumbéa,
+  ou les trois Casino, affichent souvent exactement le même prix ; une comparaison par
+  enseigne vaut alors autant qu'une comparaison par magasin.
 - Le nom d'enseigne n'est pas un champ : il faut le déduire du nom de magasin
   (`CARREFOUR MARKET DUCOS`, `LEADER PRICE POINDIMIE`…), ce qui reste approximatif.
 - Le jeu `prixnc` de data.gouv.nc n'est pas interrogeable par l'API du portail :

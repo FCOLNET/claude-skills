@@ -16,6 +16,8 @@ Filtres communs aux analyses :
     --type "grande surface" sous-chaîne du type de commerce
     --secteur epicerie     sous-chaîne du secteur ou sous-secteur de consommation
     --sans-promo           exclut les prix en promotion
+    --garder-aberrants     garde les prix à plus de 3× ou moins de 1/3 de la médiane du produit
+                           (écartés par défaut : erreurs de saisie ou d'unité dans les fichiers)
     --min-magasins 3       nombre minimal de magasins vendant un produit pour qu'il compte
     --csv sortie.csv       écrit le résultat complet en CSV
 
@@ -44,6 +46,7 @@ TAILLE_PAGE = 1000          # plafond imposé par l'API
 PARALLELES = 3              # appels simultanés : service public, rester sobre
 PAUSE = 0.2                 # secondes avant chaque appel, par courtoisie
 NOUMEA = dt.timezone(dt.timedelta(hours=11), "Pacific/Noumea")  # pas d'heure d'été
+FACTEUR_ABERRANT = 3        # au-delà de 3× (ou en deçà de 1/3) du prix médian : erreur probable
 DELIMITEUR = ";"            # ouverture directe dans Excel en français
 ENCODAGE = "utf-8-sig"
 
@@ -157,12 +160,14 @@ def collecter(args):
         "alimentaire": "oui" if p.get("alimentaire") else "non", "origine": p.get("origine") or "",
     } for p in parcourir("produits")}
 
-    releves, orphelins = [], 0
+    releves, orphelins, hors_referentiel = [], 0, set()
     for r in parcourir("relevesprix"):
         produit = produits.get(r["idProduit"], {})
         magasin = magasins.get(r["idMagasin"], {})
         if not produit or not magasin:
             orphelins += 1
+        if not magasin:
+            hors_referentiel.add((r.get("magasin") or "").strip())
         releves.append({
             "date_releve": date_noumea(r.get("dateReleve")),
             "id_magasin": r["idMagasin"], "magasin": (r.get("magasin") or "").strip(),
@@ -199,6 +204,7 @@ def collecter(args):
         "source": API, "collecte_le": dt.datetime.now(NOUMEA).isoformat(timespec="seconds"),
         "duree_s": round(time.time() - debut), "magasins": len(magasins),
         "produits": len(produits), "releves": len(releves), "releves_orphelins": orphelins,
+        "magasins_hors_referentiel": sorted(hors_referentiel),
         "releve_le_plus_ancien": dates[0] if dates else None,
         "releve_le_plus_recent": dates[-1] if dates else None,
         "fichiers_bqp": len(fichiers_bqp),
@@ -237,7 +243,26 @@ def charger(instantane, args):
         if r["prix"] <= 0:
             continue
         lignes.append(r)
-    return lignes
+    return lignes if args.garder_aberrants else ecarter_aberrants(lignes)
+
+
+def ecarter_aberrants(lignes):
+    """Retire les prix hors de [médiane / 3, médiane × 3] pour leur produit.
+
+    Les fichiers transmis contiennent des erreurs de saisie ou d'unité (lot facturé
+    comme l'unité, prix en centimes…) qui écrasent les écarts et les indices.
+    """
+    par_produit = defaultdict(list)
+    for r in lignes:
+        par_produit[r["id_produit"]].append(r["prix"])
+    medianes = {p: statistics.median(v) for p, v in par_produit.items() if len(v) >= 3}
+    gardees = [r for r in lignes if r["id_produit"] not in medianes
+               or 1 / FACTEUR_ABERRANT <= r["prix"] / medianes[r["id_produit"]] <= FACTEUR_ABERRANT]
+    if len(gardees) < len(lignes):
+        print(f"({len(lignes) - len(gardees)} prix aberrants écartés : plus de {FACTEUR_ABERRANT}× "
+              f"ou moins de 1/{FACTEUR_ABERRANT} du prix médian du produit ; "
+              f"--garder-aberrants pour les inclure)", file=sys.stderr)
+    return gardees
 
 
 def xpf(valeur):
@@ -469,6 +494,8 @@ def main():
         p.add_argument("--type")
         p.add_argument("--secteur")
         p.add_argument("--sans-promo", action="store_true")
+        p.add_argument("--garder-aberrants", action="store_true",
+                       help="garde les prix à plus de 3× ou moins de 1/3 de la médiane du produit")
         p.add_argument("--min-magasins", type=int, default=3)
         p.add_argument("--top", type=int, default=30, help="lignes affichées (0 = toutes)")
         p.add_argument("--csv")
