@@ -1,2 +1,4 @@
 # Instantanés prix.nc (≈ 65 Mo chacun, régénérables)
 donnees/
+
+__pycache__/
