@@ -1,0 +1,494 @@
+<title>Kaïkaï</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout : appli mobile d'abord — une colonne ; sur grand écran, recettes à gauche, détail à droite. */
+:root {
+  --sol: #f3f5ef;          /* fond, gris légèrement vert niaouli */
+  --carte: #ffffff;
+  --encre: #17241f;
+  --doux: #5b6b63;
+  --trait: #dde3da;
+  --laterite: #b4472a;     /* accent : terre rouge du Grand Sud */
+  --laterite-pale: #f6e4dc;
+  --niaouli: #2f5d4d;
+  --niaouli-pale: #e1ece5;
+  --bon: #2f7a4f;
+  --alerte: #9a6a00;
+  --alerte-pale: #fbf0d4;
+  --f-titre: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-texte: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sol: #111916; --carte: #18221e; --encre: #e6ede8; --doux: #9db0a6; --trait: #2a3631;
+    --laterite: #e7805e; --laterite-pale: #3a2219; --niaouli: #8cc3ac; --niaouli-pale: #1f3029;
+    --bon: #7ccc9c; --alerte: #e5bd5c; --alerte-pale: #3a3019; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --sol: #111916; --carte: #18221e; --encre: #e6ede8; --doux: #9db0a6; --trait: #2a3631;
+  --laterite: #e7805e; --laterite-pale: #3a2219; --niaouli: #8cc3ac; --niaouli-pale: #1f3029;
+  --bon: #7ccc9c; --alerte: #e5bd5c; --alerte-pale: #3a3019; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--sol); color: var(--encre);
+  font-family: var(--f-texte); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.app { max-width: 1120px; margin: 0 auto; display: grid; gap: 24px; }
+h1, h2, h3 { font-family: var(--f-titre); margin: 0; text-wrap: balance; line-height: 1.1; }
+.num { font-variant-numeric: tabular-nums; }
+button, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--laterite); outline-offset: 2px; border-radius: 6px; }
+
+/* En-tête */
+.entete { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; }
+.marque { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.marque h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em; color: var(--laterite); }
+.marque p { margin: 0; color: var(--doux); font-size: 1rem; }
+.tampon { font-size: .82rem; color: var(--doux); }
+.tampon b { color: var(--encre); }
+.bandeau-proto {
+  font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
+  color: var(--niaouli); background: var(--niaouli-pale); padding: 3px 9px; border-radius: 99px;
+}
+
+/* Grille principale */
+.corps { display: grid; gap: 24px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .corps { grid-template-columns: 300px minmax(0, 1fr); align-items: start; } }
+
+/* Liste des recettes */
+.recettes { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x mandatory; }
+@media (min-width: 900px) { .recettes { flex-direction: column; overflow: visible; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); } }
+.recette {
+  flex: 0 0 210px; scroll-snap-align: start; text-align: left; cursor: pointer;
+  background: var(--carte); border: 1.5px solid var(--trait); border-radius: var(--r);
+  padding: 14px 16px; display: grid; gap: 6px;
+}
+@media (min-width: 900px) { .recette { flex-basis: auto; } }
+.recette:hover { border-color: var(--doux); }
+.recette[aria-pressed="true"] { border-color: var(--laterite); box-shadow: 0 0 0 1.5px var(--laterite) inset; }
+.recette h3 { font-size: 1.12rem; font-weight: 700; }
+.recette .st { color: var(--doux); font-size: .88rem; }
+.recette .des { font-size: .9rem; }
+.recette .des b { font-family: var(--f-titre); font-size: 1.15rem; color: var(--laterite); }
+
+/* Détail */
+.detail { display: grid; gap: 20px; min-width: 0; }
+.titre-recette { display: grid; gap: 4px; }
+.titre-recette h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.02em; }
+.titre-recette p { margin: 0; color: var(--doux); }
+
+.reglages { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; }
+.reglage { display: grid; gap: 6px; min-width: 0; }
+.reglage > span { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color: var(--doux); font-weight: 700; }
+.segments { display: inline-flex; background: var(--carte); border: 1.5px solid var(--trait); border-radius: 99px; padding: 3px; }
+.segments button {
+  border: 0; background: transparent; padding: 6px 14px; border-radius: 99px; cursor: pointer; white-space: nowrap;
+}
+.segments button[aria-pressed="true"] { background: var(--encre); color: var(--sol); font-weight: 700; }
+select {
+  background: var(--carte); border: 1.5px solid var(--trait); border-radius: 99px;
+  padding: 7px 14px; max-width: 100%;
+}
+.aide-mode { font-size: .88rem; color: var(--doux); margin: -6px 0 0; max-width: 62ch; }
+
+/* Résultat principal */
+.verdict {
+  background: var(--carte); border-radius: var(--r); border: 1.5px solid var(--trait);
+  padding: 20px; display: grid; gap: 16px; grid-template-columns: 1fr;
+}
+@media (min-width: 640px) { .verdict { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: center; } }
+.verdict .ou { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--doux); font-weight: 700; }
+.verdict .magasin { font-family: var(--f-titre); font-size: 1.35rem; font-weight: 700; }
+.verdict .commune { color: var(--doux); }
+.verdict .total { font-family: var(--f-titre); font-weight: 800; font-size: clamp(2.4rem, 7vw, 3.4rem); color: var(--laterite); line-height: 1; letter-spacing: -0.02em; }
+.verdict .parpers { color: var(--doux); margin-top: 4px; }
+.economies { display: grid; gap: 8px; }
+.eco { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--niaouli-pale); }
+.eco b { color: var(--bon); white-space: nowrap; }
+
+/* Sections */
+.section { display: grid; gap: 10px; min-width: 0; }
+.section h3 { font-size: 1.15rem; font-weight: 700; }
+.section .sous { color: var(--doux); font-size: .9rem; margin: -4px 0 0; }
+
+/* Ingrédients */
+.ingredients { background: var(--carte); border: 1.5px solid var(--trait); border-radius: var(--r); }
+.ing { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 12px 16px; border-top: 1px solid var(--trait); }
+.ing:first-child { border-top: 0; }
+.ing .nom { font-weight: 700; }
+.ing .qte { color: var(--doux); font-weight: 400; }
+.ing .produit { grid-column: 1; color: var(--doux); font-size: .9rem; overflow-wrap: anywhere; }
+.ing .montant { grid-column: 2; grid-row: 1 / span 2; text-align: right; align-self: center; }
+.ing .montant b { font-size: 1.05rem; }
+.ing .montant small { display: block; color: var(--doux); font-size: .8rem; white-space: nowrap; }
+.puces { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.puce { font-size: .74rem; font-weight: 700; padding: 1px 8px; border-radius: 99px; }
+.puce.promo { background: var(--laterite-pale); color: var(--laterite); }
+.puce.vieux { background: var(--alerte-pale); color: var(--alerte); }
+.puce.date { background: var(--sol); color: var(--doux); font-weight: 400; }
+.puce.manque { background: var(--alerte-pale); color: var(--alerte); }
+.ing.total-ligne { background: var(--sol); border-radius: 0 0 var(--r) var(--r); }
+.ing.possede .nom, .ing.possede .produit, .ing.possede .montant { opacity: .6; }
+.placard {
+  grid-column: 1 / -1; justify-self: start; cursor: pointer; font-size: .82rem; font-weight: 700;
+  background: transparent; color: var(--niaouli); border: 1.5px solid var(--trait); border-radius: 99px; padding: 3px 12px;
+}
+.placard:hover { border-color: var(--niaouli); }
+.placard[aria-pressed="true"] { background: var(--niaouli-pale); border-color: var(--niaouli); }
+
+/* Classement */
+.classement { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rang {
+  width: 100%; display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto; gap: 4px 12px; align-items: center;
+  background: var(--carte); border: 1.5px solid var(--trait); border-radius: 12px; padding: 10px 14px;
+  text-align: left; cursor: pointer;
+}
+.rang:hover { border-color: var(--doux); }
+.rang[aria-pressed="true"] { border-color: var(--laterite); }
+.rang .n { color: var(--doux); font-variant-numeric: tabular-nums; }
+.rang .m { font-weight: 700; overflow-wrap: anywhere; }
+.rang .m small { display: block; font-weight: 400; color: var(--doux); }
+.rang .p { text-align: right; font-weight: 700; white-space: nowrap; }
+.rang .p small { display: block; font-weight: 400; color: var(--doux); }
+.barre { grid-column: 2 / 4; height: 5px; border-radius: 99px; background: var(--sol); overflow: hidden; }
+.barre i { display: block; height: 100%; background: var(--niaouli); border-radius: 99px; }
+.rang:first-child .barre i { background: var(--laterite); }
+.plus { justify-self: start; background: none; border: 0; color: var(--laterite); font-weight: 700; cursor: pointer; padding: 6px 0; }
+.note { font-size: .88rem; color: var(--doux); margin: 0; }
+
+.vide { background: var(--carte); border: 1.5px dashed var(--trait); border-radius: var(--r); padding: 20px; color: var(--doux); }
+
+/* Pied */
+.pied { border-top: 1px solid var(--trait); padding-top: 16px; color: var(--doux); font-size: .85rem; display: grid; gap: 6px; max-width: 80ch; }
+.pied p { margin: 0; }
+.pied a { color: var(--niaouli); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .barre i { transition: width .35s ease; }
+}
+</style>
+
+<div class="app">
+  <header class="entete">
+    <div class="marque">
+      <h1>Kaïkaï</h1>
+      <p>Combien coûte ce plat au meilleur prix, près de chez vous ?</p>
+    </div>
+    <div class="tampon">
+      <span class="bandeau-proto">Prototype</span>
+      &nbsp;Prix relevés du <b id="de"></b> au <b id="a"></b> · source prix.nc
+    </div>
+  </header>
+
+  <div class="corps">
+    <nav class="recettes" id="recettes" aria-label="Recettes"></nav>
+
+    <main class="detail" id="detail">
+      <div class="titre-recette">
+        <h2 id="titre"></h2>
+        <p id="sous-titre"></p>
+      </div>
+
+      <div class="reglages">
+        <div class="reglage">
+          <span id="lbl-pers">Personnes</span>
+          <div class="segments" id="personnes" role="group" aria-labelledby="lbl-pers"></div>
+        </div>
+        <label class="reglage" for="commune">
+          <span>Commune</span>
+          <select id="commune"></select>
+        </label>
+        <div class="reglage">
+          <span id="lbl-mode">Calcul</span>
+          <div class="segments" id="mode" role="group" aria-labelledby="lbl-mode">
+            <button type="button" data-mode="plat" aria-pressed="true">Coût du plat</button>
+            <button type="button" data-mode="ticket" aria-pressed="false">Ticket de caisse</button>
+          </div>
+        </div>
+      </div>
+      <p class="aide-mode" id="aide-mode"></p>
+
+      <section class="verdict" id="verdict" aria-live="polite"></section>
+
+      <section class="section">
+        <h3 id="titre-ing"></h3>
+        <p class="sous">Le produit retenu est celui qui coûte le moins cher en caisse pour la quantité demandée.</p>
+        <div class="ingredients" id="ingredients"></div>
+      </section>
+
+      <section class="section">
+        <h3>Tous les magasins</h3>
+        <p class="sous">La barre montre l'écart avec le moins cher. Touchez un magasin pour voir le détail de ses produits.</p>
+        <ol class="classement" id="classement"></ol>
+        <button type="button" class="plus" id="plus" hidden></button>
+        <p class="note" id="partiels"></p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="pied">
+    <p><b>Prototype de démonstration, non officiel.</b> Les prix viennent de l'API publique de l'observatoire des prix
+      du gouvernement de la Nouvelle-Calédonie (<a href="https://prix.nc" target="_blank" rel="noopener">prix.nc</a>),
+      instantané du <span id="inst"></span>. Ils ne sont pas mis à jour en direct.</p>
+    <p>Les magasins de 350 m² et plus transmettent leurs prix chaque semaine ; les plus petits sont relevés sur le terrain,
+      parfois plusieurs semaines avant. Une étiquette signale les relevés de plus de 30 jours. Les prix unitaires
+      aberrants (plus de 3 fois ou moins du tiers du prix médian) sont écartés.</p>
+    <p>« Coût du plat » compte la part de chaque produit réellement utilisée, y compris ce que vous avez déjà ;
+      « Ticket de caisse » compte les paquets entiers à acheter, sans les ingrédients marqués « J'en ai déjà ».
+      Ces choix restent enregistrés dans votre navigateur. Le sel, le poivre et l'eau ne sont pas comptés.</p>
+  </footer>
+</div>
+
+<script type="application/json" id="donnees">__DATA__</script>
+<script>
+(function () {
+  "use strict";
+  var D = JSON.parse(document.getElementById("donnees").textContent);
+  var MAG = D.magasins;
+  var PERSONNES = [2, 4, 6, 8];
+  var BASE = 4;
+  var VIEUX_JOURS = 30;
+  var etat = { recette: 0, pers: 4, commune: "", mode: "plat", magasin: null, tout: false };
+
+  function lire(cle, defaut) { try { var v = localStorage.getItem("kaikai-" + cle); return v === null ? defaut : v; } catch (e) { return defaut; } }
+  function ecrire(cle, v) { try { localStorage.setItem("kaikai-" + cle, v); } catch (e) {} }
+  etat.commune = lire("commune", "");
+  etat.mode = lire("mode", "plat") === "ticket" ? "ticket" : "plat";
+  /* Ingrédients déjà dans les placards, par nom : cocher « Huile » vaut pour toutes les recettes. */
+  try { etat.placard = JSON.parse(lire("placard", "{}")) || {}; } catch (e) { etat.placard = {}; }
+
+  var fmt = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+  function xpf(n) { return fmt.format(Math.round(n)) + " F"; }
+  function dateFr(iso) { var p = iso.split("-"); return p[2] + "/" + p[1]; }
+  function dateLongue(iso) { var p = iso.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
+  var JOUR_REF = Date.parse(D.instantane);
+  function age(iso) { return Math.round((JOUR_REF - Date.parse(iso)) / 86400000); }
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function quantite(ing, pers) {
+    var q = ing.q * pers / BASE;
+    return ing.unite === "u" ? Math.ceil(q) : q;
+  }
+  function libelleQte(q, unite) {
+    if (unite === "u") return q + "";
+    if (unite === "kg") return q < 1 ? fmt.format(q * 1000) + " g" : (Math.round(q * 10) / 10 + "").replace(".", ",") + " kg";
+    return q < 1 ? fmt.format(q * 100) + " cl" : (Math.round(q * 10) / 10 + "").replace(".", ",") + " l";
+  }
+
+  /* Pour un magasin : le produit le moins cher en caisse pour chaque ingrédient.
+     Le coût du plat compte tout ce que la recette consomme ; le ticket ne compte que ce qu'il faut acheter. */
+  function chiffrer(recette, cellule, pers, placard) {
+    var lignes = [], plat = 0, ticket = 0, manquePlat = 0, manqueTicket = 0;
+    recette.ingredients.forEach(function (ing, i) {
+      var q = quantite(ing, pers), meilleur = null, possede = !!placard[ing.nom];
+      cellule[i].forEach(function (c) {
+        var paquets = Math.max(1, Math.ceil(q / c[2] - 1e-9));
+        var cout = paquets * c[1];
+        if (!meilleur || cout < meilleur.ticket || (cout === meilleur.ticket && c[1] / c[2] < meilleur.prix / meilleur.taille)) {
+          meilleur = { produit: c[0], prix: c[1], taille: c[2], date: c[3], promo: c[4], paquets: paquets, ticket: cout, plat: q * c[1] / c[2] };
+        }
+      });
+      if (meilleur) plat += meilleur.plat; else manquePlat++;
+      if (!possede) { if (meilleur) ticket += meilleur.ticket; else manqueTicket++; }
+      lignes.push({ ing: ing, q: q, offre: meilleur, possede: possede });
+    });
+    return { lignes: lignes, plat: plat, ticket: ticket, manquePlat: manquePlat, manqueTicket: manqueTicket };
+  }
+
+  function resultats(recette) {
+    var complets = [], partiels = 0;
+    Object.keys(recette.offres).forEach(function (m) {
+      var info = MAG[m];
+      if (etat.commune && info[1] !== etat.commune) return;
+      var r = chiffrer(recette, recette.offres[m], etat.pers, etat.placard);
+      if (etat.mode === "plat" ? r.manquePlat : r.manqueTicket) { partiels++; return; }
+      r.m = +m; r.nom = info[0]; r.commune = info[1];
+      complets.push(r);
+    });
+    complets.sort(function (a, b) { return a[etat.mode] - b[etat.mode]; });
+    return { complets: complets, partiels: partiels };
+  }
+
+  function minParPersonne(recette) {
+    var min = Infinity;
+    Object.keys(recette.offres).forEach(function (m) {
+      var r = chiffrer(recette, recette.offres[m], BASE, {});
+      if (!r.manquePlat && r.plat < min) min = r.plat;
+    });
+    return min / BASE;
+  }
+
+  /* --- Rendu --- */
+  function rendreRecettes() {
+    var nav = document.getElementById("recettes");
+    nav.innerHTML = "";
+    D.recettes.forEach(function (r, i) {
+      var b = el("button", "recette");
+      b.type = "button";
+      b.setAttribute("aria-pressed", i === etat.recette ? "true" : "false");
+      b.innerHTML = "<h3>" + esc(r.nom) + "</h3><span class=\"st\">" + esc(r.sous_titre) + "</span>" +
+        "<span class=\"des num\">dès <b>" + xpf(r._min) + "</b> / pers.</span>";
+      b.addEventListener("click", function () { etat.recette = i; etat.magasin = null; etat.tout = false; rendre(); });
+      nav.appendChild(b);
+    });
+  }
+
+  function rendrePersonnes() {
+    var g = document.getElementById("personnes");
+    g.innerHTML = "";
+    PERSONNES.forEach(function (p) {
+      var b = el("button", null, p + "");
+      b.type = "button";
+      b.setAttribute("aria-pressed", p === etat.pers ? "true" : "false");
+      b.setAttribute("aria-label", p + " personnes");
+      b.addEventListener("click", function () { etat.pers = p; etat.magasin = null; rendre(); });
+      g.appendChild(b);
+    });
+  }
+
+  function rendreCommunes(recette) {
+    var s = document.getElementById("commune");
+    var communes = {};
+    Object.keys(recette.offres).forEach(function (m) { communes[MAG[m][1]] = 1; });
+    var liste = Object.keys(communes).sort(function (a, b) { return a.localeCompare(b, "fr"); });
+    if (etat.commune && !communes[etat.commune]) etat.commune = "";
+    s.innerHTML = "<option value=\"\">Toute la Nouvelle-Calédonie</option>" +
+      liste.map(function (c) { return "<option" + (c === etat.commune ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("");
+  }
+
+  function rendre() {
+    var recette = D.recettes[etat.recette];
+    rendreRecettes();
+    rendrePersonnes();
+    rendreCommunes(recette);
+    document.querySelectorAll("#mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.mode === etat.mode ? "true" : "false"); });
+    document.getElementById("aide-mode").textContent = etat.mode === "plat"
+      ? "Ce que coûtent les quantités utilisées dans la recette. Le reste du paquet reste dans vos placards."
+      : "Ce que vous payez en caisse : les paquets entiers, sauf pour ce que vous avez déjà. Cochez « J'en ai déjà » sous un ingrédient pour le retirer.";
+    document.getElementById("titre").textContent = recette.nom;
+    document.getElementById("sous-titre").textContent = recette.sous_titre + " · " + etat.pers + " personnes";
+
+    var res = resultats(recette), liste = res.complets;
+    var verdict = document.getElementById("verdict");
+    var ing = document.getElementById("ingredients");
+    var cl = document.getElementById("classement");
+    var plus = document.getElementById("plus");
+    document.getElementById("partiels").textContent = res.partiels
+      ? res.partiels + " autre(s) magasin(s) n'ont pas tous les ingrédients et ne sont pas classés." : "";
+
+    if (!liste.length) {
+      verdict.innerHTML = "<div class=\"vide\">Aucun magasin de cette commune ne propose tous les ingrédients. Choisissez « Toute la Nouvelle-Calédonie » ou une commune voisine.</div>";
+      verdict.style.gridTemplateColumns = "1fr";
+      ing.innerHTML = ""; cl.innerHTML = ""; plus.hidden = true;
+      document.getElementById("titre-ing").textContent = "Ingrédients";
+      return;
+    }
+    verdict.style.gridTemplateColumns = "";
+
+    var cle = etat.mode, meilleur = liste[0], pire = liste[liste.length - 1];
+    var mediane = liste[Math.floor((liste.length - 1) / 2)][cle];
+    var choisi = liste.filter(function (r) { return r.m === etat.magasin; })[0] || meilleur;
+
+    verdict.innerHTML =
+      "<div><div class=\"ou\">Le moins cher " + (etat.commune ? "à " + esc(etat.commune) : "en Nouvelle-Calédonie") + "</div>" +
+      "<div class=\"magasin\">" + esc(meilleur.nom) + "</div><div class=\"commune\">" + esc(meilleur.commune) + "</div>" +
+      "<div class=\"total num\" style=\"margin-top:12px\">" + xpf(meilleur[cle]) + "</div>" +
+      "<div class=\"parpers num\">soit " + xpf(meilleur[cle] / etat.pers) + " par personne</div></div>" +
+      "<div class=\"economies\">" +
+      (liste.length > 1 ? "<div class=\"eco\"><span>par rapport au magasin le plus cher</span><b class=\"num\">− " + xpf(pire[cle] - meilleur[cle]) + "</b></div>" : "") +
+      (liste.length > 2 ? "<div class=\"eco\"><span>par rapport au prix habituel (médiane)</span><b class=\"num\">− " + xpf(mediane - meilleur[cle]) + "</b></div>" : "") +
+      "<div class=\"note\">" + liste.length + " magasin(s) comparé(s)</div></div>";
+
+    document.getElementById("titre-ing").textContent = "Les ingrédients chez " + choisi.nom;
+    ing.innerHTML = "";
+    var nbPossedes = 0;
+    choisi.lignes.forEach(function (l) {
+      var o = l.offre, montant, detail;
+      if (l.possede) nbPossedes++;
+      if (o) {
+        var j = age(o.date);
+        detail = esc(o.produit) + "<div class=\"puces\"><span class=\"puce date\">relevé le " + dateFr(o.date) + "</span>" +
+          (o.promo ? "<span class=\"puce promo\">promo</span>" : "") +
+          (j > VIEUX_JOURS ? "<span class=\"puce vieux\">relevé il y a " + Math.round(j / 7) + " semaines</span>" : "") + "</div>";
+      } else {
+        detail = "Pas vendu dans ce magasin";
+      }
+      if (etat.mode === "plat") {
+        montant = "<b class=\"num\">" + xpf(o.plat) + "</b><small class=\"num\">paquet " + xpf(o.prix) + "</small>";
+      } else if (l.possede) {
+        montant = "<b class=\"num\">0 F</b><small>déjà chez vous</small>";
+      } else {
+        montant = "<b class=\"num\">" + xpf(o.ticket) + "</b><small class=\"num\">" + (o.paquets > 1 ? o.paquets + " × " + xpf(o.prix) : "1 paquet") + "</small>";
+      }
+      var ligne = el("div", "ing" + (l.possede ? " possede" : ""));
+      ligne.innerHTML = "<div class=\"nom\">" + esc(l.ing.nom) + " <span class=\"qte\">· " + libelleQte(l.q, l.ing.unite) + "</span></div>" +
+        "<div class=\"montant\">" + montant + "</div>" +
+        "<div class=\"produit\">" + detail + "</div>";
+      var bouton = el("button", "placard", l.possede ? "✓ Dans mes placards" : "J'en ai déjà");
+      bouton.type = "button";
+      bouton.setAttribute("aria-pressed", l.possede ? "true" : "false");
+      bouton.setAttribute("aria-label", l.ing.nom + " : j'en ai déjà");
+      bouton.addEventListener("click", function () {
+        if (etat.placard[l.ing.nom]) delete etat.placard[l.ing.nom]; else etat.placard[l.ing.nom] = 1;
+        ecrire("placard", JSON.stringify(etat.placard));
+        rendre();
+      });
+      ligne.appendChild(bouton);
+      ing.appendChild(ligne);
+    });
+    var tot = el("div", "ing total-ligne");
+    var aPayer = "À payer en caisse" + (nbPossedes ? " sans ce que vous avez déjà" : "") + " : " + xpf(choisi.ticket);
+    tot.innerHTML = "<div class=\"nom\">Total</div><div class=\"montant\"><b class=\"num\">" + xpf(choisi[cle]) + "</b><small class=\"num\">" +
+      xpf(choisi[cle] / etat.pers) + " / pers.</small></div><div class=\"produit\">" +
+      (etat.mode === "plat" ? aPayer : "Coût réel du plat, placards compris : " + xpf(choisi.plat)) + "</div>";
+    ing.appendChild(tot);
+
+    cl.innerHTML = "";
+    var etendue = pire[cle] - meilleur[cle] || 1, visibles = etat.tout ? liste : liste.slice(0, 8);
+    visibles.forEach(function (r, i) {
+      var li = el("li");
+      var b = el("button", "rang");
+      b.type = "button";
+      b.setAttribute("aria-pressed", r.m === choisi.m ? "true" : "false");
+      var ecart = r[cle] - meilleur[cle];
+      b.innerHTML = "<span class=\"n\">" + (i + 1) + "</span>" +
+        "<span class=\"m\">" + esc(r.nom) + "<small>" + esc(r.commune) + "</small></span>" +
+        "<span class=\"p num\">" + xpf(r[cle]) + "<small>" + (i === 0 ? "le moins cher" : "+ " + xpf(ecart)) + "</small></span>" +
+        "<span class=\"barre\" aria-hidden=\"true\"><i style=\"width:" + (4 + 96 * ecart / etendue).toFixed(1) + "%\"></i></span>";
+      b.addEventListener("click", function () {
+        etat.magasin = r.m; rendre();
+        document.getElementById("titre-ing").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      li.appendChild(b);
+      cl.appendChild(li);
+    });
+    plus.hidden = liste.length <= 8;
+    plus.textContent = etat.tout ? "Afficher moins" : "Voir les " + liste.length + " magasins";
+  }
+
+  document.getElementById("commune").addEventListener("change", function (e) {
+    etat.commune = e.target.value; etat.magasin = null; ecrire("commune", etat.commune); rendre();
+  });
+  document.querySelectorAll("#mode button").forEach(function (b) {
+    b.addEventListener("click", function () { etat.mode = b.dataset.mode; ecrire("mode", etat.mode); rendre(); });
+  });
+  document.getElementById("plus").addEventListener("click", function () { etat.tout = !etat.tout; rendre(); });
+
+  document.getElementById("de").textContent = dateLongue(D.releves_de);
+  document.getElementById("a").textContent = dateLongue(D.releves_a);
+  document.getElementById("inst").textContent = dateLongue(D.instantane);
+  D.recettes.forEach(function (r) { r._min = minParPersonne(r); });
+  rendre();
+})();
+</script>
