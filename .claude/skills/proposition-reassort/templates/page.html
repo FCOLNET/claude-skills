@@ -118,6 +118,10 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .state{font-size:12.5px;text-align:right;width:100%}
 .state b{color:var(--ok)} .st-ref .state b{color:var(--bad)}
 .state .who{color:var(--muted)}
+.claude{border-top:1px dashed var(--line);padding-top:8px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.sugg{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;background:var(--accent-soft);border-radius:var(--r);padding:7px 10px}
+.sugg-t{min-width:0}
+.sugg .meta{display:inline}
 .more{display:flex;justify-content:center;padding:6px 0 20px}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
 .notice{margin-top:12px;border-radius:var(--r);padding:9px 12px;background:var(--warn-soft);color:var(--ink);font-size:13px}
@@ -179,7 +183,7 @@ var TABS=[
   {id:"DEJ",l:"Déjà vendus ici",d:"Vendus chez vous dans les douze derniers mois, plus depuis trois mois, stock à zéro. C’est souvent la saison qui revient : regardez le repère Noël."},
   {id:"ABS",l:"Absents chez moi",d:"Jamais vendus ni stockés chez vous ces douze mois, alors que d’autres magasins les vendent. La vente estimée est celle des autres, ramenée à la taille de votre magasin, puis divisée par deux par prudence."},
   {id:"NOU",l:"Nouveautés",d:"Les références apparues cette année. « Démarrent ailleurs » : d’autres magasins les vendent déjà. « Jamais sorties » : elles sont en réserve et aucun magasin ne les a ; l’estimation vient de produits comparables de la même sous-famille."},
-  {id:"SUB",l:"Substitutions",d:"Votre référence est en rupture partout sur l’île. On vous propose un produit proche en réserve : même sous-famille, prix voisin, libellé ressemblant. La vente estimée suppose que la moitié de vos clients l’accepte."},
+  {id:"SUB",l:"Substitutions",d:"Votre référence est en rupture partout sur l’île. On ne propose un remplaçant que s’il est du même type (même nom de produit, même précision d’usage : un sac à dos pour un sac à dos), à prix voisin. Sinon la rupture est signalée sans proposition ; vous pouvez demander à Claude de chercher un équivalent d’usage parmi le stock d’entrepôt. La vente estimée suppose que la moitié de vos clients accepte le remplaçant."},
   {id:"CED",l:"À céder",d:"Votre stock qui ne tourne pas, alors qu’un autre magasin en a besoin. Accepter, c’est préparer le transfert."},
   {id:"MES",l:"Mes choix",d:"Ce que votre magasin a accepté, prêt à saisir ou à transmettre."}
 ];
@@ -187,9 +191,9 @@ var MOTIFS=["Pas de place","Clientèle non adaptée","Déjà commandé","Prix","
 var REFUS_JOURS=56;
 var PAGE=50;
 
-var D=null, state={store:null, tab:"RUP", dept:"", q:"", statut:"todo", tri:"sc", nouv:"all", unit:null, limit:PAGE, openRefus:null};
+var D=null, state={store:null, tab:"RUP", dept:"", q:"", statut:"todo", tri:"sc", nouv:"all", sub:"all", unit:null, limit:PAGE, openRefus:null};
 var decisions={}; // store -> key -> body
-var db=null, user=null, canWrite=null, myId=null, profiles={}, dlCap=null;
+var db=null, user=null, canWrite=null, myId=null, profiles={}, dlCap=null, sampleCap=null, claudeRes={};
 var nf=new Intl.NumberFormat("fr-FR"), nf1=new Intl.NumberFormat("fr-FR",{maximumFractionDigits:1,minimumFractionDigits:1});
 function F(v){ return nf.format(Math.round(v))+" F"; }
 function MF(v){ return Math.abs(v)>=1e6 ? nf1.format(v/1e6)+" M F" : nf.format(Math.round(v/1000))+" k F"; }
@@ -198,7 +202,7 @@ function token(code){ return (D.sites[code]||code).toLowerCase(); }
 function el(tag,cls,txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
 function art(i){ return D.arts[i]; }
 function storeIx(code){ return D.magasins.indexOf(code); }
-function keyOf(l){ return (l.g==="CED"?"c":"a")+art(l.a)[0]; }
+function keyOf(l){ return (l.g==="CED"?"c":l.g==="RRS"?"r":"a")+art(l.a)[0]; }
 function stockAt(a,code){ return a[9][POS.indexOf(code)]; }
 function autresMag(a,code){ var t=0; D.magasins.forEach(function(s){ if(s!==code) t+=Math.max(0,stockAt(a,s)); }); return t; }
 function reserve(a){ return Math.max(0,a[9][0])+Math.max(0,a[9][7])+Math.max(0,a[12]); }
@@ -226,6 +230,7 @@ fetch("data.json").then(function(r){ if(!r.ok) throw new Error(r.status); return
 });
 
 function init(){
+  D.idx={}; D.arts.forEach(function(a,i){ D.idx[a[0]]=i; });
   var fin=new Date(D.meta.fin+"T12:00:00");
   document.getElementById("dataDate").textContent="données au "+fin.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
   var h=(location.hash||"").slice(1).toLowerCase(), saved=try_(function(){ return localStorage.getItem("reassort-store"); });
@@ -257,6 +262,7 @@ function connect(){
     return Promise.all([u.id(), u.can("data.write")]).then(function(r){ myId=r[0]; canWrite=r[1]; if(canWrite===false) notice("Vous consultez en lecture seule : pour accepter ou refuser, il faut un accès Contributeur à cette page."); render(); });
   });
   window.claude.use("downloads").then(function(d){ dlCap=d; render(); });
+  window.claude.use("sample").then(function(x){ sampleCap=x; render(); });
   window.claude.use("db").then(function(d){
     db=d;
     if(!d){ notice("Les décisions ne peuvent pas être enregistrées dans cette vue : connectez-vous à claude.ai pour accepter ou refuser."); render(); return; }
@@ -302,8 +308,9 @@ function render(){
   var cnt={}, todo=0, ok=0, ref=0, mgTodo=0, mgOk=0;
   TABS.forEach(function(t){ cnt[t.id]=0; });
   L.forEach(function(l){
-    var st=statusOf(code,l).s, t=l.g==="NVD"?"NOU":l.g;
+    var st=statusOf(code,l).s, t=l.g==="NVD"?"NOU":l.g==="RRS"?"SUB":l.g;
     if(st==="todo"){ cnt[t]++; }
+    if(l.g==="RRS") return;
     if(l.g==="CED") { if(st==="ok") ok++; else if(st==="ref") ref++; else todo++; return; }
     if(st==="todo"){ todo++; mgTodo+=l.mg; } else if(st==="ok"){ ok++; var d=decisions[code][keyOf(l)]; mgOk+=d.mg!=null?d.mg:l.mg; } else ref++;
   });
@@ -357,8 +364,9 @@ function cap(s){ s=String(s||"").toLowerCase(); return s.charAt(0).toUpperCase()
 function filtered(code,L){
   var q=state.q.trim().toLowerCase(), u=state.unit;
   return L.filter(function(l){
-    var g=l.g==="NVD"?"NOU":l.g; if(g!==state.tab) return false;
+    var g=l.g==="NVD"?"NOU":l.g==="RRS"?"SUB":l.g; if(g!==state.tab) return false;
     if(state.tab==="NOU" && state.nouv!=="all" && l.g!==state.nouv) return false;
+    if(state.tab==="SUB" && state.sub!=="all" && l.g!==state.sub) return false;
     var a=art(l.a);
     if(state.dept && dept(a)!==state.dept) return false;
     if(u){ if(u.niv==="de" && dept(a)!==u.c) return false; if(u.niv==="sf" && a[2]!==u.c) return false; if(u.niv==="fa" && D.sf2fa[a[2]]!==u.c) return false; }
@@ -386,6 +394,7 @@ function renderList(app,code,L){
   s.oninput=function(){ state.q=s.value; state.limit=PAGE; clearTimeout(s._t); s._t=setTimeout(function(){ render(); var x=document.getElementById("fSearch"); if(x){ x.focus(); x.setSelectionRange(x.value.length,x.value.length);} },250); };
   f.appendChild(s);
   f.appendChild(seg([["todo","À traiter"],["ok","Acceptées"],["ref","Refusées"],["all","Toutes"]],state.statut,function(v){ state.statut=v; state.limit=PAGE; render(); }));
+  if(state.tab==="SUB") f.appendChild(seg([["all","Toutes"],["SUB","Remplaçant trouvé"],["RRS","Sans remplaçant sûr"]],state.sub,function(v){ state.sub=v; state.limit=PAGE; render(); }));
   if(state.tab==="NOU") f.appendChild(seg([["all","Toutes"],["NOU","Démarrent ailleurs"],["NVD","Jamais sorties"]],state.nouv,function(v){ state.nouv=v; state.limit=PAGE; render(); }));
   var tri=el("select"); tri.id="fTri"; tri.setAttribute("aria-label","Trier");
   [["sc","Les plus sûres et rentables d’abord"],["mg","Marge estimée"],["ca","Chiffre d’affaires estimé"],["lib","Libellé"]].forEach(function(o){ tri.appendChild(new Option(o[1],o[0])); });
@@ -427,6 +436,7 @@ function porteurs(por){
   return Object.keys(por).sort(function(x,y){ return por[y]-por[x]; }).map(function(s){ return nom(s)+" "+nf.format(por[s]); }).join(" · ");
 }
 function row(code,l){
+  if(l.g==="RRS") return rowRRS(code,l);
   var a=art(l.a), st=statusOf(code,l), ix=storeIx(code);
   var r=el("div","row st-"+st.s);
   // produit
@@ -441,8 +451,11 @@ function row(code,l){
   else if(l.g==="DEJ"){ var t=txt("Vendu "+nf.format(l.v12)+" fois chez vous, plus depuis "+M[l.der]+", stock à 0. "); if(l.noel){ t.appendChild(el("span","tag noel","Noël")); } w.appendChild(t); w.appendChild(spark(l.m,0)); }
   else if(l.g==="ABS"||l.g==="NOU"){ var t2=txt("Vendu par "+Object.keys(l.por).length+" autre"+(Object.keys(l.por).length>1?"s":"")+" magasin"+(Object.keys(l.por).length>1?"s":"")+", jamais chez vous. "); if(l.g==="NOU") t2.appendChild(el("span","tag new","Nouveauté")); w.appendChild(t2); w.appendChild(el("div","proof","Ventes 12 mois : "+porteurs(l.por))); }
   else if(l.g==="NVD"){ var t3=txt("En réserve depuis "+l.age+" jour"+(l.age>1?"s":"")+", aucun magasin ne l’a. "); t3.appendChild(el("span","tag new","Jamais sortie")); w.appendChild(t3); w.appendChild(el("div","proof","Estimation d’après "+nf.format(l.nref)+" produit"+(l.nref>1?"s":"")+" de la même sous-famille à prix voisin.")); }
-  else if(l.g==="SUB"){ var o=art(l.orig); w.appendChild(txt("Remplace « "+o[1]+" » ("+F(o[5])+") : vous en avez vendu "+nf.format(l.v12)+", plus de stock nulle part."));
-    var pr=el("div","proof"); var bits=["Prix "+(a[5]>=o[5]?"+":"")+Math.round((a[5]/o[5]-1)*100)+" %"];
+  else if(l.g==="SUB"){ var o=art(l.orig); w.appendChild(txt("Remplace « "+o[1]+" » ("+F(o[5])+")"+(l.v12!=null?" : vous en avez vendu "+nf.format(l.v12)+", plus de stock nulle part.":".")));
+    var pr=el("div","proof"); var bits=[];
+    if(l.typ && l.typ.length) bits.push("même type : "+l.typ.map(cap).join(", "));
+    if(l.via==="claude") bits.push("choisi avec Claude"+(l.raison?" : "+l.raison:""));
+    bits.push("prix "+(a[5]>=o[5]?"+":"")+Math.round((a[5]/o[5]-1)*100)+" %");
     if(l.attendu>0) bits.push("l’original revient : "+nf.format(l.attendu)+" en commande ou en mer");
     if(l.pour && l.pour.length>1) bits.push("remplace aussi "+(l.pour.length-1)+" autre"+(l.pour.length>2?"s":"")+" référence"+(l.pour.length>2?"s":""));
     pr.textContent=bits.join(" · "); w.appendChild(pr); }
@@ -528,9 +541,94 @@ function resolveNames(){
 }
 var _render=render; render=function(){ _render(); resolveNames(); };
 
+/* ---------- ruptures sans remplaçant sûr ---------- */
+function rowRRS(code,l){
+  var a=art(l.a), st=statusOf(code,l), M=D.meta.mois, k=keyOf(l), res=claudeRes[code+k];
+  var r=el("div","row st-"+st.s);
+  var p=el("div","cell prod"); p.appendChild(el("b",null,a[1]));
+  var meta=el("div","meta"); [a[0], cap(D.sfams[a[2]]||a[2]), a[3], F(a[5])+" TTC"].forEach(function(t){ if(t) meta.appendChild(el("span",null,t)); });
+  p.appendChild(meta); r.appendChild(p);
+  var w=el("div","cell why");
+  w.appendChild(txt("Vous en avez vendu "+nf.format(l.v12)+" en 12 mois, le dernier en "+M[l.der]+". Plus de stock nulle part sur l’île, et aucun produit du même type en entrepôt."));
+  w.appendChild(spark(l.m,D.meta.params.recent)); r.appendChild(w);
+  var s=el("div","cell src"); s.appendChild(el("div",null,"Rien sur l’île"));
+  s.appendChild(el("div","muted",l.attendu>0?"En commande ou en mer : "+nf.format(l.attendu):"Rien en commande ni en mer")); r.appendChild(s);
+  var q=el("div","cell qty"); q.appendChild(el("div","lbl","Quantité")); q.appendChild(el("small",null,"aucune proposition")); r.appendChild(q);
+  var e=el("div","cell est"); e.appendChild(el("b",null,F(l.vm*a[5]))); e.appendChild(el("small",null,"de CA perdu par mois ("+nf1.format(l.vm)+" ventes)")); r.appendChild(e);
+  var ac=el("div","cell act");
+  if(st.s==="todo"){
+    if(sampleCap && !(res && (res.st==="load"||res.st==="ok"))){
+      var b=el("button","btn yes","Chercher avec Claude"); b.type="button"; b.title="Claude cherche un produit de même usage dans le stock d’entrepôt";
+      b.onclick=function(){ askClaude(code,l); }; ac.appendChild(b); }
+    var n=el("button","btn","Pas de remplaçant"); n.type="button"; n.disabled=!writable();
+    n.onclick=function(){ decide(code,l,{st:"ref",q:0,motif:"Aucun remplaçant"}); }; ac.appendChild(n);
+  } else {
+    var stt=el("div","state"); stt.appendChild(el("b",null,st.d.st==="ok"?"Remplaçant choisi · "+(st.d.sub||""):"Classée · "+(st.d.motif||"")));
+    var who=el("div","who"); who.dataset.uid=st.d.by||""; who.textContent=whoText(st.d); stt.appendChild(who); ac.appendChild(stt);
+    var u=el("button","btn small","Annuler la décision"); u.type="button"; u.disabled=!writable(); u.onclick=function(){ undo(code,l); }; ac.appendChild(u);
+  }
+  r.appendChild(ac);
+  if(res){
+    var box=el("div","claude"); box.style.gridColumn="1/-1";
+    if(res.st==="load") box.appendChild(el("div","muted","Claude compare "+res.n+" produits en entrepôt…"));
+    else if(res.st==="err") box.appendChild(el("div","muted",res.msg));
+    else if(!res.items.length) box.appendChild(el("div","muted","Claude ne trouve aucun produit de même usage en entrepôt. Mieux vaut ne rien proposer."));
+    else res.items.forEach(function(it){
+      var b2=art(it.i), line=el("div","sugg");
+      var t=el("div","sugg-t"); t.appendChild(el("b",null,b2[1])); 
+      t.appendChild(el("span","meta"," "+b2[0]+" · "+F(b2[5])+" ("+(b2[5]>=a[5]?"+":"")+Math.round((b2[5]/a[5]-1)*100)+" %) · entrepôt "+nf.format(reserve(b2))));
+      t.appendChild(el("div","proof",it.raison)); line.appendChild(t);
+      var qv=subQty(l,b2), pb=el("button","btn small","Proposer "+qv+" u"); pb.type="button"; pb.disabled=!writable()||st.s!=="todo";
+      pb.onclick=function(){ acceptClaude(code,l,it,qv); }; line.appendChild(pb); box.appendChild(line);
+    });
+    r.appendChild(box);
+  }
+  return r;
+}
+function subQty(l,b){ var vm=l.vm*D.meta.params.report, lot=b[6]||1, besoin=Math.max(1,Math.ceil(vm*D.meta.params.couv/30));
+  return Math.max(1,Math.min(Math.max(lot,Math.ceil(besoin/lot)*lot), reserve(b))); }
+function subEst(l,b,q){ var vm=l.vm*D.meta.params.report, u=Math.min(q,vm*D.meta.params.horizon);
+  return {vm:vm, ca:Math.round(u*b[5]), mg:Math.round(u*(b[5]/(1+b[7])-b[4]))}; }
+function askClaude(code,l){
+  var a=art(l.a), dep=a[2].slice(0,2), key=code+keyOf(l);
+  var cands=D.vivier.filter(function(i){ var b=D.arts[i]; return i!==l.a && b[2].slice(0,2)===dep && stockAt(b,code)<=0 && reserve(b)>0 && b[5]>=a[5]*0.5 && b[5]<=a[5]*2; })
+    .sort(function(x,y){ var bx=D.arts[x], by=D.arts[y]; return ((bx[2]===a[2]?0:1)-(by[2]===a[2]?0:1)) || (Math.abs(Math.log(bx[5]/a[5]))-Math.abs(Math.log(by[5]/a[5]))); }).slice(0,80);
+  if(!cands.length){ claudeRes[key]={st:"ok",items:[]}; render(); return; }
+  claudeRes[key]={st:"load",n:cands.length}; render();
+  var list=cands.map(function(i){ var b=D.arts[i]; return b[0]+" | "+b[1]+" | "+(D.sfams[b[2]]||b[2])+" | "+b[5]+" F"; }).join("\n");
+  var prompt="Tu aides un magasin d’équipement de la maison en Nouvelle-Calédonie. Ce produit est en rupture sur toute l’île :\n"
+    +"« "+a[1]+" » (sous-famille "+(D.sfams[a[2]]||a[2])+", "+a[5]+" F TTC). Le magasin en vendait environ "+Math.round(l.vm*10)/10+" par mois.\n\n"
+    +"Parmi les produits en stock à l’entrepôt ci-dessous, choisis au plus 3 produits qu’un client venu pour ce produit accepterait à la place : même usage, même usager, gamme de prix proche. "
+    +"Un produit d’un autre usage, même voisin en rayon, ne convient pas : dans le doute, n’en propose pas. Une liste vide est une bonne réponse.\n\n"
+    +"Produits disponibles (code | libellé | sous-famille | prix TTC) :\n"+list+"\n\n"
+    +"Réponds uniquement en JSON : {\"choix\":[{\"code\":\"...\",\"raison\":\"pourquoi le client l’accepterait, 15 mots au plus\"}]}";
+  sampleCap.json(prompt).then(function(res){
+    var ok={}; cands.forEach(function(i){ ok[D.arts[i][0]]=i; });
+    var items=((res&&res.choix)||[]).filter(function(c){ return c && ok[c.code]!=null; }).slice(0,3).map(function(c){ return {i:ok[c.code], raison:String(c.raison||"").slice(0,160)}; });
+    claudeRes[key]={st:"ok",items:items}; render();
+  }).catch(function(e){
+    var c=e&&e.code;
+    if(c==="not_granted"){ sampleCap=null; delete claudeRes[key]; notice("Claude n’a pas été autorisé pour cette page : la recherche de remplaçant est désactivée pour cette visite."); }
+    else claudeRes[key]={st:"err",msg:c==="rate_limited"?"Trop de demandes en même temps : réessayez dans un moment.":"La recherche n’a pas abouti ("+(c||"erreur")+"). Réessayez."};
+    render();
+  });
+}
+function acceptClaude(code,l,it,q){
+  var b=art(it.i), est=subEst(l,b,q);
+  var l2={g:"SUB",a:it.i,q:q,vm:est.vm,cf:"moyenne",ca:est.ca,mg:est.mg,orig:l.a,src:[["E",q]],via:"claude",raison:it.raison};
+  decide(code,l2,{st:"ok",q:q,mg:est.mg,ca:est.ca,pr:b[4],orig:art(l.a)[0],via:"claude",raison:it.raison});
+  decide(code,l,{st:"ok",q:0,sub:b[0]+" "+b[1]});
+}
+
 /* ---------- mes choix ---------- */
 function mine(code){
-  var out=[]; (D.lignes[code]||[]).forEach(function(l){ var st=statusOf(code,l); if(st.s==="ok") out.push({l:l,d:st.d}); }); return out;
+  var out=[], vus={}; (D.lignes[code]||[]).forEach(function(l){ if(l.g==="RRS") return; vus[keyOf(l)]=1; var st=statusOf(code,l); if(st.s==="ok") out.push({l:l,d:st.d}); });
+  // remplaçants choisis avec Claude : ils n'ont pas de ligne calculée
+  var m=decisions[code]||{};
+  Object.keys(m).forEach(function(k){ var d=m[k]; if(vus[k] || k.charAt(0)!=="a" || d.st!=="ok" || D.idx[d.a]==null) return;
+    var o=d.orig!=null && D.idx[d.orig]!=null ? D.idx[d.orig] : null;
+    out.push({l:{g:d.g||"SUB",a:D.idx[d.a],q:d.q,vm:d.vm||0,cf:"moyenne",ca:d.ca||0,mg:d.mg||0,orig:o,src:[["E",d.q]],via:d.via,raison:d.raison},d:d}); });
+  return out;
 }
 function renderMine(app,code){
   var M=mine(code), rec=M.filter(function(x){ return x.l.g!=="CED"; }), ced=M.filter(function(x){ return x.l.g==="CED"; });
@@ -559,7 +657,7 @@ function renderMine(app,code){
     tbody.appendChild(tr); });
   t.appendChild(tbody); w.appendChild(t); app.appendChild(w);
 }
-function tabName(g){ return {RUP:"Rupture",DEJ:"Déjà vendu ici",ABS:"Absent chez moi",NOU:"Nouveauté",NVD:"Nouveauté jamais sortie",SUB:"Substitution",CED:"À céder"}[g]; }
+function tabName(g){ return {RUP:"Rupture",DEJ:"Déjà vendu ici",ABS:"Absent chez moi",NOU:"Nouveauté",NVD:"Nouveauté jamais sortie",SUB:"Substitution",RRS:"Rupture sans remplaçant",CED:"À céder"}[g]; }
 function srcText(l,code){ if(l.g==="CED") return "vers "+l.vers.map(function(v){ return nom(v[0]); }).join(", "); return (l.src||[]).map(function(x){ return x[0]==="E"?"Entrepôt":"Transfert "+nom(x[0]); }).join(" + "); }
 function rowsOut(M,code){ return M.map(function(x){ var a=art(x.l.a); return [nom(code),a[0],a[1],tabName(x.l.g),x.d.q,srcText(x.l,code),x.l.g==="CED"?"":Math.round(x.d.mg||0),x.d.motif||"",new Date(x.d.at).toLocaleDateString("fr-FR")]; }); }
 var HDR=["Magasin","Code","Article","Liste","Quantité","Source","Marge estimée (F HT)","Motif","Date"];
@@ -578,8 +676,10 @@ function renderNetwork(app){
   var T={n:0,ok:0,ref:0,mg:0,mgOk:0}, per=[], motifs={}, demand={};
   D.magasins.forEach(function(s){
     var o={s:s,n:0,ok:0,ref:0,mg:0,mgOk:0,val:0,by:{}};
-    D.lignes[s].forEach(function(l){ if(l.g==="CED") return; var st=statusOf(s,l);
-      o.n++; o.mg+=l.mg; var g=l.g==="NVD"?"NOU":l.g; o.by[g]=o.by[g]||{n:0,ok:0}; o.by[g].n++;
+    var extra=mine(s).filter(function(x){ return x.l.via==="claude" && !D.lignes[s].some(function(m){ return m.a===x.l.a && m.g!=="RRS"; }); });
+    D.lignes[s].concat(extra.map(function(x){ return x.l; })).forEach(function(l){ if(l.g==="CED"||l.g==="RRS") return; var st=statusOf(s,l);
+      var g=l.g==="NVD"?"NOU":l.g; o.by[g]=o.by[g]||{n:0,ok:0};
+      if(l.via!=="claude"){ o.n++; o.mg+=l.mg; o.by[g].n++; }
       if(st.s==="ok"){ o.ok++; o.by[g].ok++; o.mgOk+=st.d.mg||0; o.val+=st.d.q*art(l.a)[4]; var c=art(l.a)[0]; (demand[c]=demand[c]||{a:l.a,q:0,s:[]}); demand[c].q+=st.d.q; demand[c].s.push(s); }
       else if(st.s==="ref"){ o.ref++; var m=st.d.motif||"Sans motif"; motifs[m]=(motifs[m]||0)+1; } });
     per.push(o); T.n+=o.n; T.ok+=o.ok; T.ref+=o.ref; T.mg+=o.mg; T.mgOk+=o.mgOk;
@@ -632,7 +732,8 @@ function why(code,l){
   if(l.g==="DEJ") return "Vendu "+l.v12+" en 12 mois, plus depuis "+M[l.der]+", stock à 0."+(l.noel?" Saison Noël.":"");
   if(l.g==="ABS"||l.g==="NOU") return "Vendu par "+Object.keys(l.por).length+" autre(s) magasin(s), jamais ici."+(l.g==="NOU"?" Nouveauté.":"");
   if(l.g==="NVD") return "En réserve depuis "+l.age+" j, aucun magasin ne l’a. Estimation d’après "+l.nref+" produit(s) comparable(s).";
-  if(l.g==="SUB"){ var o=art(l.orig); return "Remplace "+o[0]+" "+o[1]+" ("+o[5]+" F), vendu "+l.v12+" ici, en rupture partout."+(l.attendu>0?" L’original revient : "+l.attendu+" en commande ou en mer.":""); }
+  if(l.g==="SUB"){ var o=l.orig!=null?art(l.orig):null; return (o?"Remplace "+o[0]+" "+o[1]+" ("+o[5]+" F)"+(l.v12!=null?", vendu "+l.v12+" ici, en rupture partout.":"."):"Remplaçant.")+(l.typ&&l.typ.length?" Même type : "+l.typ.join(", ")+".":"")+(l.via==="claude"?" Choisi avec Claude"+(l.raison?" : "+l.raison:"")+".":"")+(l.attendu>0?" L’original revient : "+l.attendu+" en commande ou en mer.":""); }
+  if(l.g==="RRS") return "Vendu "+l.v12+" en 12 mois, dernier en "+M[l.der]+". Plus de stock sur l’île, aucun produit du même type en entrepôt."+(l.attendu>0?" Revient : "+l.attendu+" en commande ou en mer.":"");
   if(l.g==="CED") return "Stock ici : "+stockAt(a,code)+", "+l.motif+". Demandé par "+l.vers.map(function(v){ return nom(v[0])+" ("+v[1]+")"; }).join(", ")+".";
   return "";
 }
@@ -641,7 +742,7 @@ function propRow(code,l){
   var ail=D.magasins.map(function(s,k){ return k!==ix && a[15][k]>0 ? nom(s)+" "+a[15][k] : null; }).filter(Boolean).join(", ");
   return [nom(code), tabName(l.g), a[0], a[1], cap(D.depts[dept(a)]||dept(a)), cap(D.sfams[a[2]]||a[2]), a[3], a[5], a[4], why(code,l),
     a[15][ix]||0, ail, srcText(l,code), reserve(a), autresMag(a,code), a[10]+a[11], a[16][ix]||0, l.q, a[6], Math.round(l.vm*10)/10,
-    l.g==="CED"?"":l.ca, l.g==="CED"?"":l.mg, l.cf, {todo:"À traiter",ok:"Acceptée",ref:"Refusée"}[st.s],
+    l.g==="CED"||l.g==="RRS"?"":l.ca, l.g==="CED"||l.g==="RRS"?"":l.mg, l.cf, {todo:"À traiter",ok:"Acceptée",ref:"Refusée"}[st.s],
     dec?d.q:"", d.motif||"", dec?whoName(d):"", dec?new Date(d.at).toLocaleDateString("fr-FR"):""];
 }
 function loadXlsx(){
@@ -687,7 +788,8 @@ function exportNetwork(per,motifs,demand,btn){
   var sh=["Magasin","Poids"]; ["Ruptures","Déjà vendus","Absents","Nouveautés","Substitutions"].forEach(function(t){ sh.push(t+" proposées",t+" acceptées"); });
   sh=sh.concat(["Total proposées","Total acceptées","Total refusées","Marge possible (F HT)","Marge acceptée (F HT)","Engagé (F PR)"]);
   var decs=[];
-  D.magasins.forEach(function(s){ D.lignes[s].forEach(function(l){ if(statusOf(s,l).s!=="todo") decs.push(propRow(s,l)); }); });
+  D.magasins.forEach(function(s){ D.lignes[s].forEach(function(l){ if(statusOf(s,l).s!=="todo") decs.push(propRow(s,l)); });
+    mine(s).forEach(function(x){ if(x.l.via==="claude" && !D.lignes[s].some(function(m){ return m.a===x.l.a && m.g!=="RRS"; })) decs.push(propRow(s,x.l)); }); });
   var mo=Object.keys(motifs).sort(function(x,y){ return motifs[y]-motifs[x]; }).map(function(m){ return [m,motifs[m]]; });
   var di=Object.keys(demand).map(function(c){ var x=demand[c], a=art(x.a); return [a[0],a[1],x.q,reserve(a),x.q-reserve(a),x.s.map(nom).join(", ")]; })
     .filter(function(r){ return r[4]>0; }).sort(function(x,y){ return y[4]-x[4]; });
@@ -707,7 +809,8 @@ function method(){
    "Vente estimée : ventes des 12 derniers mois divisées par le nombre de mois où l’article était présent. Si votre stock est à zéro, on compte jusqu’à la dernière vente, pour ne pas confondre rupture et absence de demande.",
    "Quantité proposée : environ "+P.couv+" jours de vente estimée. Depuis l’entrepôt elle est arrondie au sous-colis, qui ne se divise pas ; un transfert entre magasins se fait à l’unité. Modifiez-la avant d’accepter.",
    "Marge estimée : ce qui se vendrait en "+P.horizon+" mois (au plus la quantité proposée) × (prix de vente hors TGC − prix de revient). Le taux de TGC de chaque article est lu dans ses ventes.",
-   "Absents chez moi et nouveautés : vente des autres magasins × "+P.prudence+" par prudence. Substitution : vente de la référence remplacée × "+P.report+", la part de clients qui accepte un produit proche (prix entre "+Math.round(P.prix_sub[0]*100)+" % et "+Math.round(P.prix_sub[1]*100)+" % de l’original).",
+   "Absents chez moi et nouveautés : vente des autres magasins × "+P.prudence+" par prudence.",
+   "Substitution : seulement quand un produit du même type est en entrepôt. Le type, ce sont les mots du libellé qu’emploient plusieurs fournisseurs (« sac », « étagère », « pare-soleil »), sans les couleurs, matières, tailles ni marques. Le remplaçant a le même mot de tête ; si les deux précisent leur usage (« sac à dos », « étagère chaussures »), la précision doit se retrouver ; hors de la sous-famille, il faut deux mots en commun. Prix entre "+Math.round(P.prix_sub[0]*100)+" % et "+Math.round(P.prix_sub[1]*100)+" % de l’original. Vente estimée : celle de l’original × "+P.report+". Sans remplaçant sûr, la rupture est signalée sans proposition ; Claude peut chercher un équivalent d’usage, à votre demande.",
    "Stock qui dort : aucune vente en 12 mois dans le magasin, et pas de livraison récente de l’entrepôt (plus de "+P.dort+" jours). Surstock : plus de "+P.surstock+" jours de couverture ; le cédant garde "+P.garde+" jours de ses propres ventes.",
    "Nouveauté : aucune vente sur l’île l’an dernier, ni avant les six derniers mois. « Jamais sortie » : reçue à l’entrepôt il y a moins de "+P.nvd+" jours, aucun magasin ne l’a.",
    "Rayon absent : vendu par au moins "+P.rayon_min+" autres magasins, ni vente ni stock chez vous, et quelque chose en réserve.",

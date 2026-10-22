@@ -31,6 +31,7 @@ import math
 import re
 import statistics
 import sys
+import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -76,10 +77,36 @@ def proche_tgc(x):
     return min(TGC, key=lambda v: abs(v - x))
 
 
-def mots(lib):
-    """Mots et dimensions d'un libellé, pour rapprocher deux produits."""
-    lib = lib.upper().replace(",", ".")
-    return {m for m in re.findall(r"[A-Z]{3,}|\d+(?:\.\d+)?", lib) if m not in {"LES", "DES", "AVEC", "POUR"}}
+# Mots qui décrivent une variante, jamais un usage : couleurs, matières, formes,
+# tailles, conditionnements. Deux produits ne se remplacent pas parce qu'ils
+# sont tous deux noirs.
+ATTRIBUTS = set("""
+NOIR NOIRE BLANC BLANCHE ROUGE BLEU BLEUE VERT VERTE JAUNE ROSE GRIS GRISE BEIGE MARRON NATUREL NATURELLE
+OCRE CREME TAUPE ARGENT ARGENTE DORE DOREE ORANGE VIOLET TURQUOISE ANTHRACITE IVOIRE CHOCOLAT KAKI CORAIL
+MULTICO MULTICOLORE COULEUR CLR ASS ASSORTI ASSORTIE INOX BOIS BAMBOU VERRE PLASTIQUE METAL ALU ALUMINIUM
+COTON POLYESTER RESINE CERAMIQUE PORCELAINE GRES FAIENCE ACIER FER SILICONE PVC LIN VELOURS UNI RAYE RECT
+RECTANGULAIRE ROND RONDE CARRE CARREE OVALE LONG LONGUE GRAND GRANDE PETIT PETITE MOYEN MOYENNE MINI MAXI
+LOT SET KIT PACK BOX DUO TRIO DES LES AVEC POUR SUR SANS UNE AUX PAR NEW NOUVEAU NOUVELLE LUXE DECO DECOR
+MODELE STYLE COLLECTION CMS LITRE PIECE PCS PCE PERSONNE PERS
+BLC NAT NR BLK WHT MULTICOL ASSORT COLORI DESIGN MOTIF IMPRIME
+""".split())
+
+
+def _norm(lib):
+    return unicodedata.normalize("NFKD", lib.upper()).encode("ascii", "ignore").decode()
+
+
+def _racine(m):
+    return m[:-1] if len(m) > 4 and m[-1] in "SX" else m
+
+
+def mots_libelle(lib):
+    out = []
+    for m in re.findall(r"[A-Z]{3,}", _norm(lib)):
+        r = _racine(m)
+        if m not in ATTRIBUTS and r not in ATTRIBUTS:
+            out.append(r)
+    return out
 
 
 def main():
@@ -282,12 +309,50 @@ def main():
     for i, o in enumerate(arts):
         porteurs_de[i] = [s for s in MAGASINS if ventes12(s, i) > 0]
 
-    # rapprochement des substituts, par sous-famille
-    par_sf = defaultdict(list)
+    # Rapprochement des substituts. Le type d'un produit, ce sont les mots de
+    # son libellé qu'emploient au moins deux fournisseurs : une marque n'est
+    # employée que par le sien, « GOURDE » ou « PARE SOLEIL » par plusieurs.
+    # Un substitut doit avoir le même mot de tête que l'original (« SAC »,
+    # « ETAGERE »). Quand les deux précisent leur usage par un second mot
+    # (« SAC À DOS », « ETAGERE CHAUSSURES »), ce second mot doit se retrouver
+    # chez l'autre. Hors de la sous-famille, il faut deux mots en commun.
+    # Sinon on ne propose rien : une rupture sans équivalent sûr est signalée.
+    fournisseurs_du_mot, freq = defaultdict(set), Counter()
+    for r in base:
+        for m in set(mots_libelle(r["libelle"])):
+            fournisseurs_du_mot[m].add(r["libfou"].strip())
+            freq[m] += 1
+    def type_de(lib):
+        return [m for m in mots_libelle(lib) if len(fournisseurs_du_mot[m]) >= 2]
+    idf = lambda m: math.log(len(base) / (1 + freq[m]))
+    types = [type_de(o["lib"]) for o in arts]
+    par_fa = defaultdict(list)
     for i, o in enumerate(arts):
         if reserve(i) > 0:
-            par_sf[o["sf"]].append(i)
-    mots_art = {}
+            par_fa[o["fa"]].append(i)
+
+    def substituts(i, s):
+        o, ta = arts[i], types[i]
+        if not ta:
+            return []
+        out = []
+        for j in par_fa[o["fa"]]:
+            tb = types[j]
+            if j == i or stock(s, j) > 0 or not tb or ta[0] != tb[0]:
+                continue
+            if len(ta) > 1 and len(tb) > 1 and ta[1] not in tb and tb[1] not in ta:
+                continue
+            commun = set(ta) & set(tb)
+            b = arts[j]
+            if b["sf"] != o["sf"] and len(commun) < 2:
+                continue
+            if not (PRIX_SUB[0] * o["pv"] <= b["pv"] <= PRIX_SUB[1] * o["pv"]):
+                continue
+            sim = sum(idf(m) for m in commun) / sum(idf(m) for m in set(ta) | set(tb))
+            sc = sim * 2 + (1 - abs(b["pv"] / o["pv"] - 1)) + (0.3 if b["four"] == o["four"] else 0)
+            out.append((sc, sim, j, sorted(commun, key=lambda m: -idf(m))))
+        out.sort(reverse=True)
+        return out[:3]
 
     for i, o in enumerate(arts):
         P = porteurs_de[i]
@@ -309,28 +374,17 @@ def main():
                     pousse(s, sig, i, quantite(vm, i, s, dispo), vm, conf,
                            v12=v12, der=der, m=v, noel=1 if noel else 0)
                 elif recent(s, i):
-                    # rupture partout : on cherche un produit proche en réserve
-                    if i not in mots_art:
-                        mots_art[i] = mots(o["lib"])
-                    cands = []
-                    for j in par_sf[o["sf"]]:
-                        if j == i or stock(s, j) > 0:
-                            continue
-                        b = arts[j]
-                        if not (PRIX_SUB[0] * o["pv"] <= b["pv"] <= PRIX_SUB[1] * o["pv"]):
-                            continue
-                        if j not in mots_art:
-                            mots_art[j] = mots(b["lib"])
-                        A_, B_ = mots_art[i], mots_art[j]
-                        sim = len(A_ & B_) / len(A_ | B_) if (A_ | B_) else 0
-                        sc = sim * 2 + (1 - abs(b["pv"] / o["pv"] - 1)) + (0.3 if b["four"] == o["four"] else 0)
-                        cands.append((sc, sim, j))
-                    cands.sort(reverse=True)
-                    for rang, (sc, sim, j) in enumerate(cands[:3]):
+                    # rupture partout : un produit du même type en réserve, ou rien
+                    cands = substituts(i, s)
+                    for rang, (sc, sim, j, commun) in enumerate(cands):
                         vmj = vm * REPORT_SUB
                         pousse(s, "SUB", j, quantite(vmj, j, s, offre(j, s)), vmj,
-                               "moyenne" if sim >= 0.3 else "faible",
+                               "moyenne" if sim >= 0.5 else "faible",
                                orig=i, v12=v12, m=v, sim=round(sim, 2), rang=rang + 1,
+                               typ=commun[:3], attendu=o["cde"] + o["flo"])
+                    if not cands:
+                        # vente perdue sans équivalent sûr : on la signale, sans rien forcer
+                        pousse(s, "RRS", i, 0, vm, "faible", v12=v12, der=der, m=v,
                                attendu=o["cde"] + o["flo"])
                 continue
             # jamais vendu ici, pas en stock
@@ -369,7 +423,7 @@ def main():
 
     # Une référence ne figure qu'une fois par magasin, sous son signal le plus
     # sûr : sinon elle se commanderait deux fois. Ce qu'elle remplace la suit.
-    PRIO = {"RUP": 0, "DEJ": 1, "SUB": 2, "NOU": 3, "ABS": 4, "NVD": 5}
+    PRIO = {"RUP": 0, "DEJ": 1, "SUB": 2, "NOU": 3, "ABS": 4, "NVD": 5, "RRS": 6}
     for s in MAGASINS:
         garde = {}
         for l in sorted(lignes[s], key=lambda l: (PRIO[l["g"]], -l["sc"])):
@@ -430,8 +484,11 @@ def main():
                         rayons[s].append({"niv": cle, "c": u, "lib": libs.get(u, u), "por": len(ps), "n": nb})
 
     # --- sortie compacte : seules les références proposées ---
+    # Le stock d'entrepôt sert aussi à chercher un substitut avec Claude depuis
+    # la page, pour les ruptures sans équivalent évident.
+    vivier = [i for i, o in enumerate(arts) if reserve(i) > 0]
     utiles = sorted({l["a"] for L in lignes.values() for l in L} |
-                    {x for L in lignes.values() for l in L for x in l.get("pour", [])})
+                    {x for L in lignes.values() for l in L for x in l.get("pour", [])} | set(vivier))
     ren = {i: k for k, i in enumerate(utiles)}
     out_arts = []
     for i in utiles:
@@ -474,6 +531,7 @@ def main():
         "arts": out_arts,
         "lignes": lignes,
         "rayons": rayons,
+        "vivier": [ren[i] for i in vivier],
     }
     with open(a.out, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))

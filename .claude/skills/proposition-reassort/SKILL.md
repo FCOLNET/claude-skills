@@ -29,7 +29,7 @@ python3 scripts/build_data.py \
 cp templates/page.html <scratchpad>/reassort/index.html
 ```
 
-Puis publier `index.html` avec l'outil Artifact, `files: {"data.json": ...}` et `capabilities: {db: {}, user: {scopes: ["profile"]}, downloads: true}`. Pour une mise à jour, republier sur la même URL : les décisions restent (elles sont dans la base de l'artefact, clé = magasin + code article). Ne jamais committer les exports ni `data.json` : ce sont des données d'entreprise.
+Puis publier `index.html` avec l'outil Artifact, `files: {"data.json": ...}` et `capabilities: {db: {}, user: {scopes: ["profile"]}, downloads: true, sample: {}}`. Pour une mise à jour, republier sur la même URL : les décisions restent (elles sont dans la base de l'artefact, clé = magasin + code article). Ne jamais committer les exports ni `data.json` : ce sont des données d'entreprise.
 
 ## Exports Excel
 
@@ -46,7 +46,8 @@ La page génère des `.xlsx` (SheetJS 0.18.5 chargé depuis cdnjs au premier cli
 - **ABS** absent chez moi : ni vente ni stock ici, vendu ailleurs ces 6 derniers mois.
 - **NOU** nouveauté qui démarre : comme ABS, sur une référence sans vente N-1 ni avant les 6 derniers mois.
 - **NVD** nouveauté jamais sortie : en réserve, reçue depuis moins de 180 jours, aucun magasin ne l'a ni ne l'a vendue ; proposée à tous au sous-colis.
-- **SUB** substitution : rupture partout de la référence vendue ici ; jusqu'à 3 produits en réserve de la même sous-famille, prix entre 75 % et 133 %, classés par libellé proche, prix et fournisseur.
+- **SUB** substitution : rupture partout de la référence vendue ici ; jusqu'à 3 produits en réserve **du même type** (mêmes mots de type — ceux qu'emploient au moins deux fournisseurs, hors couleurs, matières, tailles et marques ; même mot de tête ; si les deux précisent leur usage, « sac à dos », la précision doit se retrouver ; hors sous-famille, deux mots en commun), prix entre 75 % et 133 %. Mieux vaut rien qu'un produit d'un autre usage.
+- **RRS** rupture sans remplaçant sûr : signalée sans proposition (vente perdue, ce qui revient en commande). Le magasin peut demander à Claude (capacité `sample`, sur son propre compte, avec son accord) de chercher un équivalent d'usage parmi le stock d'entrepôt du même département ; seuls des codes réellement en stock sont retenus.
 - **CED** à céder : stock qui dort (aucune vente en 12 mois, pas de livraison depuis 90 jours) ou surstock (> 180 jours de couverture, on garde 60 jours) quand un autre magasin en a besoin.
 
 Une référence n'apparaît qu'une fois par magasin, sous le signal le plus sûr. Les rayons absents (département, famille, sous-famille vendus par au moins 3 autres magasins, rien ici, du stock en réserve) s'affichent en tête.
