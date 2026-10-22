@@ -133,6 +133,9 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
 .notice{margin-top:12px;border-radius:var(--r);padding:9px 12px;background:var(--warn-soft);color:var(--ink);font-size:13px}
 .notice[hidden]{display:none}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;max-width:min(92vw,640px);
+  background:var(--ink);color:var(--bg);border-radius:var(--r);padding:10px 14px;font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.toast.mal{background:var(--bad);color:#fff}
 
 /* mes choix et réseau */
 .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
@@ -276,18 +279,33 @@ function setStore(s){
 }
 
 /* ---------- décisions partagées ---------- */
+var APERCU="Vous regardez un aperçu du fichier : les téléchargements y sont bloqués. Enregistrez d’abord le fichier sur votre ordinateur, puis ouvrez-le d’un double-clic (Chrome ou Edge).";
+var XLSX_TYPE="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+function toast(t,mal){
+  var o=document.getElementById("toast"); if(!o){ o=el("div"); o.id="toast"; o.setAttribute("role","status"); document.body.appendChild(o); }
+  o.className="toast"+(mal?" mal":""); o.textContent=t; o.hidden=false;
+  clearTimeout(toast._t); toast._t=setTimeout(function(){ o.hidden=true; }, mal?12000:6000);
+}
 var CLE_LOCALE=function(code){ return "reassort-choix-"+code; };
 function connectLocal(){
   D.magasins.forEach(function(s){ decisions[s]={}; });
   var lu=try_(function(){ return localStorage.getItem(CLE_LOCALE(D.seul)); });
   if(lu) try_(function(){ decisions[D.seul]=JSON.parse(lu)||{}; });
   var ok=try_(function(){ localStorage.setItem("reassort-test","1"); localStorage.removeItem("reassort-test"); return true; });
-  notice(ok ? "Version fichier : vos choix sont gardés dans ce navigateur, sur ce poste. Quand vous avez terminé, ouvrez « Mes choix » et téléchargez le fichier Excel pour l’envoyer."
+  /* Un aperçu (pièce jointe affichée dans Outlook, Teams, l'application Claude…)
+     montre la page dans un cadre qui bloque les téléchargements sans le dire. */
+  var cadre=true; try{ cadre = window.self!==window.top; }catch(e){ cadre=true; }
+  if(cadre) notice(APERCU);
+  else notice(ok ? "Version fichier : vos choix sont gardés dans ce navigateur, sur ce poste. Quand vous avez terminé, ouvrez « Mes choix » et téléchargez le fichier Excel pour l’envoyer."
             : "Ce navigateur ne garde pas vos choix si vous fermez la page : téléchargez-les en Excel depuis « Mes choix » avant de la fermer.");
   dlCap={save:function(r){
-    var blob=r.data instanceof Blob ? r.data : new Blob([r.data]), url=URL.createObjectURL(blob), a=document.createElement("a");
-    a.href=url; a.download=r.filename; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); },4000); return Promise.resolve({status:"saved"}); }};
+    if(cadre) return Promise.reject({code:"apercu"});
+    var blob=r.data instanceof Blob ? r.data : new Blob([r.data],{type:XLSX_TYPE});
+    if(window.navigator && navigator.msSaveOrOpenBlob){ navigator.msSaveOrOpenBlob(blob,r.filename); return Promise.resolve({status:"saved"}); }
+    var url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download=r.filename; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); },60000);
+    return Promise.resolve({status:"saved"}); }};
   render();
 }
 function saveLocal(code){ try_(function(){ localStorage.setItem(CLE_LOCALE(code), JSON.stringify(decisions[code]||{})); }); }
@@ -816,10 +834,15 @@ function saveXlsx(name,sheets,btn){
       X.utils.book_append_sheet(wb,ws,sh.n.replace(/[:\\/?*\[\]]/g," ").slice(0,31));
     });
     var buf=X.write(wb,{bookType:"xlsx",type:"array"});
-    return dlCap.save({filename:name,data:new Blob([buf])});
+    return dlCap.save({filename:name,data:new Blob([buf],{type:XLSX_TYPE})}).then(function(){
+      if(LOCAL) toast("Fichier Excel enregistré : "+name+" (dossier Téléchargements).");
+    });
   }).catch(function(e){
     if(e && e.code==="declined") return;
-    notice(e && e.code==="load" ? "Le module Excel n’a pas pu être chargé. Vérifiez la connexion et réessayez." : "Le fichier Excel n’a pas pu être proposé ("+((e&&e.code)||"erreur")+").");
+    var t = e && e.code==="apercu" ? APERCU
+          : e && e.code==="load" ? "Le module Excel n’a pas pu être chargé. Vérifiez la connexion et réessayez."
+          : "Le fichier Excel n’a pas pu être créé ("+((e&&(e.code||e.message))||"erreur")+").";
+    notice(t); toast(t,true);
   }).then(function(){ btn.disabled=false; btn.textContent=old; });
 }
 function exportStore(code,btn){
