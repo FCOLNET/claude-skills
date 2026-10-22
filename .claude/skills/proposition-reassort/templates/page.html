@@ -88,6 +88,13 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .row.st-ok{border-left:4px solid var(--ok)}
 .row.st-ref{border-left:4px solid var(--bad);opacity:.78}
 .cell{min-width:0}
+.prod{display:flex;gap:10px;align-items:flex-start}
+.prod-t{min-width:0}
+.thumb{flex:none;border-radius:4px;background-color:#fff;background-repeat:no-repeat;border:1px solid var(--line)}
+.thumb.none{background:repeating-linear-gradient(135deg,var(--sunk) 0 6px,transparent 6px 12px);border-style:dashed}
+.orig{display:flex;gap:8px;align-items:flex-start}
+.sugg>.thumb{margin-top:2px}
+.sugg-t{flex:1}
 .prod b{display:block;font-weight:650;font-size:14.5px;line-height:1.25}
 .meta{color:var(--muted);font-size:12px;margin-top:3px}
 .meta span+span::before{content:" · "}
@@ -223,8 +230,10 @@ function takenElsewhere(code,a){
 }
 
 /* ---------- chargement ---------- */
+var PH_={map:{}};   /* planches de vignettes : facultatives, la page vit sans */
 fetch("data.json").then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }).then(function(data){
   D=data; init();
+  fetch("photos/index.json").then(function(r){ return r.ok ? r.json() : null; }).then(function(x){ if(x){ PH_=x; render(); } }).catch(function(){});
 }).catch(function(){
   document.getElementById("loading").textContent="Les données des propositions n’ont pas pu être chargées. Rechargez la page ; si le problème persiste, les données doivent être republiées.";
 });
@@ -440,10 +449,10 @@ function row(code,l){
   var a=art(l.a), st=statusOf(code,l), ix=storeIx(code);
   var r=el("div","row st-"+st.s);
   // produit
-  var p=el("div","cell prod"); p.appendChild(el("b",null,a[1]));
+  var p=el("div","cell prod"); p.appendChild(thumb(a,56)); var pt=el("div","prod-t"); p.appendChild(pt); pt.appendChild(el("b",null,a[1]));
   var meta=el("div","meta"); [a[0], cap(D.sfams[a[2]]||a[2]), a[3], F(a[5])+" TTC"].forEach(function(t){ if(t) meta.appendChild(el("span",null,t)); });
-  p.appendChild(meta);
-  if(a[8]) p.appendChild(el("div","meta",a[8]));
+  pt.appendChild(meta);
+  if(a[8]) pt.appendChild(el("div","meta",a[8]));
   r.appendChild(p);
   // pourquoi
   var w=el("div","cell why"), M=D.meta.mois;
@@ -451,7 +460,7 @@ function row(code,l){
   else if(l.g==="DEJ"){ var t=txt("Vendu "+nf.format(l.v12)+" fois chez vous, plus depuis "+M[l.der]+", stock à 0. "); if(l.noel){ t.appendChild(el("span","tag noel","Noël")); } w.appendChild(t); w.appendChild(spark(l.m,0)); }
   else if(l.g==="ABS"||l.g==="NOU"){ var t2=txt("Vendu par "+Object.keys(l.por).length+" autre"+(Object.keys(l.por).length>1?"s":"")+" magasin"+(Object.keys(l.por).length>1?"s":"")+", jamais chez vous. "); if(l.g==="NOU") t2.appendChild(el("span","tag new","Nouveauté")); w.appendChild(t2); w.appendChild(el("div","proof","Ventes 12 mois : "+porteurs(l.por))); }
   else if(l.g==="NVD"){ var t3=txt("En réserve depuis "+l.age+" jour"+(l.age>1?"s":"")+", aucun magasin ne l’a. "); t3.appendChild(el("span","tag new","Jamais sortie")); w.appendChild(t3); w.appendChild(el("div","proof","Estimation d’après "+nf.format(l.nref)+" produit"+(l.nref>1?"s":"")+" de la même sous-famille à prix voisin.")); }
-  else if(l.g==="SUB"){ var o=art(l.orig); w.appendChild(txt("Remplace « "+o[1]+" » ("+F(o[5])+")"+(l.v12!=null?" : vous en avez vendu "+nf.format(l.v12)+", plus de stock nulle part.":".")));
+  else if(l.g==="SUB"){ var o=art(l.orig); var orow=el("div","orig"); orow.appendChild(thumb(o,40)); orow.appendChild(txt("Remplace « "+o[1]+" » ("+F(o[5])+")"+(l.v12!=null?" : vous en avez vendu "+nf.format(l.v12)+", plus de stock nulle part.":"."))); w.appendChild(orow);
     var pr=el("div","proof"); var bits=[];
     if(l.typ && l.typ.length) bits.push("même type : "+l.typ.map(cap).join(", "));
     if(l.via==="claude") bits.push("choisi avec Claude"+(l.raison?" : "+l.raison:""));
@@ -526,6 +535,17 @@ function row(code,l){
   return r;
 }
 function txt(t){ var d=el("div"); d.textContent=t; return d; }
+function thumb(a,px){
+  var d=el("div","thumb"), m=PH_.map && PH_.map[a[0]];
+  d.style.width=d.style.height=px+"px";
+  if(!m){ d.className="thumb none"; d.title="Pas de photo"; return d; }
+  var k=px/PH_.cell, col=m[1]%PH_.cols, lig=Math.floor(m[1]/PH_.cols);
+  d.style.backgroundImage="url(photos/p"+String(m[0]).padStart(3,"0")+".jpg)";
+  d.style.backgroundSize=(PH_.cols*PH_.cell*k)+"px auto";
+  d.style.backgroundPosition=(-col*PH_.cell*k)+"px "+(-lig*PH_.cell*k)+"px";
+  d.setAttribute("role","img"); d.setAttribute("aria-label",a[1]);
+  return d;
+}
 function whoText(d){
   var p=d.by && profiles[d.by], n=p && p.name ? p.name : (d.by && d.by===myId ? "vous" : "");
   return (n?n+", ":"")+"le "+new Date(d.at).toLocaleDateString("fr-FR");
@@ -545,9 +565,9 @@ var _render=render; render=function(){ _render(); resolveNames(); };
 function rowRRS(code,l){
   var a=art(l.a), st=statusOf(code,l), M=D.meta.mois, k=keyOf(l), res=claudeRes[code+k];
   var r=el("div","row st-"+st.s);
-  var p=el("div","cell prod"); p.appendChild(el("b",null,a[1]));
+  var p=el("div","cell prod"); p.appendChild(thumb(a,56)); var pt=el("div","prod-t"); p.appendChild(pt); pt.appendChild(el("b",null,a[1]));
   var meta=el("div","meta"); [a[0], cap(D.sfams[a[2]]||a[2]), a[3], F(a[5])+" TTC"].forEach(function(t){ if(t) meta.appendChild(el("span",null,t)); });
-  p.appendChild(meta); r.appendChild(p);
+  pt.appendChild(meta); r.appendChild(p);
   var w=el("div","cell why");
   w.appendChild(txt("Vous en avez vendu "+nf.format(l.v12)+" en 12 mois, le dernier en "+M[l.der]+". Plus de stock nulle part sur l’île, et aucun produit du même type en entrepôt."));
   w.appendChild(spark(l.m,D.meta.params.recent)); r.appendChild(w);
@@ -574,7 +594,7 @@ function rowRRS(code,l){
     else if(res.st==="err") box.appendChild(el("div","muted",res.msg));
     else if(!res.items.length) box.appendChild(el("div","muted","Claude ne trouve aucun produit de même usage en entrepôt. Mieux vaut ne rien proposer."));
     else res.items.forEach(function(it){
-      var b2=art(it.i), line=el("div","sugg");
+      var b2=art(it.i), line=el("div","sugg"); line.appendChild(thumb(b2,48));
       var t=el("div","sugg-t"); t.appendChild(el("b",null,b2[1])); 
       t.appendChild(el("span","meta"," "+b2[0]+" · "+F(b2[5])+" ("+(b2[5]>=a[5]?"+":"")+Math.round((b2[5]/a[5]-1)*100)+" %) · entrepôt "+nf.format(reserve(b2))));
       t.appendChild(el("div","proof",it.raison)); line.appendChild(t);

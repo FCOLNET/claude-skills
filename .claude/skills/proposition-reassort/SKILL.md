@@ -39,6 +39,12 @@ La page génère des `.xlsx` (SheetJS 0.18.5 chargé depuis cdnjs au premier cli
 - « Mes choix » : demandes (bon de demande), cessions, détail ;
 - le réseau : synthèse par magasin, toutes les décisions, motifs de refus, stock disputé.
 
+## Photos
+
+1. Sur un poste du réseau : `scripts/extraire_photos.ps1` avec `codes_photos.txt` (un code par ligne, les articles de `data.json`) copie et réduit à 120 px les photos de `\\10.10.101.52\SMRC_photo`, puis produit `photos_reassort.zip`.
+2. Ici : `python3 scripts/build_photos.py --zip photos_reassort.zip --out <scratchpad>/reassort/photos` assemble des planches de 100 vignettes (`pNNN.jpg`) et `index.json`. Les images vides (1 px ou toutes blanches) sont écartées : la page montre alors une case hachurée.
+3. Publier `photos/*` avec `data.json` (paramètres `root` et `files`). La page charge `photos/index.json` si présent et vit sans.
+
 ## Les signaux
 
 - **RUP** rupture récente : vendu ces 3 derniers mois, stock magasin ≤ 0, l'île en a.

@@ -16,6 +16,10 @@ param(
 Add-Type -AssemblyName System.Drawing
 if (-not (Test-Path $Codes))  { Write-Host "Liste introuvable : $Codes"; exit 1 }
 if (-not (Test-Path $Source)) { Write-Host "Partage photo inaccessible : $Source"; exit 1 }
+# Repartir d'un dossier de sortie vide, sans jamais toucher au dossier source.
+if ((Test-Path $Sortie) -and ((Resolve-Path $Sortie).Path.TrimEnd('\') -ne (Resolve-Path $Source).Path.TrimEnd('\'))) {
+  Remove-Item (Join-Path $Sortie "*.jpg") -Force
+}
 New-Item -ItemType Directory -Force -Path $Sortie | Out-Null
 
 $jpeg = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq "image/jpeg" }
@@ -31,7 +35,9 @@ foreach ($c in $liste) {
   if (-not (Test-Path $src)) { $absentes++; continue }
   try {
     $img = [System.Drawing.Image]::FromFile($src)
-    $r = [Math]::Min(1, [Math]::Min($Taille / $img.Width, $Taille / $img.Height))
+    # 1.0 et non 1 : avec un entier, PowerShell choisit Min(int, int) et
+    # arrondit le facteur de réduction à 0 ; la photo sortait en un pixel.
+    $r = [Math]::Min(1.0, [Math]::Min([double]$Taille / $img.Width, [double]$Taille / $img.Height))
     $w = [int][Math]::Max(1, [Math]::Round($img.Width * $r))
     $h = [int][Math]::Max(1, [Math]::Round($img.Height * $r))
     $bmp = New-Object System.Drawing.Bitmap($w, $h)
