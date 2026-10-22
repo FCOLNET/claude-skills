@@ -231,12 +231,21 @@ function takenElsewhere(code,a){
 
 /* ---------- chargement ---------- */
 var PH_={map:{}};   /* planches de vignettes : facultatives, la page vit sans */
-fetch("data.json").then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }).then(function(data){
+/* Version fichier : les données et les vignettes sont dans la page elle-même,
+   pour un magasin, et les choix restent dans le navigateur du poste. */
+var EMB=document.getElementById("donnees"), LOCAL=!!EMB;
+/* Lancé en fin de script, une fois toutes les déclarations faites. */
+function demarrer(){
+if(LOCAL){
+  try{ D=JSON.parse(EMB.textContent); var vg=document.getElementById("vignettes"); if(vg) PH_=JSON.parse(vg.textContent); init(); }
+  catch(e){ if(window.console) console.error(e); document.getElementById("loading").textContent="Ce fichier est abîmé : demandez-en une nouvelle copie."; }
+} else fetch("data.json").then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }).then(function(data){
   D=data; init();
   fetch("photos/index.json").then(function(r){ return r.ok ? r.json() : null; }).then(function(x){ if(x){ PH_=x; render(); } }).catch(function(){});
 }).catch(function(){
   document.getElementById("loading").textContent="Les données des propositions n’ont pas pu être chargées. Rechargez la page ; si le problème persiste, les données doivent être republiées.";
 });
+}
 
 function init(){
   D.idx={}; D.arts.forEach(function(a,i){ D.idx[a[0]]=i; });
@@ -244,13 +253,15 @@ function init(){
   document.getElementById("dataDate").textContent="données au "+fin.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
   var h=(location.hash||"").slice(1).toLowerCase(), saved=try_(function(){ return localStorage.getItem("reassort-store"); });
   var byTok={}; D.magasins.forEach(function(s){ byTok[token(s)]=s; }); byTok.reseau="RES";
-  state.store=byTok[h]||saved||D.magasins[0];
+  state.store=D.seul||byTok[h]||saved||D.magasins[0];
   if(state.store!=="RES" && D.magasins.indexOf(state.store)<0) state.store=D.magasins[0];
   buildStores(); render(); connect();
+  if(D.seul) return;
   window.addEventListener("hashchange",function(){ var s=byTok[(location.hash||"").slice(1).toLowerCase()]; if(s && s!==state.store){ setStore(s); } });
 }
 function buildStores(){
   var nav=document.getElementById("stores"); nav.textContent="";
+  if(D.seul){ nav.appendChild(el("span","date","Version fichier · magasin "+nom(D.seul))); return; }
   D.magasins.forEach(function(s){ var b=el("button",null,nom(s)); b.type="button"; b.dataset.s=s; b.onclick=function(){ setStore(s); }; nav.appendChild(b); });
   nav.appendChild(el("span","sep"));
   var r=el("button",null,"Réseau"); r.type="button"; r.dataset.s="RES"; r.onclick=function(){ setStore("RES"); }; nav.appendChild(r);
@@ -265,7 +276,23 @@ function setStore(s){
 }
 
 /* ---------- décisions partagées ---------- */
+var CLE_LOCALE=function(code){ return "reassort-choix-"+code; };
+function connectLocal(){
+  D.magasins.forEach(function(s){ decisions[s]={}; });
+  var lu=try_(function(){ return localStorage.getItem(CLE_LOCALE(D.seul)); });
+  if(lu) try_(function(){ decisions[D.seul]=JSON.parse(lu)||{}; });
+  var ok=try_(function(){ localStorage.setItem("reassort-test","1"); localStorage.removeItem("reassort-test"); return true; });
+  notice(ok ? "Version fichier : vos choix sont gardés dans ce navigateur, sur ce poste. Quand vous avez terminé, ouvrez « Mes choix » et téléchargez le fichier Excel pour l’envoyer."
+            : "Ce navigateur ne garde pas vos choix si vous fermez la page : téléchargez-les en Excel depuis « Mes choix » avant de la fermer.");
+  dlCap={save:function(r){
+    var blob=r.data instanceof Blob ? r.data : new Blob([r.data]), url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download=r.filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); },4000); return Promise.resolve({status:"saved"}); }};
+  render();
+}
+function saveLocal(code){ try_(function(){ localStorage.setItem(CLE_LOCALE(code), JSON.stringify(decisions[code]||{})); }); }
 function connect(){
+  if(LOCAL){ connectLocal(); return; }
   if(!window.claude || !window.claude.use){ notice("Les décisions ne s’enregistrent que dans la page publiée sur claude.ai."); return; }
   window.claude.use("user").then(function(u){ user=u; if(!u) return null;
     return Promise.all([u.id(), u.can("data.write")]).then(function(r){ myId=r[0]; canWrite=r[1]; if(canWrite===false) notice("Vous consultez en lecture seule : pour accepter ou refuser, il faut un accès Contributeur à cette page."); render(); });
@@ -287,13 +314,15 @@ function connect(){
 var pend=null; function scheduleRender(){ if(pend) return; pend=setTimeout(function(){ pend=null; render(); },120); }
 var noticeTxt="";
 function notice(t){ noticeTxt=t; var n=document.getElementById("notice"); if(n){ n.textContent=t; n.hidden=!t; } }
-function writable(){ return !!db && canWrite!==false; }
+function writable(){ return LOCAL || (!!db && canWrite!==false); }
 function decide(code,l,body){
   if(!writable()) return;
-  var ref=db.doc("mag/"+code+"/dec/"+keyOf(l));
   var a=art(l.a);
   var full=Object.assign({g:l.g, a:a[0], lib:a[1], by:myId||null, at:new Date().toISOString(), data:D.meta.fin, vm:l.vm}, body);
-  (decisions[code]=decisions[code]||{})[keyOf(l)]=full; render();
+  (decisions[code]=decisions[code]||{})[keyOf(l)]=full;
+  if(LOCAL){ saveLocal(code); render(); return; }
+  var ref=db.doc("mag/"+code+"/dec/"+keyOf(l));
+  render();
   ref.set(full).catch(function(e){
     delete decisions[code][keyOf(l)];
     if(e && e.code==="invalid_argument"){ canWrite=false; notice("Votre accès ne permet pas d’enregistrer de décision. Demandez un accès Contributeur à cette page."); }
@@ -304,6 +333,7 @@ function decide(code,l,body){
 function undo(code,l){
   if(!writable()) return;
   var k=keyOf(l), old=decisions[code][k]; delete decisions[code][k]; render();
+  if(LOCAL){ saveLocal(code); return; }
   db.doc("mag/"+code+"/dec/"+k).delete().catch(function(){ decisions[code][k]=old; notice("L’annulation n’a pas été enregistrée. Réessayez."); render(); });
 }
 
@@ -540,7 +570,7 @@ function thumb(a,px){
   d.style.width=d.style.height=px+"px";
   if(!m){ d.className="thumb none"; d.title="Pas de photo"; return d; }
   var k=px/PH_.cell, col=m[1]%PH_.cols, lig=Math.floor(m[1]/PH_.cols);
-  d.style.backgroundImage="url(photos/p"+String(m[0]).padStart(3,"0")+".jpg)";
+  d.style.backgroundImage=PH_.sheets ? "url(\""+PH_.sheets[m[0]]+"\")" : "url(photos/p"+String(m[0]).padStart(3,"0")+".jpg)";
   d.style.backgroundSize=(PH_.cols*PH_.cell*k)+"px auto";
   d.style.backgroundPosition=(-col*PH_.cell*k)+"px "+(-lig*PH_.cell*k)+"px";
   d.setAttribute("role","img"); d.setAttribute("aria-label",a[1]);
@@ -839,5 +869,6 @@ function method(){
   ].forEach(function(t){ ul.appendChild(el("li",null,t)); });
   d.appendChild(ul); return d;
 }
+demarrer();
 })();
 </script>

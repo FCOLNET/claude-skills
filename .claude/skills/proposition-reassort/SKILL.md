@@ -45,6 +45,10 @@ La page génère des `.xlsx` (SheetJS 0.18.5 chargé depuis cdnjs au premier cli
 2. Ici : `python3 scripts/build_photos.py --zip photos_reassort.zip --out <scratchpad>/reassort/photos` assemble des planches de 100 vignettes (`pNNN.jpg`) et `index.json`. Les images vides (1 px ou toutes blanches) sont écartées : la page montre alors une case hachurée.
 3. Publier `photos/*` avec `data.json` (paramètres `root` et `files`). La page charge `photos/index.json` si présent et vit sans.
 
+## Version fichier (équipes sans claude.ai)
+
+`python3 scripts/build_autonome.py --data data.json --page templates/page.html --photos photos_reassort.zip --xlsx xlsx.full.min.js --out <dossier>` produit un `reassort-<magasin>-<date>.html` par magasin (≈ 6 Mo) : propositions du magasin, vignettes 72 px et SheetJS intégrés, ouverture par double-clic sans connexion. Les choix restent dans le navigateur du poste (localStorage) et repartent par l'Excel de « Mes choix ». Pas de vue Réseau ni de recherche avec Claude. `xlsx.full.min.js` : `npm pack xlsx@0.18.5`, fichier `package/dist/` ; sans lui, la page le charge depuis cdnjs.
+
 ## Les signaux
 
 - **RUP** rupture récente : vendu ces 3 derniers mois, stock magasin ≤ 0, l'île en a.
