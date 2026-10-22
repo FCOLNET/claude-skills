@@ -282,7 +282,7 @@ def main():
         return round(u * o["pv"]), round(u * o["mu"])
 
     def source(i, s, qte):
-        """Ce qui dort ailleurs part d'abord ; l'entrepôt complète."""
+        """Ce qui dort ailleurs part d'abord ; l'entrepôt complète (E), puis la réception (R)."""
         out, reste = [], qte
         for d in sorted((d for d in donneurs[i] if d[0] != s), key=lambda d: -d[1]):
             if reste <= 0:
@@ -290,8 +290,16 @@ def main():
             p = min(reste, d[1])
             out.append([d[0], p])
             reste -= p
+        # l'entrepôt : d'abord le stock en rayon de réserve, puis la réception
+        # (disponible sous deux à trois jours) ; jamais le flottant ni le commandé
+        o = arts[i]
+        phys = sum(max(0, o["st"][r]) for r in RESERVES)
+        if reste > 0 and phys > 0:
+            p = min(reste, phys)
+            out.append(["E", p])
+            reste -= p
         if reste > 0:
-            out.append(["E", reste])
+            out.append(["R", reste])
         return out
 
     lignes = {s: [] for s in MAGASINS}

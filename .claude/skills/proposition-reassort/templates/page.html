@@ -197,11 +197,11 @@ var TABS=[
   {id:"CED",l:"À céder",d:"Votre stock qui ne tourne pas, alors qu’un autre magasin en a besoin. Accepter, c’est préparer le transfert."},
   {id:"MES",l:"Mes choix",d:"Ce que votre magasin a accepté, prêt à saisir ou à transmettre."}
 ];
-var MOTIFS=["Pas de place","Clientèle non adaptée","Déjà commandé","Prix","Produit / qualité","Autre"];
+var MOTIFS=["Pas de place","Non dispo en entrepôt","Clientèle non adaptée","Usage couvert"];
 var REFUS_JOURS=56;
 var PAGE=50;
 
-var D=null, state={store:null, tab:"RUP", dept:"", q:"", statut:"todo", tri:"sc", nouv:"all", sub:"all", unit:null, limit:PAGE, openRefus:null};
+var D=null, state={store:null, tab:"RUP", dept:"", dispo:"", q:"", statut:"todo", tri:"sc", nouv:"all", sub:"all", unit:null, limit:PAGE, openRefus:null};
 var decisions={}; // store -> key -> body
 var db=null, user=null, canWrite=null, myId=null, profiles={}, dlCap=null, sampleCap=null, claudeRes={};
 var nf=new Intl.NumberFormat("fr-FR"), nf1=new Intl.NumberFormat("fr-FR",{maximumFractionDigits:1,minimumFractionDigits:1});
@@ -215,6 +215,7 @@ function storeIx(code){ return D.magasins.indexOf(code); }
 function keyOf(l){ return (l.g==="CED"?"c":l.g==="RRS"?"r":"a")+art(l.a)[0]; }
 function stockAt(a,code){ return a[9][POS.indexOf(code)]; }
 function autresMag(a,code){ var t=0; D.magasins.forEach(function(s){ if(s!==code) t+=Math.max(0,stockAt(a,s)); }); return t; }
+function stockEnt(a){ return Math.max(0,a[9][0])+Math.max(0,a[9][7]); }
 function reserve(a){ return Math.max(0,a[9][0])+Math.max(0,a[9][7])+Math.max(0,a[12]); }
 function dept(a){ return a[2].slice(0,2); }
 function try_(f){ try{ return f(); }catch(e){ return null; } }
@@ -426,6 +427,13 @@ function filtered(code,L){
     if(state.tab==="SUB" && state.sub!=="all" && l.g!==state.sub) return false;
     var a=art(l.a);
     if(state.dept && dept(a)!==state.dept) return false;
+    if(state.dispo){
+      if(l.g==="CED"||l.g==="RRS") return false;
+      var tr=(l.src||[]).some(function(x){ return x[0]!=="E" && x[0]!=="R"; });
+      if(state.dispo==="ent" && !(stockEnt(a)>0)) return false;
+      if(state.dispo==="rec" && !(stockEnt(a)<=0 && a[12]>0)) return false;
+      if(state.dispo==="tr" && !tr) return false;
+    }
     if(u){ if(u.niv==="de" && dept(a)!==u.c) return false; if(u.niv==="sf" && a[2]!==u.c) return false; if(u.niv==="fa" && D.sf2fa[a[2]]!==u.c) return false; }
     if(q && (a[1].toLowerCase().indexOf(q)<0 && a[0].indexOf(q)<0 && (a[3]||"").toLowerCase().indexOf(q)<0)) return false;
     var st=statusOf(code,l).s;
@@ -434,6 +442,7 @@ function filtered(code,L){
   }).sort(function(x,y){
     if(state.tri==="mg") return y.mg-x.mg;
     if(state.tri==="ca") return y.ca-x.ca;
+    if(state.tri==="ent") return stockEnt(art(y.a))-stockEnt(art(x.a)) || y.sc-x.sc;
     if(state.tri==="lib") return art(x.a)[1].localeCompare(art(y.a)[1],"fr");
     return y.sc-x.sc;
   });
@@ -451,10 +460,15 @@ function renderList(app,code,L){
   s.oninput=function(){ state.q=s.value; state.limit=PAGE; clearTimeout(s._t); s._t=setTimeout(function(){ render(); var x=document.getElementById("fSearch"); if(x){ x.focus(); x.setSelectionRange(x.value.length,x.value.length);} },250); };
   f.appendChild(s);
   f.appendChild(seg([["todo","À traiter"],["ok","Acceptées"],["ref","Refusées"],["all","Toutes"]],state.statut,function(v){ state.statut=v; state.limit=PAGE; render(); }));
+  if(state.tab!=="CED"){
+    var dsp=el("select"); dsp.id="fDispo"; dsp.setAttribute("aria-label","Disponibilité");
+    [["","Toutes les disponibilités"],["ent","En stock à l’entrepôt maintenant"],["rec","En réception seulement (2 à 3 jours)"],["tr","Transfert d’un autre magasin"]].forEach(function(o){ dsp.appendChild(new Option(o[1],o[0])); });
+    dsp.value=state.dispo; dsp.onchange=function(){ state.dispo=dsp.value; state.limit=PAGE; render(); }; f.appendChild(dsp);
+  }
   if(state.tab==="SUB") f.appendChild(seg([["all","Toutes"],["SUB","Remplaçant trouvé"],["RRS","Sans remplaçant sûr"]],state.sub,function(v){ state.sub=v; state.limit=PAGE; render(); }));
   if(state.tab==="NOU") f.appendChild(seg([["all","Toutes"],["NOU","Démarrent ailleurs"],["NVD","Jamais sorties"]],state.nouv,function(v){ state.nouv=v; state.limit=PAGE; render(); }));
   var tri=el("select"); tri.id="fTri"; tri.setAttribute("aria-label","Trier");
-  [["sc","Les plus sûres et rentables d’abord"],["mg","Marge estimée"],["ca","Chiffre d’affaires estimé"],["lib","Libellé"]].forEach(function(o){ tri.appendChild(new Option(o[1],o[0])); });
+  [["sc","Les plus sûres et rentables d’abord"],["mg","Marge estimée"],["ca","Chiffre d’affaires estimé"],["ent","Stock entrepôt disponible"],["lib","Libellé"]].forEach(function(o){ tri.appendChild(new Option(o[1],o[0])); });
   tri.value=state.tri; tri.onchange=function(){ state.tri=tri.value; render(); }; f.appendChild(tri);
   var rows=filtered(code,L);
   var c=el("span","count",nf.format(rows.length)+" ligne"+(rows.length>1?"s":"")); f.appendChild(c);
@@ -508,7 +522,7 @@ function row(code,l){
   else if(l.g==="DEJ"){ var t=txt("Vendu "+nf.format(l.v12)+" fois chez vous, plus depuis "+M[l.der]+", stock à 0. "); if(l.noel){ t.appendChild(el("span","tag noel","Noël")); } w.appendChild(t); w.appendChild(spark(l.m,0)); }
   else if(l.g==="ABS"||l.g==="NOU"){ var t2=txt("Vendu par "+Object.keys(l.por).length+" autre"+(Object.keys(l.por).length>1?"s":"")+" magasin"+(Object.keys(l.por).length>1?"s":"")+", jamais chez vous. "); if(l.g==="NOU") t2.appendChild(el("span","tag new","Nouveauté")); w.appendChild(t2); w.appendChild(el("div","proof","Ventes 12 mois : "+porteurs(l.por))); }
   else if(l.g==="NVD"){ var t3=txt("En réserve depuis "+l.age+" jour"+(l.age>1?"s":"")+", aucun magasin ne l’a. "); t3.appendChild(el("span","tag new","Jamais sortie")); w.appendChild(t3); w.appendChild(el("div","proof","Estimation d’après "+nf.format(l.nref)+" produit"+(l.nref>1?"s":"")+" de la même sous-famille à prix voisin.")); }
-  else if(l.g==="SUB"){ var o=art(l.orig); var orow=el("div","orig"); orow.appendChild(thumb(o,40)); orow.appendChild(txt("Remplace « "+o[1]+" » ("+F(o[5])+")"+(l.v12!=null?" : vous en avez vendu "+nf.format(l.v12)+", plus de stock nulle part.":"."))); w.appendChild(orow);
+  else if(l.g==="SUB"){ var o=art(l.orig); var orow=el("div","orig"); orow.appendChild(thumb(o,40)); orow.appendChild(txt("Remplace "+o[0]+" « "+o[1]+" » ("+F(o[5])+")"+(l.v12!=null?" : vous en avez vendu "+nf.format(l.v12)+", plus de stock nulle part.":"."))); w.appendChild(orow);
     var pr=el("div","proof"); var bits=[];
     if(l.typ && l.typ.length) bits.push("même type : "+l.typ.map(cap).join(", "));
     if(l.via==="claude") bits.push("choisi avec Claude"+(l.raison?" : "+l.raison:""));
@@ -527,13 +541,15 @@ function row(code,l){
   else {
     (l.src||[]).forEach(function(x){
       if(x[0]==="E"){ s.appendChild(el("div",null,"À prendre à l’entrepôt : "+nf.format(x[1]))); }
+      else if(x[0]==="R"){ s.appendChild(el("div",null,"En réception : "+nf.format(x[1]))); s.appendChild(el("div","muted","disponible sous 2 à 3 jours")); }
       else { var dort=(a[15][storeIx(x[0])]||0)===0; s.appendChild(el("div",null,"À transférer de "+nom(x[0])+" : "+nf.format(x[1]))); s.appendChild(el("div","muted",dort?"où il ne se vend pas":"qui en a trop")); }
     });
     var res=reserve(a), tk=takenElsewhere(code,a);
-    var ent=Math.max(0,a[9][0])+Math.max(0,a[9][7]);
-    s.appendChild(el("div","muted","Stock entrepôt : "+nf.format(ent)+(a[12]>0?" + "+nf.format(a[12])+" en réception":"")+(tk?" · déjà pris par d’autres magasins : "+nf.format(tk):"")));
+    s.appendChild(el("div","muted","Entrepôt disponible : "+nf.format(stockEnt(a))+(tk?" · déjà pris par d’autres magasins : "+nf.format(tk):"")));
+    if(a[12]>0) s.appendChild(el("div","muted","En réception (2 à 3 jours) : "+nf.format(a[12])));
     var autres=autresMag(a,code); if(autres>0) s.appendChild(el("div","muted","Dans les autres magasins : "+nf.format(autres)));
-    if(a[10]+a[11]>0) s.appendChild(el("div","muted","En commande ou en mer : "+nf.format(a[10]+a[11])));
+    if(a[11]>0) s.appendChild(el("div","muted","Flottant, en mer, non disponible : "+nf.format(a[11])));
+    if(a[10]>0) s.appendChild(el("div","muted","En commande fournisseur : "+nf.format(a[10])));
   }
   r.appendChild(s);
   // quantité
@@ -558,8 +574,6 @@ function row(code,l){
     if(state.openRefus===keyOf(l)){
       var mo=el("div","motifs");
       MOTIFS.forEach(function(m){
-        if(m==="Autre"){ var t=el("input"); t.placeholder="Autre motif"; t.id="motif-"+keyOf(l); t.setAttribute("aria-label","Autre motif"); mo.appendChild(t);
-          var okb=el("button","btn","Refuser"); okb.type="button"; okb.onclick=function(){ state.openRefus=null; decide(code,l,{st:"ref",q:0,motif:t.value.trim()||"Autre"}); }; mo.appendChild(okb); return; }
         var b=el("button","btn",m); b.type="button"; b.onclick=function(){ state.openRefus=null; decide(code,l,{st:"ref",q:0,motif:m}); }; mo.appendChild(b);
       });
       var cx=el("button","btn small","Annuler"); cx.type="button"; cx.onclick=function(){ state.openRefus=null; render(); }; mo.appendChild(cx);
@@ -709,10 +723,10 @@ function renderMine(app,code){
   var cp=el("button","btn","Copier le tableau"); cp.type="button"; cp.disabled=!M.length; cp.onclick=function(){ copyTsv(M,code,cp); }; tb.appendChild(cp);
   if(dlCap){ var dl=el("button","btn yes","Télécharger en Excel"); dl.type="button"; dl.disabled=!M.length; tb.appendChild(dl);
     dl.onclick=function(){
-      var bon=rec.map(function(x){ var a=art(x.l.a); return [a[0],a[1],x.d.q,srcText(x.l,code),a[4],x.d.q*a[4],Math.round(x.d.mg||0),tabName(x.l.g)]; });
+      var bon=rec.map(function(x){ var a=art(x.l.a), rp=remplace(x.l); return [a[0],a[1],x.d.q,srcText(x.l,code),stockEnt(a),Math.max(0,a[12]),a[4],x.d.q*a[4],Math.round(x.d.mg||0),tabName(x.l.g),rp[0]]; });
       var ce=ced.map(function(x){ var a=art(x.l.a); return [a[0],a[1],x.d.q,x.l.vers.map(function(v){ return nom(v[0])+" ("+v[1]+")"; }).join(", "),a[4],x.d.q*a[4]]; });
       saveXlsx("reassort-"+token(code)+"-mes-choix-"+D.meta.fin+".xlsx",[
-        {n:"Demandes",h:["Code","Article","Quantité","Source","PR unitaire (F)","Valeur PR (F)","Marge estimée 3 mois (F HT)","Liste"],r:bon,w:[9,40,10,26,14,14,22,20]},
+        {n:"Demandes",h:["Code","Article","Quantité","Source","Stock entrepôt dispo","En réception (2-3 j)","PR unitaire (F)","Valeur PR (F)","Marge estimée 3 mois (F HT)","Liste","Code remplacé"],r:bon,w:[9,40,10,26,12,12,14,14,22,20,14]},
         {n:"Cessions",h:["Code","Article","Quantité","Vers","PR unitaire (F)","Valeur PR (F)"],r:ce,w:[9,40,10,34,14,14]},
         {n:"Détail",h:PH,r:M.map(function(x){ return propRow(code,x.l); }),w:PW}],dl); }; }
   app.appendChild(tb);
@@ -726,7 +740,9 @@ function renderMine(app,code){
   t.appendChild(tbody); w.appendChild(t); app.appendChild(w);
 }
 function tabName(g){ return {RUP:"Rupture",DEJ:"Déjà vendu ici",ABS:"Absent chez moi",NOU:"Nouveauté",NVD:"Nouveauté jamais sortie",SUB:"Substitution",RRS:"Rupture sans remplaçant",CED:"À céder"}[g]; }
-function srcText(l,code){ if(l.g==="CED") return "vers "+l.vers.map(function(v){ return nom(v[0]); }).join(", "); return (l.src||[]).map(function(x){ return x[0]==="E"?"Entrepôt":"Transfert "+nom(x[0]); }).join(" + "); }
+function srcText(l,code){ if(l.g==="CED") return "vers "+l.vers.map(function(v){ return nom(v[0]); }).join(", "); return (l.src||[]).map(function(x){ return x[0]==="E"?"Entrepôt":x[0]==="R"?"Réception (2-3 j)":"Transfert "+nom(x[0]); }).join(" + "); }
+function remplace(l){ if(l.g!=="SUB") return ["",""]; var L=(l.pour&&l.pour.length?l.pour:(l.orig!=null?[l.orig]:[])).map(art);
+  return [L.map(function(o){ return o[0]; }).join(", "), L.map(function(o){ return o[1]; }).join(" ; ")]; }
 function rowsOut(M,code){ return M.map(function(x){ var a=art(x.l.a); return [nom(code),a[0],a[1],tabName(x.l.g),x.d.q,srcText(x.l,code),x.l.g==="CED"?"":Math.round(x.d.mg||0),x.d.motif||"",new Date(x.d.at).toLocaleDateString("fr-FR")]; }); }
 var HDR=["Magasin","Code","Article","Liste","Quantité","Source","Marge estimée (F HT)","Motif","Date"];
 function copyTsv(M,code,btn){
@@ -789,10 +805,10 @@ function renderNetwork(app){
 }
 
 /* ---------- exports Excel ---------- */
-var PH=["Magasin","Liste","Code","Article","Département","Sous-famille","Fournisseur","PV TTC (F)","PR (F)","Pourquoi",
-  "Vendu ici 12 mois","Vendu ailleurs 12 mois","Source","Stock entrepôt (+ Gallieni, réception)","Stock autres magasins","En commande ou en mer","Capacité rayon","Quantité proposée","Sous-colis",
+var PH=["Magasin","Liste","Code","Article","Code remplacé","Article remplacé","Département","Sous-famille","Fournisseur","PV TTC (F)","PR (F)","Pourquoi",
+  "Vendu ici 12 mois","Vendu ailleurs 12 mois","Source","Stock entrepôt dispo","En réception (2-3 j)","Flottant (en mer, non dispo)","En commande fournisseur","Stock autres magasins","Capacité rayon","Quantité proposée","Sous-colis",
   "Vente estimée / mois","CA estimé 3 mois (F TTC)","Marge estimée 3 mois (F HT)","Confiance","Statut","Quantité décidée","Motif","Décidé par","Date décision"];
-var PW=[12,18,9,38,20,24,20,11,10,60,10,34,26,14,12,12,10,11,9,11,14,14,10,11,11,20,18,12];
+var PW=[12,18,9,38,14,34,20,24,20,11,10,60,10,34,26,12,12,14,12,12,10,11,9,11,14,14,10,11,11,20,18,12];
 function whoName(d){ var p=d && d.by && profiles[d.by]; return p && p.name ? p.name : (d && d.by && d.by===myId ? "moi" : ""); }
 function why(code,l){
   var a=art(l.a), M=D.meta.mois;
@@ -808,8 +824,9 @@ function why(code,l){
 function propRow(code,l){
   var a=art(l.a), ix=storeIx(code), st=statusOf(code,l), d=st.d||{}, dec=st.s!=="todo";
   var ail=D.magasins.map(function(s,k){ return k!==ix && a[15][k]>0 ? nom(s)+" "+a[15][k] : null; }).filter(Boolean).join(", ");
-  return [nom(code), tabName(l.g), a[0], a[1], cap(D.depts[dept(a)]||dept(a)), cap(D.sfams[a[2]]||a[2]), a[3], a[5], a[4], why(code,l),
-    a[15][ix]||0, ail, srcText(l,code), reserve(a), autresMag(a,code), a[10]+a[11], a[16][ix]||0, l.q, a[6], Math.round(l.vm*10)/10,
+  var rp=remplace(l);
+  return [nom(code), tabName(l.g), a[0], a[1], rp[0], rp[1], cap(D.depts[dept(a)]||dept(a)), cap(D.sfams[a[2]]||a[2]), a[3], a[5], a[4], why(code,l),
+    a[15][ix]||0, ail, srcText(l,code), stockEnt(a), Math.max(0,a[12]), Math.max(0,a[11]), Math.max(0,a[10]), autresMag(a,code), a[16][ix]||0, l.q, a[6], Math.round(l.vm*10)/10,
     l.g==="CED"||l.g==="RRS"?"":l.ca, l.g==="CED"||l.g==="RRS"?"":l.mg, l.cf, {todo:"À traiter",ok:"Acceptée",ref:"Refusée"}[st.s],
     dec?d.q:"", d.motif||"", dec?whoName(d):"", dec?new Date(d.at).toLocaleDateString("fr-FR"):""];
 }
@@ -877,7 +894,7 @@ function exportNetwork(per,motifs,demand,btn){
 function method(){
   var P=D.meta.params, d=el("details","method"); d.appendChild(el("summary",null,"Comment les propositions sont calculées"));
   var ul=el("ul");
-  ["Seul compte le stock présent sur l’île. « Stock entrepôt » regroupe l’entrepôt, Gallieni (qui ne vend pas) et la réception à deux jours. Le stock des autres magasins est affiché, mais seul celui qui y dort ou y est en surstock est proposé en transfert : on ne vide pas un magasin qui vend. Ce qui est en commande ou en mer est signalé, jamais proposé.",
+  ["Seul compte le stock présent sur l’île. « Entrepôt disponible » regroupe l’entrepôt et Gallieni (qui ne vend pas). La marchandise en réception est disponible sous 2 à 3 jours et peut être proposée, en le disant. Le flottant (en mer) et le commandé fournisseur ne sont jamais disponibles : ils sont seulement affichés. Le stock des autres magasins est affiché, mais seul celui qui y dort ou y est en surstock est proposé en transfert : on ne vide pas un magasin qui vend. ",
    "Tous les magasins reçoivent toutes les propositions, quelle que soit leur taille. La taille ne sert qu’à estimer : la vente d’un autre magasin est ramenée au poids du vôtre.",
    "Vente estimée : ventes des 12 derniers mois divisées par le nombre de mois où l’article était présent. Si votre stock est à zéro, on compte jusqu’à la dernière vente, pour ne pas confondre rupture et absence de demande.",
    "Quantité proposée : environ "+P.couv+" jours de vente estimée. Depuis l’entrepôt elle est arrondie au sous-colis, qui ne se divise pas ; un transfert entre magasins se fait à l’unité. Modifiez-la avant d’accepter.",
