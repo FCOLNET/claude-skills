@@ -31,6 +31,14 @@ cp templates/page.html <scratchpad>/reassort/index.html
 
 Puis publier `index.html` avec l'outil Artifact, `files: {"data.json": ...}` et `capabilities: {db: {}, user: {scopes: ["profile"]}, downloads: true}`. Pour une mise à jour, republier sur la même URL : les décisions restent (elles sont dans la base de l'artefact, clé = magasin + code article). Ne jamais committer les exports ni `data.json` : ce sont des données d'entreprise.
 
+## Exports Excel
+
+La page génère des `.xlsx` (SheetJS 0.18.5 chargé depuis cdnjs au premier clic, fichier remis par la capacité `downloads`) :
+- la liste affichée, avec ses filtres ;
+- le magasin complet : un onglet par liste, plus les rayons absents ;
+- « Mes choix » : demandes (bon de demande), cessions, détail ;
+- le réseau : synthèse par magasin, toutes les décisions, motifs de refus, stock disputé.
+
 ## Les signaux
 
 - **RUP** rupture récente : vendu ces 3 derniers mois, stock magasin ≤ 0, l'île en a.
