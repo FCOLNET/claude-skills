@@ -33,7 +33,7 @@ Puis publier `index.html` avec l'outil Artifact, `files: {"data.json": ...}` et 
 
 ## Exports Excel
 
-La page génère des `.xlsx` (SheetJS 0.18.5 chargé depuis cdnjs au premier clic, fichier remis par la capacité `downloads`) :
+La page génère des `.xlsx` mis en forme avec ExcelJS 4.4.0 (chargé depuis jsDelivr au premier clic, intégré dans la version fichier) : bandeau titre et date, en-têtes colorés, volets figés, filtres, montants en F, couleurs de confiance et de statut, totaux (SOUS.TOTAL, qui suivent les filtres), photos dans le bon de demande. Classeurs :
 - la liste affichée, avec ses filtres ;
 - le magasin complet : un onglet par liste, plus les rayons absents ;
 - « Mes choix » : demandes (bon de demande), cessions, détail ;
@@ -47,7 +47,7 @@ La page génère des `.xlsx` (SheetJS 0.18.5 chargé depuis cdnjs au premier cli
 
 ## Version fichier (équipes sans claude.ai)
 
-`python3 scripts/build_autonome.py --data data.json --page templates/page.html --photos photos_reassort.zip --xlsx xlsx.full.min.js --out <dossier>` produit un `reassort-<magasin>-<date>.html` par magasin (≈ 6 Mo) : propositions du magasin, vignettes 72 px et SheetJS intégrés, ouverture par double-clic sans connexion. Les choix restent dans le navigateur du poste (localStorage) et repartent par l'Excel de « Mes choix ». Pas de vue Réseau ni de recherche avec Claude. `xlsx.full.min.js` : `npm pack xlsx@0.18.5`, fichier `package/dist/` ; sans lui, la page le charge depuis cdnjs.
+`python3 scripts/build_autonome.py --data data.json --page templates/page.html --photos photos_reassort.zip --excel exceljs.min.js --out <dossier>` produit un `reassort-<magasin>-<date>.html` par magasin (≈ 6 Mo) : propositions du magasin, vignettes 72 px et ExcelJS intégrés, ouverture par double-clic sans connexion. Les choix restent dans le navigateur du poste (localStorage) et repartent par l'Excel de « Mes choix ». Pas de vue Réseau ni de recherche avec Claude. `exceljs.min.js` : `npm pack exceljs@4.4.0`, fichier `package/dist/` ; sans lui, la page le charge depuis jsDelivr.
 
 ## Les signaux
 

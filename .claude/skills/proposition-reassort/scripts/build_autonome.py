@@ -2,10 +2,11 @@
 
 Usage :
     python3 build_autonome.py --data data.json --page ../templates/page.html \
-        --photos photos_reassort.zip --xlsx xlsx.full.min.js --out <dossier>
+        --photos photos_reassort.zip --excel exceljs.min.js --out <dossier>
 
 Chaque fichier porte les propositions de son magasin, les vignettes des articles
-concernés (planches réduites à 72 px, intégrées en data: URI) et le module Excel :
+concernés (planches réduites à 72 px, intégrées en data: URI) et le module Excel
+(ExcelJS 4.4.0, pour des classeurs mis en forme) :
 il s'ouvre d'un double-clic, sans connexion. Les choix restent dans le
 navigateur du poste ; le magasin les renvoie par le fichier Excel de « Mes
 choix ». Pas de vue Réseau ni de recherche avec Claude dans cette version.
@@ -76,7 +77,8 @@ def main():
     ap.add_argument("--data", required=True)
     ap.add_argument("--page", required=True)
     ap.add_argument("--photos")
-    ap.add_argument("--xlsx", help="xlsx.full.min.js (SheetJS) à intégrer ; sinon chargé depuis cdnjs")
+    ap.add_argument("--excel", "--xlsx", dest="excel",
+                    help="exceljs.min.js (ExcelJS 4.4.0) à intégrer ; sinon chargé depuis jsDelivr")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
@@ -86,8 +88,8 @@ def main():
     corps = re.sub(r"<title>.*?</title>\n?", "", page, count=1)
     corps = re.sub(r'<meta name="claude:viewport-fit-sides"[^>]*>\n?', "", corps, count=1)
     xlsx = ""
-    if a.xlsx:
-        xlsx = "<script>" + open(a.xlsx, encoding="utf-8").read().replace("</script", "<\\/script") + "</script>\n"
+    if a.excel:
+        xlsx = "<script>" + open(a.excel, encoding="utf-8").read().replace("</script", "<\\/script") + "</script>\n"
     imgs = vignettes(a.photos)
     os.makedirs(a.out, exist_ok=True)
 

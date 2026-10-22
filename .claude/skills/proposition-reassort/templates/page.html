@@ -474,7 +474,7 @@ function renderList(app,code,L){
   var c=el("span","count",nf.format(rows.length)+" ligne"+(rows.length>1?"s":"")); f.appendChild(c);
   if(dlCap){ var xb=el("button","btn","Exporter en Excel"); xb.type="button"; xb.disabled=!rows.length; xb.title="Les "+rows.length+" lignes de cette liste, avec les filtres en cours";
     xb.onclick=function(){ var t=TABS.filter(function(x){ return x.id===state.tab; })[0];
-      saveXlsx("reassort-"+token(code)+"-"+t.l.toLowerCase().replace(/[^a-zà-ÿ]+/g,"-")+"-"+D.meta.fin+".xlsx",[{n:t.l,h:PH,r:rows.map(function(l){ return propRow(code,l); }),w:PW}],xb); };
+      saveXlsx("reassort-"+token(code)+"-"+t.l.toLowerCase().replace(/[^a-zà-ÿ]+/g,"-")+"-"+D.meta.fin+".xlsx",[{n:t.l,title:t.l+" · "+nom(code),sub:"Données au "+dateTxt()+" · "+nf.format(rows.length)+" lignes"+filtresTxt(),h:PH,r:rows.map(function(l){ return propRow(code,l); }),w:PW,freeze:4,tot:TOT_PROP}],xb); };
     f.appendChild(xb); }
   if(state.unit){ var x=el("button","btn small","Retirer le filtre « "+cap(state.unit.lib)+" »"); x.type="button"; x.onclick=function(){ state.unit=null; render(); }; f.appendChild(x); }
   app.appendChild(f);
@@ -726,9 +726,12 @@ function renderMine(app,code){
       var bon=rec.map(function(x){ var a=art(x.l.a), rp=remplace(x.l); return [a[0],a[1],x.d.q,srcText(x.l,code),stockEnt(a),Math.max(0,a[12]),a[4],x.d.q*a[4],Math.round(x.d.mg||0),tabName(x.l.g),rp[0]]; });
       var ce=ced.map(function(x){ var a=art(x.l.a); return [a[0],a[1],x.d.q,x.l.vers.map(function(v){ return nom(v[0])+" ("+v[1]+")"; }).join(", "),a[4],x.d.q*a[4]]; });
       saveXlsx("reassort-"+token(code)+"-mes-choix-"+D.meta.fin+".xlsx",[
-        {n:"Demandes",h:["Code","Article","Quantité","Source","Stock entrepôt dispo","En réception (2-3 j)","PR unitaire (F)","Valeur PR (F)","Marge estimée 3 mois (F HT)","Liste","Code remplacé"],r:bon,w:[9,40,10,26,12,12,14,14,22,20,14]},
-        {n:"Cessions",h:["Code","Article","Quantité","Vers","PR unitaire (F)","Valeur PR (F)"],r:ce,w:[9,40,10,34,14,14]},
-        {n:"Détail",h:PH,r:M.map(function(x){ return propRow(code,x.l); }),w:PW}],dl); }; }
+        {n:"Bon de demande",title:"Bon de demande · "+nom(code),sub:"Réassort proposé · données au "+dateTxt()+" · préparé le "+new Date().toLocaleDateString("fr-FR"),
+         h:["Code","Article","Quantité","Source","Stock entrepôt dispo","En réception (2-3 j)","PR unitaire (F)","Valeur PR (F)","Marge estimée 3 mois (F HT)","Liste","Code remplacé"],r:bon,w:[9,40,10,22,12,12,13,14,20,18,14],
+         freeze:2,photos:rec.map(function(x){ return art(x.l.a); }),tot:["Quantité","Valeur PR (F)","Marge estimée 3 mois (F HT)"]},
+        {n:"Cessions",title:"Cessions · "+nom(code),sub:"Votre stock qui dort, à transférer vers les magasins indiqués",h:["Code","Article","Quantité","Vers","PR unitaire (F)","Valeur PR (F)"],r:ce,w:[9,40,10,34,14,14],
+         freeze:2,photos:ced.map(function(x){ return art(x.l.a); }),tot:["Quantité","Valeur PR (F)"]},
+        {n:"Détail",title:"Détail des choix · "+nom(code),h:PH,r:M.map(function(x){ return propRow(code,x.l); }),w:PW,freeze:4,tot:TOT_PROP}],dl); }; }
   app.appendChild(tb);
   if(!M.length){ app.appendChild(el("div","empty","Aucune proposition acceptée pour l’instant. Acceptez des lignes dans les autres onglets : elles se rassemblent ici.")); return; }
   var w=el("div","tablewrap"), t=el("table"), th=el("thead"), hr=el("tr");
@@ -830,27 +833,103 @@ function propRow(code,l){
     l.g==="CED"||l.g==="RRS"?"":l.ca, l.g==="CED"||l.g==="RRS"?"":l.mg, l.cf, {todo:"À traiter",ok:"Acceptée",ref:"Refusée"}[st.s],
     dec?d.q:"", d.motif||"", dec?whoName(d):"", dec?new Date(d.at).toLocaleDateString("fr-FR"):""];
 }
+/* ExcelJS écrit la mise en forme (SheetJS gratuit ne le fait pas) : bandeau de
+   titre, en-têtes colorés, volets figés, filtres, formats en francs, couleurs
+   de confiance et de statut, totaux, photos dans le bon de demande. */
 function loadXlsx(){
-  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
   if(loadXlsx.p) return loadXlsx.p;
   loadXlsx.p=new Promise(function(res,rej){ var s=document.createElement("script");
-    s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-    s.onload=function(){ window.XLSX ? res(window.XLSX) : rej({code:"load"}); };
+    s.src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+    s.onload=function(){ window.ExcelJS ? res(window.ExcelJS) : rej({code:"load"}); };
     s.onerror=function(){ loadXlsx.p=null; rej({code:"load"}); }; document.head.appendChild(s); });
   return loadXlsx.p;
+}
+var XC={teal:"FF0A6970",tealSoft:"FFDCEFEE",ink:"FF13201F",muted:"FF5A6A68",zebra:"FFF3F6F5",line:"FFD5DFDC",
+  ok:"FF1D7A3F",okSoft:"FFDFF2E5",warn:"FF9A5B00",warnSoft:"FFFBEED6",bad:"FFB0281F",badSoft:"FFF8E1DE",sunk:"FFE9EFED",white:"FFFFFFFF"};
+function xFill(c){ return {type:"pattern",pattern:"solid",fgColor:{argb:c}}; }
+function xType(h){
+  if(/\(F( HT| TTC| PR)?\)|^Engagé|^Valeur PR|^PR unitaire/.test(h)) return "money";
+  if(/^Vente estimée|^Poids/.test(h)) return "dec";
+  return "auto";
+}
+/* La vignette d'un article, découpée dans sa planche, en JPEG pour Excel. */
+var planchesChargees={};
+function photoURL(a){
+  var m=PH_.map && PH_.map[a[0]]; if(!m) return Promise.resolve(null);
+  var src=PH_.sheets ? PH_.sheets[m[0]] : "photos/p"+String(m[0]).padStart(3,"0")+".jpg";
+  var pr=planchesChargees[src] || (planchesChargees[src]=new Promise(function(res){ var im=new Image(); im.onload=function(){ res(im); }; im.onerror=function(){ res(null); }; im.src=src; }));
+  return pr.then(function(im){ if(!im) return null;
+    var c=document.createElement("canvas"), z=96; c.width=c.height=z; var g=c.getContext("2d");
+    g.fillStyle="#fff"; g.fillRect(0,0,z,z);
+    g.drawImage(im,(m[1]%PH_.cols)*PH_.cell,Math.floor(m[1]/PH_.cols)*PH_.cell,PH_.cell,PH_.cell,0,0,z,z);
+    try{ return c.toDataURL("image/jpeg",0.85); }catch(e){ return null; } });
+}
+function feuille(X,wb,sh){
+  var ph=!!sh.photos, dec=ph?1:0, nc=sh.h.length+dec, n=sh.r.length, top=4;
+  var ws=wb.addWorksheet(sh.n.replace(/[:\\\/?*\[\]]/g," ").slice(0,31),{properties:{tabColor:{argb:sh.tab||XC.teal}},
+    views:[{state:"frozen",xSplit:(sh.freeze||0)+dec,ySplit:top,showGridLines:false,zoomScale:100}]});
+  ws.getCell(1,1).value=sh.title||sh.n; ws.getCell(1,1).font={name:"Calibri",size:16,bold:true,color:{argb:XC.teal}};
+  ws.getRow(1).height=24;
+  ws.getCell(2,1).value=sh.sub||("Réassort proposé · données au "+new Date(D.meta.fin+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}));
+  ws.getCell(2,1).font={name:"Calibri",size:10,color:{argb:XC.muted}};
+  ws.getRow(3).height=6;
+  var types=sh.h.map(xType);
+  (ph?[""]:[]).concat(sh.h).forEach(function(h,k){
+    var c=ws.getCell(top,k+1); c.value=h; c.fill=xFill(XC.teal); c.font={name:"Calibri",size:10,bold:true,color:{argb:XC.white}};
+    c.alignment={vertical:"middle",horizontal:k>=dec&&typeof (sh.r[0]||[])[k-dec]==="number"?"right":"left",wrapText:true};
+    c.border={bottom:{style:"medium",color:{argb:XC.ink}}};
+  });
+  ws.getRow(top).height=32;
+  (sh.w||[]).forEach(function(w,k){ ws.getColumn(k+1+dec).width=w; });
+  if(ph) ws.getColumn(1).width=8;
+  var ix={}; sh.h.forEach(function(h,k){ ix[h]=k; });
+  sh.r.forEach(function(r,i){
+    var row=ws.getRow(top+1+i); row.height=ph?42:18;
+    r.forEach(function(v,k){
+      var c=row.getCell(k+1+dec), h=sh.h[k]; c.value=(v===""||v==null)?null:v;
+      c.font={name:"Calibri",size:10,color:{argb:XC.ink}};
+      c.alignment={vertical:"middle"};
+      if(i%2) c.fill=xFill(XC.zebra);
+      c.border={bottom:{style:"hair",color:{argb:XC.line}}};
+      if(typeof v==="number"){ c.numFmt = types[k]==="money" ? '#,##0" F"' : types[k]==="dec" ? "0.0" : "#,##0"; c.alignment={vertical:"middle",horizontal:"right"}; }
+      if(h==="Confiance" && v){ var cf={forte:[XC.okSoft,XC.ok],moyenne:[XC.warnSoft,XC.warn],faible:[XC.sunk,XC.muted]}[v];
+        if(cf){ c.fill=xFill(cf[0]); c.font={name:"Calibri",size:10,bold:true,color:{argb:cf[1]}}; c.alignment={vertical:"middle",horizontal:"center"}; } }
+      if(h==="Statut" && v){ var sc={"Acceptée":[XC.okSoft,XC.ok],"Refusée":[XC.badSoft,XC.bad]}[v];
+        if(sc){ c.fill=xFill(sc[0]); c.font={name:"Calibri",size:10,bold:true,color:{argb:sc[1]}}; } }
+      if(h==="Stock entrepôt dispo" && typeof v==="number") c.font={name:"Calibri",size:10,bold:v>0,color:{argb:v>0?XC.ok:XC.muted}};
+      if(/^Flottant/.test(h) && typeof v==="number" && v>0) c.font={name:"Calibri",size:10,italic:true,color:{argb:XC.muted}};
+      if((h==="Article"||h==="Code") && k<6) c.font={name:"Calibri",size:10,bold:h==="Article",color:{argb:XC.ink}};
+      if(/^Marge/.test(h) && typeof v==="number") c.font={name:"Calibri",size:10,bold:true,color:{argb:XC.teal}};
+      if(h==="Écart" && typeof v==="number" && v>0) c.font={name:"Calibri",size:10,bold:true,color:{argb:XC.bad}};
+    });
+  });
+  if(n) ws.autoFilter={from:{row:top,column:1},to:{row:top+n,column:nc}};
+  if(sh.tot && n){
+    var tr=ws.getRow(top+n+1); tr.height=20;
+    for(var k=0;k<nc;k++){ var c=tr.getCell(k+1); c.fill=xFill(XC.tealSoft); c.border={top:{style:"medium",color:{argb:XC.teal}}}; c.font={name:"Calibri",size:10,bold:true,color:{argb:XC.ink}}; }
+    tr.getCell(1).value="Total";
+    sh.tot.forEach(function(h){ var k=ix[h]; if(k==null) return; var col=ws.getColumn(k+1+dec).letter, c=tr.getCell(k+1+dec);
+      c.value={formula:"SUBTOTAL(9,"+col+(top+1)+":"+col+(top+n)+")"}; c.numFmt=types[k]==="money"?'#,##0" F"':"#,##0"; c.alignment={horizontal:"right"}; });
+  }
+  /* Une feuille étroite tient sur la largeur d'une page ; une large s'imprime à 60 %, sur plusieurs pages. */
+  ws.pageSetup={orientation:"landscape",fitToPage:nc<=14,fitToWidth:1,fitToHeight:0,scale:60,paperSize:9,margins:{left:0.3,right:0.3,top:0.4,bottom:0.4,header:0.2,footer:0.2}};
+  ws.pageSetup.printTitlesRow=top+":"+top;
+  if(!ph) return Promise.resolve();
+  return Promise.all(sh.photos.map(function(a){ return a?photoURL(a):null; })).then(function(urls){
+    urls.forEach(function(u,i){ if(!u) return;
+      var id=wb.addImage({base64:u,extension:"jpeg"});
+      ws.addImage(id,{tl:{col:0.12,row:top+i+0.08},ext:{width:50,height:50},editAs:"oneCell"}); });
+  });
 }
 function saveXlsx(name,sheets,btn){
   if(!dlCap) return;
   var old=btn.textContent; btn.disabled=true; btn.textContent="Préparation…";
   loadXlsx().then(function(X){
-    var wb=X.utils.book_new();
-    sheets.forEach(function(sh){
-      var ws=X.utils.aoa_to_sheet([sh.h].concat(sh.r));
-      ws["!cols"]=(sh.w||[]).map(function(w){ return {wch:w}; });
-      ws["!autofilter"]={ref:X.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(1,sh.r.length),c:sh.h.length-1}})};
-      X.utils.book_append_sheet(wb,ws,sh.n.replace(/[:\\/?*\[\]]/g," ").slice(0,31));
-    });
-    var buf=X.write(wb,{bookType:"xlsx",type:"array"});
+    var wb=new X.Workbook(); wb.creator="Réassort proposé"; wb.created=new Date();
+    return sheets.reduce(function(p,sh){ return p.then(function(){ return feuille(X,wb,sh); }); },Promise.resolve())
+      .then(function(){ return wb.xlsx.writeBuffer(); });
+  }).then(function(buf){
     return dlCap.save({filename:name,data:new Blob([buf],{type:XLSX_TYPE})}).then(function(){
       if(LOCAL) toast("Fichier Excel enregistré : "+name+" (dossier Téléchargements).");
     });
@@ -862,13 +941,26 @@ function saveXlsx(name,sheets,btn){
     notice(t); toast(t,true);
   }).then(function(){ btn.disabled=false; btn.textContent=old; });
 }
+function filtresTxt(){ var f=[]; if(state.dept) f.push(cap(D.depts[state.dept]));
+  if(state.dispo) f.push({ent:"en stock à l’entrepôt",rec:"en réception seulement",tr:"transfert d’un autre magasin"}[state.dispo]);
+  if(state.q.trim()) f.push("« "+state.q.trim()+" »"); if(state.unit) f.push(cap(state.unit.lib));
+  if(state.statut!=="all") f.push({todo:"à traiter",ok:"acceptées",ref:"refusées"}[state.statut]);
+  return f.length?" · filtres : "+f.join(", "):""; }
+function dateTxt(){ return new Date(D.meta.fin+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}); }
+var TOT_PROP=["Quantité proposée","CA estimé 3 mois (F TTC)","Marge estimée 3 mois (F HT)","Quantité décidée"];
 function exportStore(code,btn){
-  var L=D.lignes[code], sheets=[];
+  var L=D.lignes[code], sheets=[], syn=[];
   TABS.forEach(function(t){ if(t.id==="MES") return;
-    var r=L.filter(function(l){ return (l.g==="NVD"?"NOU":l.g)===t.id; }).map(function(l){ return propRow(code,l); });
-    sheets.push({n:t.l,h:PH,r:r,w:PW}); });
+    var Lt=L.filter(function(l){ return (l.g==="NVD"?"NOU":l.g==="RRS"?"SUB":l.g)===t.id; });
+    var o={todo:0,ok:0,ref:0,mg:0,mgOk:0};
+    Lt.forEach(function(l){ var st=statusOf(code,l); o[st.s]++; if(l.g!=="CED"&&l.g!=="RRS"){ o.mg+=l.mg; if(st.s==="ok") o.mgOk+=st.d.mg||0; } });
+    syn.push([t.l,Lt.length,o.todo,o.ok,o.ref,Math.round(o.mg),Math.round(o.mgOk)]);
+    sheets.push({n:t.l,title:t.l+" · "+nom(code),sub:t.d,h:PH,r:Lt.map(function(l){ return propRow(code,l); }),w:PW,freeze:4,tot:TOT_PROP}); });
   var R=(D.rayons[code]||[]).map(function(x){ return [{de:"Département",fa:"Famille",sf:"Sous-famille"}[x.niv],x.c,cap(x.lib),x.por,x.n]; });
-  sheets.push({n:"Rayons absents",h:["Niveau","Code","Libellé","Autres magasins qui le vendent","Références proposables"],r:R,w:[14,10,32,16,14]});
+  sheets.unshift({n:"Synthèse",title:"Réassort proposé · "+nom(code),sub:"Données au "+dateTxt()+" · un onglet par liste, avec les décisions déjà prises",
+    h:["Liste","Lignes","À traiter","Acceptées","Refusées","Marge possible 3 mois (F HT)","Marge acceptée (F HT)"],r:syn,w:[22,10,11,11,11,22,20],tot:["Lignes","À traiter","Acceptées","Refusées","Marge possible 3 mois (F HT)","Marge acceptée (F HT)"]});
+  sheets.push({n:"Rayons absents",title:"Rayons absents · "+nom(code),sub:"Vendus par d’autres magasins, ni vente ni stock chez vous, du stock en réserve",
+    h:["Niveau","Code","Libellé","Autres magasins qui le vendent","Références proposables"],r:R,w:[14,10,32,16,14]});
   saveXlsx("reassort-"+token(code)+"-"+D.meta.fin+".xlsx",sheets,btn);
 }
 function exportNetwork(per,motifs,demand,btn){
@@ -884,10 +976,11 @@ function exportNetwork(per,motifs,demand,btn){
   var di=Object.keys(demand).map(function(c){ var x=demand[c], a=art(x.a); return [a[0],a[1],x.q,reserve(a),x.q-reserve(a),x.s.map(nom).join(", ")]; })
     .filter(function(r){ return r[4]>0; }).sort(function(x,y){ return y[4]-x[4]; });
   saveXlsx("reassort-reseau-"+D.meta.fin+".xlsx",[
-    {n:"Synthèse",h:sh,r:syn,w:sh.map(function(h,i){ return i===0?14:12; })},
-    {n:"Décisions",h:PH,r:decs,w:PW},
-    {n:"Motifs de refus",h:["Motif","Refus"],r:mo,w:[30,10]},
-    {n:"Stock disputé",h:["Code","Article","Accepté","Stock entrepôt","Écart","Magasins"],r:di,w:[9,40,10,10,10,40]}],btn);
+    {n:"Synthèse",title:"Réassort proposé · réseau",sub:"Données au "+dateTxt()+" · proposées et acceptées par magasin et par liste",h:sh,r:syn,w:sh.map(function(h,i){ return i===0?16:12; }),freeze:1,
+     tot:sh.slice(2)},
+    {n:"Décisions",title:"Décisions des magasins",h:PH,r:decs,w:PW,freeze:4,tot:TOT_PROP},
+    {n:"Motifs de refus",title:"Pourquoi les magasins refusent",h:["Motif","Refus"],r:mo,w:[30,10],tot:["Refus"]},
+    {n:"Stock disputé",title:"Stock disputé",sub:"Plus accepté par les magasins que disponible à l’entrepôt et en réception",h:["Code","Article","Accepté","Stock entrepôt","Écart","Magasins"],r:di,w:[9,40,10,12,10,40],freeze:2}],btn);
 }
 
 /* ---------- méthode ---------- */
