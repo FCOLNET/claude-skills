@@ -200,6 +200,7 @@ function art(i){ return D.arts[i]; }
 function storeIx(code){ return D.magasins.indexOf(code); }
 function keyOf(l){ return (l.g==="CED"?"c":"a")+art(l.a)[0]; }
 function stockAt(a,code){ return a[9][POS.indexOf(code)]; }
+function autresMag(a,code){ var t=0; D.magasins.forEach(function(s){ if(s!==code) t+=Math.max(0,stockAt(a,s)); }); return t; }
 function reserve(a){ return Math.max(0,a[9][0])+Math.max(0,a[9][7])+Math.max(0,a[12]); }
 function dept(a){ return a[2].slice(0,2); }
 function try_(f){ try{ return f(); }catch(e){ return null; } }
@@ -455,11 +456,13 @@ function row(code,l){
   if(l.g==="CED"){ s.appendChild(el("div",null,"Vers "+l.vers.map(function(v){ return nom(v[0]); }).join(", "))); }
   else {
     (l.src||[]).forEach(function(x){
-      if(x[0]==="E"){ s.appendChild(el("div",null,"Entrepôt : "+nf.format(x[1]))); }
-      else { var dort=(a[15][storeIx(x[0])]||0)===0; s.appendChild(el("div",null,"Transfert de "+nom(x[0])+" : "+nf.format(x[1]))); s.appendChild(el("div","muted",dort?"où il ne se vend pas":"qui en a trop")); }
+      if(x[0]==="E"){ s.appendChild(el("div",null,"À prendre à l’entrepôt : "+nf.format(x[1]))); }
+      else { var dort=(a[15][storeIx(x[0])]||0)===0; s.appendChild(el("div",null,"À transférer de "+nom(x[0])+" : "+nf.format(x[1]))); s.appendChild(el("div","muted",dort?"où il ne se vend pas":"qui en a trop")); }
     });
     var res=reserve(a), tk=takenElsewhere(code,a);
-    s.appendChild(el("div","muted","Réserves : "+nf.format(res)+(tk?" · déjà pris ailleurs : "+nf.format(tk):"")));
+    var ent=Math.max(0,a[9][0])+Math.max(0,a[9][7]);
+    s.appendChild(el("div","muted","Stock entrepôt : "+nf.format(ent)+(a[12]>0?" + "+nf.format(a[12])+" en réception":"")+(tk?" · déjà pris par d’autres magasins : "+nf.format(tk):"")));
+    var autres=autresMag(a,code); if(autres>0) s.appendChild(el("div","muted","Dans les autres magasins : "+nf.format(autres)));
     if(a[10]+a[11]>0) s.appendChild(el("div","muted","En commande ou en mer : "+nf.format(a[10]+a[11])));
   }
   r.appendChild(s);
@@ -610,7 +613,7 @@ function renderNetwork(app){
   var p2=el("div","panel"); p2.appendChild(el("h3",null,"Stock disputé : plus demandé que disponible"));
   var dl=Object.keys(demand).map(function(c){ var x=demand[c], a=art(x.a); return {a:a,q:x.q,s:x.s,res:reserve(a)}; }).filter(function(x){ return x.q>x.res; }).sort(function(x,y){ return (y.q-y.res)-(x.q-x.res); });
   if(!dl.length) p2.appendChild(el("div","empty","Aucun conflit : ce qui est accepté tient dans les réserves."));
-  else { var dw=el("div","tablewrap"), dt=el("table"), dh=el("tr"); ["Article","Accepté","Réserves","Magasins"].forEach(function(h,i){ dh.appendChild(el("th",i===1||i===2?"n":null,h)); }); var dth=el("thead"); dth.appendChild(dh); dt.appendChild(dth);
+  else { var dw=el("div","tablewrap"), dt=el("table"), dh=el("tr"); ["Article","Accepté","Stock entrepôt","Magasins"].forEach(function(h,i){ dh.appendChild(el("th",i===1||i===2?"n":null,h)); }); var dth=el("thead"); dth.appendChild(dh); dt.appendChild(dth);
     var db_=el("tbody"); dl.slice(0,30).forEach(function(x){ var tr=el("tr"); tr.appendChild(el("td",null,x.a[0]+" "+x.a[1])); tr.appendChild(el("td","n",nf.format(x.q))); tr.appendChild(el("td","n",nf.format(x.res))); tr.appendChild(el("td",null,x.s.map(nom).join(", "))); db_.appendChild(tr); });
     dt.appendChild(db_); dw.appendChild(dt); p2.appendChild(dw);
     p2.appendChild(el("p","tabdesc","Les transferts entre magasins peuvent couvrir une partie de l’écart ; sinon, à arbitrer.")); }
@@ -619,9 +622,9 @@ function renderNetwork(app){
 
 /* ---------- exports Excel ---------- */
 var PH=["Magasin","Liste","Code","Article","Département","Sous-famille","Fournisseur","PV TTC (F)","PR (F)","Pourquoi",
-  "Vendu ici 12 mois","Vendu ailleurs 12 mois","Source","Réserves","En commande ou en mer","Capacité rayon","Quantité proposée","Sous-colis",
+  "Vendu ici 12 mois","Vendu ailleurs 12 mois","Source","Stock entrepôt (+ Gallieni, réception)","Stock autres magasins","En commande ou en mer","Capacité rayon","Quantité proposée","Sous-colis",
   "Vente estimée / mois","CA estimé 3 mois (F TTC)","Marge estimée 3 mois (F HT)","Confiance","Statut","Quantité décidée","Motif","Décidé par","Date décision"];
-var PW=[12,18,9,38,20,24,20,11,10,60,10,34,26,10,12,10,11,9,11,14,14,10,11,11,20,18,12];
+var PW=[12,18,9,38,20,24,20,11,10,60,10,34,26,14,12,12,10,11,9,11,14,14,10,11,11,20,18,12];
 function whoName(d){ var p=d && d.by && profiles[d.by]; return p && p.name ? p.name : (d && d.by && d.by===myId ? "moi" : ""); }
 function why(code,l){
   var a=art(l.a), M=D.meta.mois;
@@ -637,7 +640,7 @@ function propRow(code,l){
   var a=art(l.a), ix=storeIx(code), st=statusOf(code,l), d=st.d||{}, dec=st.s!=="todo";
   var ail=D.magasins.map(function(s,k){ return k!==ix && a[15][k]>0 ? nom(s)+" "+a[15][k] : null; }).filter(Boolean).join(", ");
   return [nom(code), tabName(l.g), a[0], a[1], cap(D.depts[dept(a)]||dept(a)), cap(D.sfams[a[2]]||a[2]), a[3], a[5], a[4], why(code,l),
-    a[15][ix]||0, ail, srcText(l,code), reserve(a), a[10]+a[11], a[16][ix]||0, l.q, a[6], Math.round(l.vm*10)/10,
+    a[15][ix]||0, ail, srcText(l,code), reserve(a), autresMag(a,code), a[10]+a[11], a[16][ix]||0, l.q, a[6], Math.round(l.vm*10)/10,
     l.g==="CED"?"":l.ca, l.g==="CED"?"":l.mg, l.cf, {todo:"À traiter",ok:"Acceptée",ref:"Refusée"}[st.s],
     dec?d.q:"", d.motif||"", dec?whoName(d):"", dec?new Date(d.at).toLocaleDateString("fr-FR"):""];
 }
@@ -692,14 +695,14 @@ function exportNetwork(per,motifs,demand,btn){
     {n:"Synthèse",h:sh,r:syn,w:sh.map(function(h,i){ return i===0?14:12; })},
     {n:"Décisions",h:PH,r:decs,w:PW},
     {n:"Motifs de refus",h:["Motif","Refus"],r:mo,w:[30,10]},
-    {n:"Stock disputé",h:["Code","Article","Accepté","Réserves","Écart","Magasins"],r:di,w:[9,40,10,10,10,40]}],btn);
+    {n:"Stock disputé",h:["Code","Article","Accepté","Stock entrepôt","Écart","Magasins"],r:di,w:[9,40,10,10,10,40]}],btn);
 }
 
 /* ---------- méthode ---------- */
 function method(){
   var P=D.meta.params, d=el("details","method"); d.appendChild(el("summary",null,"Comment les propositions sont calculées"));
   var ul=el("ul");
-  ["Seul compte le stock présent sur l’île : entrepôt, Gallieni, réception à deux jours et stock qui dort dans un autre magasin. Ce qui est en commande ou en mer est signalé, jamais proposé.",
+  ["Seul compte le stock présent sur l’île. « Stock entrepôt » regroupe l’entrepôt, Gallieni (qui ne vend pas) et la réception à deux jours. Le stock des autres magasins est affiché, mais seul celui qui y dort ou y est en surstock est proposé en transfert : on ne vide pas un magasin qui vend. Ce qui est en commande ou en mer est signalé, jamais proposé.",
    "Tous les magasins reçoivent toutes les propositions, quelle que soit leur taille. La taille ne sert qu’à estimer : la vente d’un autre magasin est ramenée au poids du vôtre.",
    "Vente estimée : ventes des 12 derniers mois divisées par le nombre de mois où l’article était présent. Si votre stock est à zéro, on compte jusqu’à la dernière vente, pour ne pas confondre rupture et absence de demande.",
    "Quantité proposée : environ "+P.couv+" jours de vente estimée. Depuis l’entrepôt elle est arrondie au sous-colis, qui ne se divise pas ; un transfert entre magasins se fait à l’unité. Modifiez-la avant d’accepter.",
