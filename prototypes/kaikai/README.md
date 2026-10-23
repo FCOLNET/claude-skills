@@ -15,8 +15,9 @@ depuis le menu « Partager » de la page).
 
 | Fichier | Rôle |
 |---|---|
-| `kaikai.html` | Page, données des recettes du 17/10/2026 incluses |
-| `liste-data.json` | Tous les prix (24 700 produits, 238 magasins), chargés par l'onglet « Ma liste » ; publié à côté de la page |
+| `kaikai.html` | Page à publier, avec les recettes et tous les prix de la liste intégrés (4,5 Mo) |
+| `kaikai-autonome.html` | Même page en document complet, à télécharger et ouvrir hors ligne |
+| `liste-data.json` | Tous les prix (24 700 produits, 238 magasins), intégrés dans la page par `construire.py` |
 | `template.html` | Page sans données (le marqueur `__DATA__` reçoit le JSON des recettes) |
 | `construire.py` | Chiffre les recettes à partir d'un instantané et produit `kaikai.html` |
 | `construire_liste.py` | Produit `liste-data.json` à partir d'un instantané |
@@ -27,14 +28,15 @@ depuis le menu « Partager » de la page).
 # 1. Nouvel instantané (≈ 15 min)
 python3 .claude/skills/prix-nc/scripts/prix_nc.py collecter --dossier donnees/prix-nc
 
-# 2. Reconstruire la page et les données de la liste
-python3 prototypes/kaikai/construire.py donnees/prix-nc/AAAA-MM-JJ
+# 2. Reconstruire les données de la liste, puis la page (dans cet ordre)
 python3 prototypes/kaikai/construire_liste.py donnees/prix-nc/AAAA-MM-JJ
+python3 prototypes/kaikai/construire.py donnees/prix-nc/AAAA-MM-JJ
 ```
 
-La page doit être publiée avec `liste-data.json` à côté d'elle, et la capacité
-`sample` avec images (`{"sample": {"images": true}}`) pour la lecture de photo.
-Ouverte directement depuis le disque, l'onglet « Ma liste » ne peut pas charger les prix.
+Publier `kaikai.html` avec la capacité `sample` avec images (`{"sample": {"images": true}}`)
+pour la lecture de photo et la lecture de liste par Claude. Hors de claude.ai (version
+autonome), Claude n'est pas disponible : la recherche, la saisie de texte (lue ligne à ligne),
+les calculs et les recettes fonctionnent ; la lecture de photo est masquée.
 
 ## Règles de la liste de courses
 

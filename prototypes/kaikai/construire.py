@@ -4,7 +4,8 @@ Usage:
     python3 construire.py donnees/prix-nc/AAAA-MM-JJ [kaikai.html]
 
 Lit l'instantané produit par `.claude/skills/prix-nc/scripts/prix_nc.py collecter`,
-chiffre les recettes définies dans RECETTES et injecte les données dans template.html.
+chiffre les recettes définies dans RECETTES et injecte les données dans template.html,
+ainsi que liste-data.json (à produire d'abord avec construire_liste.py) pour l'onglet « Ma liste ».
 """
 import csv, json, statistics, sys
 from collections import defaultdict
@@ -115,7 +116,18 @@ donnees = {"instantane": SNAP.rstrip("/").split("/")[-1],
            "releves_de": manifeste["releve_le_plus_ancien"], "releves_a": manifeste["releve_le_plus_recent"],
            "magasins": magasins, "recettes": sortie_recettes}
 json_donnees = json.dumps(donnees, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
-Path(OUT).write_text(TEMPLATE.read_text(encoding="utf-8").replace("__DATA__", json_donnees), encoding="utf-8")
+# prix de la liste de courses, intégrés pour que la page fonctionne aussi une fois téléchargée
+LISTE = Path(__file__).with_name("liste-data.json")
+json_liste = LISTE.read_text(encoding="utf-8").replace("<", "\\u003c") if LISTE.exists() else ""
+page = TEMPLATE.read_text(encoding="utf-8").replace("__DATA__", json_donnees)
+page = page.replace('id="liste-donnees">__LISTE__<', 'id="liste-donnees">' + json_liste + "<")
+Path(OUT).write_text(page, encoding="utf-8")
+# version autonome à télécharger : document complet, ouvrable hors ligne depuis le téléphone ou l'ordinateur
+AUTONOME = Path(OUT).with_name(Path(OUT).stem + "-autonome.html")
+AUTONOME.write_text('<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+                    '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+                    '<style>html{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}'
+                    '[hidden]{display:none!important}</style></head><body>' + page + "</body></html>", encoding="utf-8")
 print(f"Page écrite : {OUT}", file=sys.stderr)
 print("prix unitaires aberrants écartés:", ecartes, file=sys.stderr)
 for r in sortie_recettes:
