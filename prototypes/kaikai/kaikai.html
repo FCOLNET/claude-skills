@@ -205,6 +205,12 @@ select {
 .bloc-photo { background: var(--carte); border: 1.5px dashed var(--doux); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 10px; }
 .bloc-photo p { margin: 0; font-size: .9rem; color: var(--doux); }
 .bloc-photo.survol { border-color: var(--laterite); background: var(--laterite-pale); }
+.bloc-photo textarea {
+  width: 100%; font: inherit; padding: 10px 12px; color: var(--encre); resize: vertical;
+  background: var(--sol); border: 1.5px solid var(--trait); border-radius: 10px;
+}
+.bloc-photo textarea:focus { border-color: var(--laterite); outline: none; }
+#photo-etat p { margin: 0; font-size: .9rem; color: var(--doux); }
 /* le vrai champ fichier recouvre le bouton : le toucher l'ouvre directement, sans clic simulé */
 .btn-fichier { position: relative; overflow: hidden; }
 .btn-fichier input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
@@ -287,13 +293,21 @@ select {
             <label class="btn btn-fichier seulement-mobile">Prendre une photo<input id="photo-camera" type="file" accept="image/*" capture="environment"></label>
             <label class="btn btn-fichier">Choisir une image<input id="photo" type="file" accept="image/*"></label>
           </div>
-          <p id="photo-aide">Photographiez votre liste écrite à la main, ou glissez-déposez ou collez (Ctrl+V) une image ici : Claude la lit et vous propose les produits. La photo est envoyée à Claude avec votre accord.</p>
-          <div id="photo-etat" aria-live="polite"></div>
-          <ol class="photo-lignes" id="photo-lignes" hidden></ol>
-          <div class="boutons" id="photo-actions" hidden>
-            <button type="button" class="btn plein" id="photo-ajouter">Ajouter à ma liste</button>
-            <button type="button" class="btn" id="photo-annuler">Annuler</button>
-          </div>
+          <p id="photo-aide">Photographiez votre liste écrite à la main, ou glissez-déposez une image ici : Claude la lit et vous propose les produits. La photo est envoyée à Claude avec votre accord.
+            Si rien ne s'ouvre, votre application bloque l'accès aux photos : utilisez le champ ci-dessous, ou ouvrez la page dans le navigateur de votre téléphone.</p>
+        </div>
+        <div class="bloc-photo" id="bloc-texte" hidden>
+          <label for="texte-liste"><b>Écrire, dicter ou coller ma liste</b></label>
+          <textarea id="texte-liste" rows="4" placeholder="Un article par ligne, par exemple :&#10;2 pq&#10;lait x4&#10;riz jasmin"></textarea>
+          <p>Sur iPhone, touchez le champ puis l'icône « Scanner du texte » du clavier : il lit votre liste manuscrite avec l'appareil photo.
+            Vous pouvez aussi dicter, ou coller une photo de votre liste (appui long, puis Coller).</p>
+          <button type="button" class="btn plein" id="texte-lire">Trouver les produits</button>
+        </div>
+        <div id="photo-etat" aria-live="polite"></div>
+        <ol class="photo-lignes" id="photo-lignes" hidden></ol>
+        <div class="boutons" id="photo-actions" hidden>
+          <button type="button" class="btn plein" id="photo-ajouter">Ajouter à ma liste</button>
+          <button type="button" class="btn" id="photo-annuler">Annuler</button>
         </div>
         <div class="exemple" id="bandeau-exemple" hidden>
           <span id="bandeau-texte"></span>
@@ -968,7 +982,7 @@ select {
   $("commune-liste").addEventListener("change", (e) => { commune = e.target.value; choisi = null; ecrire("commune-liste", commune); rendre(); });
 
   /* ---------- Photo de la liste, lue par Claude ---------- */
-  let SAMPLE = null, ctl = null, lus = [];
+  let SAMPLE = null, IMAGES = false, ctl = null, lus = [];
   const CONSIGNE = "Cette image est la photo d'une liste de courses (manuscrite ou imprimée), faite en Nouvelle-Calédonie. " +
     "Lis chaque article de la liste. Réponds uniquement par un tableau JSON d'objets " +
     '{"texte": ce qui est écrit, "recherche": 1 à 4 mots simples en français pour trouver le produit dans un catalogue de supermarché ' +
@@ -989,15 +1003,56 @@ select {
   const PERMANENT = ["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed", "images_unavailable"];
 
   async function initPhoto() {
+    $("bloc-texte").hidden = false;          // la saisie de texte marche même sans Claude
     if (!window.claude || !window.claude.use) return;
     const s = await window.claude.use("sample");
     if (!s) return;
+    SAMPLE = s;
     const lim = await s.limits().catch(() => null);
     if (!lim || !lim.images) return;
-    SAMPLE = s;
+    IMAGES = true;
     $("photo").accept = lim.images.mediaTypes.join(",");
     $("bloc-photo").hidden = false;
   }
+
+  /* Liste écrite, dictée ou scannée par le clavier : Claude la normalise si disponible, sinon lecture ligne à ligne. */
+  const CONSIGNE_TEXTE = "Voici une liste de courses écrite par une personne en Nouvelle-Calédonie, entre les balises <liste>. " +
+    "Réponds uniquement par un tableau JSON d'objets " +
+    '{"texte": la ligne telle qu\'écrite, "recherche": 1 à 4 mots simples en français pour trouver le produit dans un catalogue de supermarché ' +
+    "(développe les abréviations, par exemple PQ -> papier toilette ; garde la marque seulement si elle est écrite ; pas de quantité ni d'unité), " +
+    '"quantite": nombre entier d\'articles (1 si rien n\'est indiqué)}. Un objet par article ; ignore ce qui n\'est pas un article. ' +
+    'Exemple : [{"texte":"2 pq","recherche":"papier toilette","quantite":2}].\n<liste>\n';
+  function lireLocal(txt) {
+    return txt.split(/[\n;,]+/).map((l) => l.trim()).filter(Boolean).map((l) => {
+      let qte = 1, terme = l, m;
+      if ((m = l.match(/^(\d+)\s*(?:x|×|fois)?\s+(.+)$/i))) { qte = +m[1]; terme = m[2]; }
+      else if ((m = l.match(/^(.+?)\s*(?:x|×)\s*(\d+)$/i))) { terme = m[1]; qte = +m[2]; }
+      return { texte: l, recherche: terme, quantite: qte };
+    });
+  }
+  let lectureTexte = false;
+  $("texte-lire").addEventListener("click", async () => {
+    const txt = $("texte-liste").value.trim();
+    if (!txt || lectureTexte) return;
+    lectureTexte = true; $("texte-lire").disabled = true;
+    $("photo-lignes").hidden = true; $("photo-actions").hidden = true;
+    let items = null;
+    if (SAMPLE) {
+      etatPhoto("<p>Lecture de votre liste…</p>");
+      try { items = await SAMPLE.json(CONSIGNE_TEXTE + txt.slice(0, 4000) + "\n</liste>", { modelTier: "quick" }); }
+      catch (e) { items = null; }
+    }
+    const ok = Array.isArray(items) ? items.filter((x) => x && (x.recherche || x.texte)) : [];
+    afficherLus(ok.length ? ok : lireLocal(txt));
+    lectureTexte = false; $("texte-lire").disabled = false;
+  });
+  $("texte-liste").addEventListener("paste", (e) => {
+    const it = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith("image/"));
+    if (!it) return;                         // du texte : collage normal
+    e.preventDefault();
+    if (IMAGES) lireImage(it.getAsFile());
+    else etatPhoto("<p>La lecture de photo n'est pas disponible ici : collez ou écrivez plutôt le texte de votre liste.</p>");
+  });
   const etatPhoto = (html) => { $("photo-etat").innerHTML = html; };
   ["photo", "photo-camera"].forEach((id) => $(id).addEventListener("change", (e) => {
     const f = e.target.files && e.target.files[0];
@@ -1013,13 +1068,13 @@ select {
     lireImage([...(e.dataTransfer ? e.dataTransfer.files : [])].find((f) => f.type.startsWith("image/")));
   });
   document.addEventListener("paste", (e) => {
-    if ($("vue-liste").hidden || !SAMPLE) return;
+    if ($("vue-liste").hidden || !IMAGES || e.target === $("texte-liste")) return;
     const it = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith("image/"));
     if (it) { e.preventDefault(); lireImage(it.getAsFile()); }
   });
 
   async function lireImage(f) {
-    if (!f || !SAMPLE || $("photo-boutons").classList.contains("occupe")) return;
+    if (!f || !IMAGES || $("photo-boutons").classList.contains("occupe")) return;
     ctl = new AbortController();
     $("photo-boutons").classList.add("occupe");
     $("photo-lignes").hidden = true; $("photo-actions").hidden = true;
@@ -1070,6 +1125,7 @@ select {
       if (deja) deja.qte += lus[k].qte; else LISTE.push({ i, qte: lus[k].qte, exact: false });
     });
     $("photo-lignes").hidden = true; $("photo-actions").hidden = true; etatPhoto("<p>Articles ajoutés à votre liste.</p>");
+    $("texte-liste").value = "";
     modifier();
   });
   $("photo-annuler").addEventListener("click", () => { $("photo-lignes").hidden = true; $("photo-actions").hidden = true; etatPhoto(""); });
