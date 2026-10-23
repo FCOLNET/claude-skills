@@ -550,14 +550,14 @@ function row(code,l){
   else {
     (l.src||[]).forEach(function(x){
       if(x[0]==="E"){ s.appendChild(el("div",null,"À prendre à l’entrepôt : "+nf.format(x[1]))); }
-      else if(x[0]==="R"){ s.appendChild(el("div",null,"En réception : "+nf.format(x[1]))); s.appendChild(el("div","muted","disponible sous 2 à 3 jours")); }
+      else if(x[0]==="R"){ s.appendChild(el("div",null,"À prendre sur la réception : "+nf.format(x[1]))); s.appendChild(el("div","muted","disponible sous 2 à 3 jours")); }
       else { var dort=(a[15][storeIx(x[0])]||0)===0; s.appendChild(el("div",null,"À transférer de "+nom(x[0])+" : "+nf.format(x[1]))); s.appendChild(el("div","muted",dort?"où il ne se vend pas":"qui en a trop")); }
     });
     var res=reserve(a), tk=takenElsewhere(code,a);
     if(l.prep) s.appendChild(el("div","prep","En préparation pour vous : "+nf.format(l.prep)+(l.prepLiv?" · livraison le "+dateCourte(l.prepLiv):"")));
-    s.appendChild(el("div","muted","Entrepôt disponible : "+nf.format(stockEnt(a))+(tk?" · déjà pris par d’autres magasins : "+nf.format(tk):"")));
+    s.appendChild(el("div","muted","Stock entrepôt disponible : "+nf.format(stockEnt(a))+(tk?" · déjà pris par d’autres magasins : "+nf.format(tk):"")));
     if(reservePrep(a)>0) s.appendChild(el("div","muted","Réservé pour les préparations en cours : "+nf.format(reservePrep(a))));
-    if(recDispo(a)>0) s.appendChild(el("div","muted","En réception (2 à 3 jours) : "+nf.format(recDispo(a))));
+    if(recDispo(a)>0) s.appendChild(el("div","muted","Stock en réception : "+nf.format(recDispo(a))+" (dispo sous 2 à 3 jours)"));
     var autres=autresMag(a,code); if(autres>0) s.appendChild(el("div","muted","Dans les autres magasins : "+nf.format(autres)));
     if(a[11]>0) s.appendChild(el("div","muted","Flottant, en mer, non disponible : "+nf.format(a[11])));
     if(a[10]>0) s.appendChild(el("div","muted","En commande fournisseur : "+nf.format(a[10])));
