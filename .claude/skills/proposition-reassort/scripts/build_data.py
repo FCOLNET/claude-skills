@@ -10,6 +10,9 @@ Gallieni), réception à deux jours, et stock qui dort dans un autre magasin. Ce
 qui est en commande ou en mer n'est jamais proposé ; il est seulement signalé.
 
 Les signaux, pour un magasin M et une référence R :
+  BAS  à réassortir : M a encore R en rayon mais sera en rupture dans moins de
+       SEUIL_BAS jours (vente récente, saison du mois qui vient, préparations
+       comprises) ; on propose de remonter à COUV_JOURS jours.
   RUP  rupture récente : M vendait R ces trois derniers mois, son stock est à 0.
   DEJ  déjà vendu ici : M a vendu R dans les douze mois, plus depuis trois mois,
        stock à 0 (souvent une référence de saison qui revient).
@@ -39,7 +42,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import exports as E  # noqa: E402
 
 # --- paramètres (affichés dans la page, modifiables ici) ---
-COUV_JOURS = 30          # couverture visée par une proposition
+COUV_JOURS = 15          # couverture visée par une proposition (stock pas trop concentré)
+SEUIL_BAS = 7            # « à réassortir » : moins de N jours de stock devant soi
+PLAF_BAS = 30            # un arrondi au sous-colis ne pousse pas au-delà (sauf un seul sous-colis)
 HORIZON_MOIS = 3         # horizon de l'estimation de CA et de marge
 RECENT_MOIS = 3          # « vendait les semaines précédentes »
 PRUDENCE_ABS = 0.5       # une référence jamais vendue ici se vendra moins qu'ailleurs
@@ -497,9 +502,69 @@ def main():
             vm = base_vm * poids[s] * PRUDENCE_ABS
             pousse(s, "NVD", i, int(min(o["lot"], reserve(i))), vm, "faible", age=age, nref=len(ref))
 
+    # À réassortir : le stock tient encore, mais plus pour longtemps. Le magasin
+    # peut commander chaque jour et l'entrepôt livre sous 2 à 3 jours : sous
+    # SEUIL_BAS jours de stock, on propose de remonter à COUV_JOURS jours.
+    # La vente retenue est la plus haute entre le rythme de l'année et celui des
+    # trois derniers mois, pondérée par la saison des jours qui viennent (le
+    # même mois l'an dernier pour la sous-famille, sur le réseau).
+    mois_suiv = (fin.month % 12) + 1
+    k_suiv = (mois_suiv - fin.month + 11) % 12
+    reste_mois = jours_mois - fin.day
+    def indice_saison(i):
+        sf = sf_mois[arts[i]["sf"]]
+        if sum(sf) < 50:
+            return 1.0
+        i_s = max(0.6, min(2.5, sf[k_suiv] / (sum(sf) / 12)))
+        r = min(COUV_JOURS, reste_mois)
+        return (r * 1.0 + (COUV_JOURS - r) * i_s) / COUV_JOURS
+    for i, o in enumerate(arts):
+        for s in MAGASINS:
+            stk = stock(s, i)
+            v = q.get((s, i))
+            if stk <= 0 or not v or sum(v) <= 0:
+                continue
+            r3 = sum(v[12 - RECENT_MOIS:]) / sum(poids_mois[12 - RECENT_MOIS:])
+            idx_s = indice_saison(i)
+            vm = max(rythme(s, i), r3) * idx_s
+            vj = vm / 30
+            if vj <= 0:
+                continue
+            p = prep.get((s, i), 0)
+            if (stk + p) / vj >= SEUIL_BAS:
+                continue
+            cible = vj * COUV_JOURS
+            capa = o["capa"].get(s, 0)
+            if capa > 0:
+                cible = min(cible, capa)
+            besoin = cible - stk - p
+            dispo = offre(i, s)
+            if besoin <= 0 or dispo <= 0:
+                continue
+            if sum(d[1] for d in donneurs[i] if d[0] != s) >= besoin:
+                qte = math.ceil(besoin)
+            else:
+                lot = o["lot"]
+                qte = math.ceil(besoin / lot) * lot
+                if qte > lot and (stk + p + qte) / vj > PLAF_BAS:
+                    qte = max(lot, math.floor((PLAF_BAS * vj - stk - p) / lot) * lot)
+            qte = int(min(qte, dispo))
+            if qte < 1:
+                continue
+            jr = stk / vj
+            pousse(s, "BAS", i, qte, vm, "forte", v12=sum(v), m=v, stk=stk, jr=round(jr, 1),
+                   apres=round((stk + p + qte) / vj), sais=round(idx_s, 2))
+            l = lignes[s][-1]
+            if p:
+                l["prep"] = int(p)
+                if (s, i) in prep_liv:
+                    l["prepLiv"] = prep_liv[(s, i)].isoformat()
+            # plus la rupture est proche, plus la ligne remonte
+            l["sc"] = round(l["sc"] * (1 + max(0, SEUIL_BAS - jr) / SEUIL_BAS))
+
     # Une référence ne figure qu'une fois par magasin, sous son signal le plus
     # sûr : sinon elle se commanderait deux fois. Ce qu'elle remplace la suit.
-    PRIO = {"RUP": 0, "DEJ": 1, "SUB": 2, "NOU": 3, "ABS": 4, "NVD": 5, "RRS": 6}
+    PRIO = {"BAS": 0, "RUP": 0, "DEJ": 1, "SUB": 2, "NOU": 3, "ABS": 4, "NVD": 5, "RRS": 6}
     for s in MAGASINS:
         garde = {}
         for l in sorted(lignes[s], key=lambda l: (PRIO[l["g"]], -l["sc"])):
@@ -519,7 +584,7 @@ def main():
     # elle ne propose que le complément.
     for s in MAGASINS:
         for l in lignes[s]:
-            if l["g"] in ("CED", "RRS"):
+            if l["g"] in ("CED", "RRS", "BAS"):   # BAS compte déjà les préparations
                 continue
             p = prep.get((s, l["a"]), 0)
             if not p:
@@ -620,7 +685,7 @@ def main():
                          "glissant": a.glissant.rsplit("/", 1)[-1]},
             "rejets": rejets,
             "prepa": {"fichier": a.prepa.rsplit("/", 1)[-1], "lignes": nb_prep} if a.prepa else None,
-            "params": {"couv": COUV_JOURS, "horizon": HORIZON_MOIS, "recent": RECENT_MOIS,
+            "params": {"couv": COUV_JOURS, "seuil_bas": SEUIL_BAS, "plaf_bas": PLAF_BAS, "horizon": HORIZON_MOIS, "recent": RECENT_MOIS,
                        "prudence": PRUDENCE_ABS, "report": REPORT_SUB, "dort": DORT_LIV_JOURS,
                        "surstock": SURSTOCK_JOURS, "garde": GARDE_JOURS, "nvd": NVD_RECEP_JOURS,
                        "prix_sub": PRIX_SUB, "rayon_min": RAYON_MIN_PORTEURS},

@@ -52,6 +52,8 @@ La page génère des `.xlsx` mis en forme avec ExcelJS 4.4.0 (chargé depuis jsD
 
 ## Les signaux
 
+- **BAS** à réassortir : article encore en rayon, moins de 7 jours de stock devant soi (préparations comprises) ; vente = max(rythme annuel, 3 derniers mois) × saison de la sous-famille sur les jours qui viennent ; on remonte à 15 jours, plafonné par la capacité de rayon, arrondi au sous-colis sans dépasser 30 jours (sauf un seul sous-colis). Le magasin commande chaque jour.
+
 - **RUP** rupture récente : vendu ces 3 derniers mois, stock magasin ≤ 0, l'île en a.
 - **DEJ** déjà vendu ici : vendu dans les 12 mois, plus depuis 3 mois, stock ≤ 0 ; repère Noël si ≥ 60 % des ventes en nov.–déc.
 - **ABS** absent chez moi : ni vente ni stock ici, vendu ailleurs ces 6 derniers mois.
@@ -76,7 +78,7 @@ Un article déjà en préparation pour un magasin n'est plus proposé (statut «
 - Vente mensuelle : ventes ÷ mois de présence (jusqu'à la dernière vente si le stock est à 0, minimum 2 mois).
 - ABS / NOU / NVD : médiane des autres magasins ramenée au poids du magasin (CA 12 mois ÷ moyenne) × 0,5.
 - SUB : vente de la référence remplacée × 0,5 (taux de report).
-- Quantité : 30 jours de vente estimée ; au sous-colis depuis l'entrepôt, à l'unité pour un transfert ; jamais plus que le disponible.
+- Quantité : 15 jours de vente estimée (stock pas trop concentré dans un magasin) ; au sous-colis depuis l'entrepôt, à l'unité pour un transfert ; jamais plus que le disponible.
 - Marge sur 3 mois : min(quantité, 3 mois de vente) × (PV ÷ (1 + TGC) − PR).
 
 Tous les paramètres sont en tête de `scripts/build_data.py` et rappelés dans la page (« Comment les propositions sont calculées »).

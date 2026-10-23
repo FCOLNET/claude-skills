@@ -192,6 +192,7 @@ details.method li{margin:4px 0}
 var NOMS={VILLE:"Ville",DUCOS:"Ducos",CPTION:"Conception",MOTORP:"Motor Pool",APOGOTI:"Apogoti",QLATIN:"Quartier Latin",ENTREPOT:"Entrepôt",GALLIENI:"Gallieni"};
 var POS=["0","1","2","3","5","6","7","8"];
 var TABS=[
+  {id:"BAS",l:"À réassortir",d:"Encore en rayon, mais en rupture dans moins d’une semaine au rythme actuel, saison comprise. On propose de remonter à environ 15 jours de stock, dans la limite de la capacité de rayon et en tenant compte de ce qui est déjà en préparation. Vous pouvez commander chaque jour : inutile de prendre plus."},
   {id:"RUP",l:"Ruptures",d:"Vous vendiez ces références ces trois derniers mois. Votre stock est à zéro, et l’île en a : entrepôt, réception ou stock qui dort dans un autre magasin."},
   {id:"DEJ",l:"Déjà vendus ici",d:"Vendus chez vous dans les douze derniers mois, plus depuis trois mois, stock à zéro. C’est souvent la saison qui revient : regardez le repère Noël."},
   {id:"ABS",l:"Absents chez moi",d:"Jamais vendus ni stockés chez vous ces douze mois, alors que d’autres magasins les vendent. La vente estimée est celle des autres, ramenée à la taille de votre magasin, puis divisée par deux par prudence."},
@@ -200,11 +201,12 @@ var TABS=[
   {id:"CED",l:"À céder",d:"Votre stock qui ne tourne pas, alors qu’un autre magasin en a besoin. Accepter, c’est préparer le transfert."},
   {id:"MES",l:"Mes choix",d:"Ce que votre magasin a accepté, prêt à saisir ou à transmettre."}
 ];
+var LISTES_RES=["BAS","RUP","DEJ","ABS","NOU","SUB"];  /* colonnes de la vue Réseau */
 var MOTIFS=["Pas de place","Non dispo en entrepôt","Clientèle non adaptée","Usage couvert"];
 var REFUS_JOURS=56;
 var PAGE=50;
 
-var D=null, state={store:null, tab:"RUP", dept:"", dispo:"", q:"", statut:"todo", tri:"sc", nouv:"all", sub:"all", unit:null, limit:PAGE, openRefus:null};
+var D=null, state={store:null, tab:"BAS", dept:"", dispo:"", q:"", statut:"todo", tri:"sc", nouv:"all", sub:"all", unit:null, limit:PAGE, openRefus:null};
 var decisions={}; // store -> key -> body
 var db=null, user=null, canWrite=null, myId=null, profiles={}, dlCap=null, sampleCap=null, claudeRes={};
 var nf=new Intl.NumberFormat("fr-FR"), nf1=new Intl.NumberFormat("fr-FR",{maximumFractionDigits:1,minimumFractionDigits:1});
@@ -455,6 +457,7 @@ function filtered(code,L){
   }).sort(function(x,y){
     if(state.tri==="mg") return y.mg-x.mg;
     if(state.tri==="ca") return y.ca-x.ca;
+    if(state.tri==="jr") return (x.jr==null?1e9:x.jr)-(y.jr==null?1e9:y.jr) || y.sc-x.sc;
     if(state.tri==="ent") return stockEnt(art(y.a))-stockEnt(art(x.a)) || y.sc-x.sc;
     if(state.tri==="lib") return art(x.a)[1].localeCompare(art(y.a)[1],"fr");
     return y.sc-x.sc;
@@ -481,7 +484,7 @@ function renderList(app,code,L){
   if(state.tab==="SUB") f.appendChild(seg([["all","Toutes"],["SUB","Remplaçant trouvé"],["RRS","Sans remplaçant sûr"]],state.sub,function(v){ state.sub=v; state.limit=PAGE; render(); }));
   if(state.tab==="NOU") f.appendChild(seg([["all","Toutes"],["NOU","Démarrent ailleurs"],["NVD","Jamais sorties"]],state.nouv,function(v){ state.nouv=v; state.limit=PAGE; render(); }));
   var tri=el("select"); tri.id="fTri"; tri.setAttribute("aria-label","Trier");
-  [["sc","Les plus sûres et rentables d’abord"],["mg","Marge estimée"],["ca","Chiffre d’affaires estimé"],["ent","Stock entrepôt disponible"],["lib","Libellé"]].forEach(function(o){ tri.appendChild(new Option(o[1],o[0])); });
+  [["sc","Les plus sûres et rentables d’abord"],["mg","Marge estimée"],["ca","Chiffre d’affaires estimé"],["jr","Rupture la plus proche"],["ent","Stock entrepôt disponible"],["lib","Libellé"]].forEach(function(o){ tri.appendChild(new Option(o[1],o[0])); });
   tri.value=state.tri; tri.onchange=function(){ state.tri=tri.value; render(); }; f.appendChild(tri);
   var rows=filtered(code,L);
   var c=el("span","count",nf.format(rows.length)+" ligne"+(rows.length>1?"s":"")); f.appendChild(c);
@@ -531,7 +534,10 @@ function row(code,l){
   r.appendChild(p);
   // pourquoi
   var w=el("div","cell why"), M=D.meta.mois;
-  if(l.g==="RUP"){ w.appendChild(txt("Vous en avez vendu "+nf.format(l.v12)+" en 12 mois, le dernier en "+M[l.der]+", votre stock est à 0.")); w.appendChild(spark(l.m,D.meta.params.recent)); }
+  if(l.g==="BAS"){ var tb=txt("Stock : "+nf.format(l.stk)+", vous en vendez "+nf1.format(l.vm/4.33)+" par semaine : rupture dans "+(l.jr<1?"moins d’1 jour":"environ "+Math.round(l.jr)+" jour"+(Math.round(l.jr)>1?"s":""))+". ");
+    if(l.sais>=1.15){ var ts=el("span","tag fin","Saison ×"+nf1.format(l.sais)); ts.title="La sous-famille vend plus le mois qui vient : vente estimée majorée"; tb.appendChild(ts); }
+    w.appendChild(tb); w.appendChild(spark(l.m,D.meta.params.recent)); }
+  else if(l.g==="RUP"){ w.appendChild(txt("Vous en avez vendu "+nf.format(l.v12)+" en 12 mois, le dernier en "+M[l.der]+", votre stock est à 0.")); w.appendChild(spark(l.m,D.meta.params.recent)); }
   else if(l.g==="DEJ"){ var t=txt("Vendu "+nf.format(l.v12)+" fois chez vous, plus depuis "+M[l.der]+", stock à 0. "); t.appendChild(tagSaison(l)); w.appendChild(t); w.appendChild(spark(l.m,0)); }
   else if(l.g==="ABS"||l.g==="NOU"){ var t2=txt("Vendu par "+Object.keys(l.por).length+" autre"+(Object.keys(l.por).length>1?"s":"")+" magasin"+(Object.keys(l.por).length>1?"s":"")+", jamais chez vous. "); if(l.g==="NOU") t2.appendChild(el("span","tag new","Nouveauté")); w.appendChild(t2); w.appendChild(el("div","proof","Ventes 12 mois : "+porteurs(l.por))); }
   else if(l.g==="NVD"){ var t3=txt("En réserve depuis "+l.age+" jour"+(l.age>1?"s":"")+", aucun magasin ne l’a. "); t3.appendChild(el("span","tag new","Jamais sortie")); w.appendChild(t3); w.appendChild(el("div","proof","Estimation d’après "+nf.format(l.nref)+" produit"+(l.nref>1?"s":"")+" de la même sous-famille à prix voisin.")); }
@@ -574,7 +580,8 @@ function row(code,l){
   inp.value=st.d && st.d.q!=null ? st.d.q : l.q; inp.disabled=st.s!=="todo";
   qd.appendChild(inp);
   var lot=a[6], cv=l.vm>0 ? (+inp.value)/(l.vm/4.33) : null, info=[];
-  if(l.g!=="CED"){ if(lot>1) info.push("sous-colis "+lot); if(cv!=null) info.push("≈ "+(cv<1?"moins d’1":Math.round(cv))+" sem. de vente"); var cp=a[16][ix]; if(cp>0) info.push("capacité rayon "+cp); }
+  if(l.g==="BAS" && st.s==="todo"){ var ap=l.vm>0?Math.round((l.stk+(l.prep||0)+(+inp.value))/(l.vm/30)):null; if(ap!=null) info.push("≈ "+ap+" jours de stock après"); }
+  if(l.g!=="CED"){ if(lot>1) info.push("sous-colis "+lot); if(cv!=null && l.g!=="BAS") info.push("≈ "+(cv<1?"moins d’1":Math.round(cv))+" sem. de vente"); var cp=a[16][ix]; if(cp>0) info.push("capacité rayon "+cp); }
   if(st.s==="prep"){ inp.value=l.prep; info=["quantité en préparation"]; }
   qd.appendChild(el("small",null,info.join(" · ")));
   r.appendChild(qd);
@@ -768,7 +775,7 @@ function renderMine(app,code){
     tbody.appendChild(tr); });
   t.appendChild(tbody); w.appendChild(t); app.appendChild(w);
 }
-function tabName(g){ return {RUP:"Rupture",DEJ:"Déjà vendu ici",ABS:"Absent chez moi",NOU:"Nouveauté",NVD:"Nouveauté jamais sortie",SUB:"Substitution",RRS:"Rupture sans remplaçant",CED:"À céder"}[g]; }
+function tabName(g){ return {BAS:"À réassortir",RUP:"Rupture",DEJ:"Déjà vendu ici",ABS:"Absent chez moi",NOU:"Nouveauté",NVD:"Nouveauté jamais sortie",SUB:"Substitution",RRS:"Rupture sans remplaçant",CED:"À céder"}[g]; }
 function srcText(l,code){ if(l.g==="CED") return "vers "+l.vers.map(function(v){ return nom(v[0]); }).join(", "); return (l.src||[]).map(function(x){ return x[0]==="E"?"Entrepôt":x[0]==="R"?"Réception (2-3 j)":"Transfert "+nom(x[0]); }).join(" + "); }
 function remplace(l){ if(l.g!=="SUB") return ["",""]; var L=(l.pour&&l.pour.length?l.pour:(l.orig!=null?[l.orig]:[])).map(art);
   return [L.map(function(o){ return o[0]; }).join(", "), L.map(function(o){ return o[1]; }).join(" ; ")]; }
@@ -809,7 +816,7 @@ function renderNetwork(app){
   var tb=el("tbody");
   per.forEach(function(o){ var tr=el("tr"); var nm=el("td"); var b=el("button","btn small",nom(o.s)); b.type="button"; b.onclick=function(){ setStore(o.s); }; nm.appendChild(b); tr.appendChild(nm);
     tr.appendChild(el("td","n",nf1.format(D.poids[o.s])));
-    ["RUP","DEJ","ABS","NOU","SUB"].forEach(function(g){ var x=o.by[g]||{n:0,ok:0}; tr.appendChild(el("td","n",nf.format(x.ok)+" / "+nf.format(x.n))); });
+    LISTES_RES.forEach(function(g){ var x=o.by[g]||{n:0,ok:0}; tr.appendChild(el("td","n",nf.format(x.ok)+" / "+nf.format(x.n))); });
     tr.appendChild(el("td","n",nf.format(o.ok))); tr.appendChild(el("td","n",nf.format(o.ref))); tr.appendChild(el("td","n",F(o.mgOk))); tr.appendChild(el("td","n",F(o.val)));
     tb.appendChild(tr); });
   t.appendChild(tb); w.appendChild(t); app.appendChild(w);
@@ -841,6 +848,7 @@ var PW=[12,18,9,38,14,34,20,24,20,11,10,60,10,34,26,13,12,12,14,12,14,12,12,10,1
 function whoName(d){ var p=d && d.by && profiles[d.by]; return p && p.name ? p.name : (d && d.by && d.by===myId ? "moi" : ""); }
 function why(code,l){
   var a=art(l.a), M=D.meta.mois;
+  if(l.g==="BAS") return "Stock "+l.stk+", "+(Math.round(l.vm/4.33*10)/10)+" vendus par semaine : rupture dans ~"+Math.round(l.jr)+" j"+(l.sais>=1.15?" (saison ×"+l.sais+")":"")+".";
   if(l.g==="RUP") return "Vendu "+l.v12+" en 12 mois, dernier en "+M[l.der]+", stock à 0.";
   if(l.g==="DEJ") return "Vendu "+l.v12+" en 12 mois, plus depuis "+M[l.der]+", stock à 0."+(l.sai==="noel"?" Noël.":l.sai==="fin"?" Pic nov.–déc. ("+l.pnd+" % des ventes réseau).":"");
   if(l.g==="ABS"||l.g==="NOU") return "Vendu par "+Object.keys(l.por).length+" autre(s) magasin(s), jamais ici."+(l.g==="NOU"?" Nouveauté.":"");
@@ -991,9 +999,9 @@ function exportStore(code,btn){
 }
 function exportNetwork(per,motifs,demand,btn){
   var syn=per.map(function(o){ var row=[nom(o.s),D.poids[o.s]];
-    ["RUP","DEJ","ABS","NOU","SUB"].forEach(function(g){ var x=o.by[g]||{n:0,ok:0}; row.push(x.n,x.ok); });
+    LISTES_RES.forEach(function(g){ var x=o.by[g]||{n:0,ok:0}; row.push(x.n,x.ok); });
     return row.concat([o.n,o.ok,o.ref,Math.round(o.mg),Math.round(o.mgOk),Math.round(o.val)]); });
-  var sh=["Magasin","Poids"]; ["Ruptures","Déjà vendus","Absents","Nouveautés","Substitutions"].forEach(function(t){ sh.push(t+" proposées",t+" acceptées"); });
+  var sh=["Magasin","Poids"]; LISTES_RES.map(function(g){ return TABS.filter(function(t){ return t.id===g; })[0].l; }).forEach(function(t){ sh.push(t+" proposées",t+" acceptées"); });
   sh=sh.concat(["Total proposées","Total acceptées","Total refusées","Marge possible (F HT)","Marge acceptée (F HT)","Engagé (F PR)"]);
   var decs=[];
   D.magasins.forEach(function(s){ D.lignes[s].forEach(function(l){ if(statusOf(s,l).s!=="todo") decs.push(propRow(s,l)); });
@@ -1016,6 +1024,7 @@ function method(){
   ["Seul compte le stock présent sur l’île. « Entrepôt disponible » regroupe l’entrepôt et Gallieni (qui ne vend pas). La marchandise en réception est disponible sous 2 à 3 jours et peut être proposée, en le disant. Le flottant (en mer) et le commandé fournisseur ne sont jamais disponibles : ils sont seulement affichés. Le stock des autres magasins est affiché, mais seul celui qui y dort ou y est en surstock est proposé en transfert : on ne vide pas un magasin qui vend. ",
    "Tous les magasins reçoivent toutes les propositions, quelle que soit leur taille. La taille ne sert qu’à estimer : la vente d’un autre magasin est ramenée au poids du vôtre.",
    "Vente estimée : ventes des 12 derniers mois divisées par le nombre de mois où l’article était présent. Si votre stock est à zéro, on compte jusqu’à la dernière vente, pour ne pas confondre rupture et absence de demande.",
+   "À réassortir : article encore en rayon, mais moins de "+P.seuil_bas+" jours de stock devant soi (préparations comprises). Vente retenue : la plus haute entre le rythme de l’année et celui des 3 derniers mois, majorée ou minorée selon la saison de la sous-famille pour les jours qui viennent. On propose de remonter à "+P.couv+" jours, plafonné par la capacité de rayon ; l’arrondi au sous-colis ne dépasse pas "+P.plaf_bas+" jours, sauf quand un seul sous-colis suffit à les dépasser.",
    "Quantité proposée : environ "+P.couv+" jours de vente estimée. Depuis l’entrepôt elle est arrondie au sous-colis, qui ne se divise pas ; un transfert entre magasins se fait à l’unité. Modifiez-la avant d’accepter.",
    "Marge estimée : ce qui se vendrait en "+P.horizon+" mois (au plus la quantité proposée) × (prix de vente hors TGC − prix de revient). Le taux de TGC de chaque article est lu dans ses ventes.",
    "Absents chez moi et nouveautés : vente des autres magasins × "+P.prudence+" par prudence.",
