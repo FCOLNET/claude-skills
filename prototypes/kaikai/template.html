@@ -168,6 +168,77 @@ select {
 
 .vide { background: var(--carte); border: 1.5px dashed var(--trait); border-radius: var(--r); padding: 20px; color: var(--doux); }
 
+[hidden] { display: none !important; }
+
+/* Onglets */
+.onglets { display: flex; gap: 4px; border-bottom: 1.5px solid var(--trait); overflow-x: auto; }
+.onglets button {
+  background: none; border: 0; padding: 10px 16px; cursor: pointer; white-space: nowrap;
+  font-family: var(--f-titre); font-weight: 700; font-size: 1.05rem; color: var(--doux);
+  border-bottom: 3px solid transparent; margin-bottom: -1.5px;
+}
+.onglets button[aria-selected="true"] { color: var(--encre); border-bottom-color: var(--laterite); }
+
+/* Ma liste */
+.liste-grille { display: grid; gap: 24px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .liste-grille { grid-template-columns: minmax(0, 390px) minmax(0, 1fr); align-items: start; } }
+.liste-saisie, .liste-resultat { display: grid; gap: 14px; min-width: 0; }
+.liste-saisie h2, .liste-resultat h2 { font-size: clamp(1.5rem, 3.5vw, 2rem); font-weight: 800; letter-spacing: -0.02em; }
+.recherche { position: relative; }
+.recherche input {
+  width: 100%; font: inherit; padding: 11px 14px; color: var(--encre);
+  background: var(--carte); border: 1.5px solid var(--trait); border-radius: 12px;
+}
+.recherche input:focus { border-color: var(--laterite); outline: none; }
+.suggestions {
+  position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); list-style: none; margin: 0; padding: 4px;
+  background: var(--carte); border: 1.5px solid var(--trait); border-radius: 12px; max-height: 360px; overflow-y: auto;
+  box-shadow: 0 10px 28px rgb(0 0 0 / .14);
+}
+.suggestions button {
+  width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  display: grid; gap: 2px; overflow-wrap: anywhere;
+}
+.suggestions button:hover, .suggestions button.actif { background: var(--sol); }
+.suggestions small { color: var(--doux); font-size: .8rem; }
+.suggestions .rien { padding: 10px; color: var(--doux); }
+.bloc-photo { background: var(--carte); border: 1.5px dashed var(--doux); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 10px; }
+.bloc-photo p { margin: 0; font-size: .9rem; color: var(--doux); }
+.btn {
+  justify-self: start; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700;
+  border-radius: 99px; padding: 8px 16px; border: 1.5px solid var(--laterite); color: var(--laterite); background: transparent;
+}
+.btn.plein { background: var(--laterite); color: var(--carte); }
+.btn[disabled] { opacity: .5; cursor: default; }
+.boutons { display: flex; flex-wrap: wrap; gap: 8px; }
+.exemple { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; background: var(--niaouli-pale); border-radius: 10px; padding: 8px 12px; font-size: .9rem; }
+.exemple button { background: none; border: 0; color: var(--niaouli); font-weight: 700; cursor: pointer; text-decoration: underline; }
+.lignes, .photo-lignes { list-style: none; margin: 0; padding: 0; background: var(--carte); border: 1.5px solid var(--trait); border-radius: var(--r); }
+.ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: 10px 14px; border-top: 1px solid var(--trait); }
+.ligne:first-child { border-top: 0; }
+.ligne .nom { font-weight: 700; overflow-wrap: anywhere; }
+.ligne .nom small { display: block; font-weight: 400; color: var(--doux); font-size: .8rem; }
+.ligne .meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.qte { display: inline-flex; align-items: center; border: 1.5px solid var(--trait); border-radius: 99px; }
+.qte button { background: none; border: 0; width: 30px; height: 28px; cursor: pointer; font-size: 1.05rem; color: var(--encre); }
+.qte span { min-width: 1.6em; text-align: center; font-variant-numeric: tabular-nums; }
+.retirer { background: none; border: 0; color: var(--doux); cursor: pointer; font-size: 1.3rem; line-height: 1; padding: 0 4px; align-self: start; }
+.retirer:hover { color: var(--laterite); }
+.photo-ligne { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; padding: 10px 14px; border-top: 1px solid var(--trait); align-items: start; }
+.photo-ligne:first-child { border-top: 0; }
+.photo-ligne .lu { font-weight: 700; }
+.photo-ligne select { grid-column: 2; width: 100%; border-radius: 10px; }
+.photo-ligne .introuvable { grid-column: 2; color: var(--alerte); font-size: .88rem; }
+.duo { background: var(--carte); border: 1.5px solid var(--trait); border-radius: var(--r); padding: 16px 20px; display: grid; gap: 10px; }
+.duo h3 { font-size: 1.1rem; font-weight: 700; }
+.duo p { margin: 0; }
+.duo .deux { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .duo .deux { grid-template-columns: 1fr 1fr; } }
+.duo .mag { background: var(--sol); border-radius: 10px; padding: 10px 12px; font-size: .9rem; }
+.duo .mag b { display: block; }
+.duo .mag ul { margin: 6px 0 0; padding-left: 18px; color: var(--doux); }
+.chargement { color: var(--doux); }
+
 /* Pied */
 .pied { border-top: 1px solid var(--trait); padding-top: 16px; color: var(--doux); font-size: .85rem; display: grid; gap: 6px; max-width: 80ch; }
 .pied p { margin: 0; }
@@ -182,7 +253,7 @@ select {
   <header class="entete">
     <div class="marque">
       <h1>Kaïkaï</h1>
-      <p>Combien coûte ce plat au meilleur prix, près de chez vous ?</p>
+      <p>Vos courses et vos recettes au meilleur prix, près de chez vous.</p>
     </div>
     <div class="tampon">
       <span class="bandeau-proto">Prototype</span>
@@ -190,6 +261,67 @@ select {
     </div>
   </header>
 
+  <nav class="onglets" role="tablist" aria-label="Rubriques">
+    <button type="button" role="tab" id="tab-liste" aria-controls="vue-liste" aria-selected="false">Ma liste de courses</button>
+    <button type="button" role="tab" id="tab-recettes" aria-controls="vue-recettes" aria-selected="true">Recettes</button>
+  </nav>
+
+  <section id="vue-liste" role="tabpanel" aria-labelledby="tab-liste" hidden>
+    <div class="liste-grille">
+      <div class="liste-saisie">
+        <h2>Ma liste de courses</h2>
+        <div class="recherche">
+          <input id="q" type="search" autocomplete="off" placeholder="Ajouter un produit : riz, lait, Colgate…"
+                 aria-label="Ajouter un produit" aria-controls="suggestions" aria-autocomplete="list">
+          <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
+        </div>
+        <div class="bloc-photo" id="bloc-photo" hidden>
+          <button type="button" class="btn" id="btn-photo">Lire la photo de ma liste</button>
+          <input id="photo" type="file" accept="image/*" hidden>
+          <p id="photo-aide">Prenez en photo votre liste écrite à la main : Claude la lit et vous proposez les produits. La photo est envoyée à Claude avec votre accord.</p>
+          <div id="photo-etat" aria-live="polite"></div>
+          <ol class="photo-lignes" id="photo-lignes" hidden></ol>
+          <div class="boutons" id="photo-actions" hidden>
+            <button type="button" class="btn plein" id="photo-ajouter">Ajouter à ma liste</button>
+            <button type="button" class="btn" id="photo-annuler">Annuler</button>
+          </div>
+        </div>
+        <div class="exemple" id="bandeau-exemple" hidden>
+          <span id="bandeau-texte"></span>
+          <button type="button" id="vider">Vider la liste</button>
+        </div>
+        <ol class="lignes" id="lignes"></ol>
+        <p class="note" id="liste-vide" hidden>Votre liste est vide. Cherchez un produit ci-dessus, ou lisez la photo de votre liste.</p>
+        <p class="note">« Le moins cher équivalent » : dans chaque magasin, le produit le moins cher de la même catégorie et d'un format proche (±30 %).
+          « Exactement ce produit » : seulement cette référence.</p>
+      </div>
+
+      <div class="liste-resultat">
+        <div class="reglages">
+          <label class="reglage" for="commune-liste">
+            <span>Commune</span>
+            <select id="commune-liste"></select>
+          </label>
+        </div>
+        <p class="chargement" id="liste-chargement">Chargement des 222 000 prix…</p>
+        <section class="verdict" id="liste-verdict" aria-live="polite" hidden></section>
+        <section class="duo" id="liste-duo" hidden></section>
+        <section class="section" id="liste-detail-bloc" hidden>
+          <h3 id="liste-detail-titre"></h3>
+          <div class="ingredients" id="liste-detail"></div>
+        </section>
+        <section class="section" id="liste-classement-bloc" hidden>
+          <h3>Tous les magasins</h3>
+          <p class="sous">Magasins qui ont toute votre liste. Touchez un magasin pour voir le détail.</p>
+          <ol class="classement" id="liste-classement"></ol>
+          <button type="button" class="plus" id="liste-plus" hidden></button>
+          <p class="note" id="liste-partiels"></p>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section id="vue-recettes" role="tabpanel" aria-labelledby="tab-recettes">
   <div class="corps">
     <nav class="recettes" id="recettes" aria-label="Recettes"></nav>
 
@@ -235,6 +367,7 @@ select {
       </section>
     </main>
   </div>
+  </section>
 
   <footer class="pied">
     <p><b>Prototype de démonstration, non officiel.</b> Les prix viennent de l'API publique de l'observatoire des prix
@@ -246,6 +379,8 @@ select {
     <p>« Coût du plat » compte la part de chaque produit réellement utilisée, y compris ce que vous avez déjà ;
       « Ticket de caisse » compte les paquets entiers à acheter, sans les ingrédients marqués « J'en ai déjà ».
       Ces choix restent enregistrés dans votre navigateur. Le sel, le poivre et l'eau ne sont pas comptés.</p>
+    <p>« Ma liste de courses » compare les 24 700 produits publiés sur prix.nc. Votre liste reste dans votre navigateur.
+      La lecture d'une photo passe par Claude, avec votre accord, et utilise votre compte Claude.</p>
   </footer>
 </div>
 
@@ -490,5 +625,430 @@ select {
   document.getElementById("inst").textContent = dateLongue(D.instantane);
   D.recettes.forEach(function (r) { r._min = minParPersonne(r); });
   rendre();
+})();
+</script>
+<script>
+/* Onglet « Ma liste de courses » : recherche, photo lue par Claude, magasin et duo de magasins les moins chers. */
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const fmt = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+  const xpf = (n) => fmt.format(Math.round(n)) + " F";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const lire = (k, d) => { try { const v = localStorage.getItem("kaikai-" + k); return v === null ? d : v; } catch (e) { return d; } };
+  const ecrire = (k, v) => { try { localStorage.setItem("kaikai-" + k, v); } catch (e) {} };
+  const sans = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\u0153/g, "oe").replace(/\u00e6/g, "ae");
+  const SYNONYMES = { pq: "papier toilette", sopalin: "essuie tout", essuietout: "essuie tout", "p-q": "papier toilette", coca: "coca cola", javel: "eau javel" };
+  const racine = (t) => (t.length > 3 && t.endsWith("s") ? t.slice(0, -1) : t);
+  const mots = (s) => sans(s).split(/[^a-z0-9]+/).filter(Boolean).map(racine);
+  const DUO_GAIN_MIN = 0.05, DUO_GAIN_F = 200;
+  const EXEMPLE = [["3357530011011", 1], ["94155877", 4], ["9415272101057", 1], ["3527030300001", 2],
+                   ["3700739200333", 2], ["3034027001013", 6], ["9300605095663", 1], ["9310047010117", 1]];
+
+  /* ---------- Onglets ---------- */
+  const onglets = { liste: $("tab-liste"), recettes: $("tab-recettes") };
+  function montrer(nom) {
+    for (const k in onglets) {
+      onglets[k].setAttribute("aria-selected", k === nom ? "true" : "false");
+      $("vue-" + k).hidden = k !== nom;
+    }
+    ecrire("onglet", nom);
+    if (nom === "liste") demarrer();
+  }
+  onglets.liste.addEventListener("click", () => montrer("liste"));
+  onglets.recettes.addEventListener("click", () => montrer("recettes"));
+
+  /* ---------- Données ---------- */
+  let D = null, MOTS = [], PAR_VAR = new Map(), CACHE_PRIX = new Map(), CACHE_EQ = new Map();
+  let LISTE = [], exemple = false, commune = lire("commune-liste", "Nouméa"), choisi = null, tout = false;
+  let chargement = null;
+
+  function demarrer() {
+    if (chargement) return chargement;
+    chargement = fetch("liste-data.json")
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { D = d; preparer(); restaurer(); $("liste-chargement").hidden = true; rendre(); initPhoto(); })
+      .catch(() => { $("liste-chargement").textContent = "Les prix n'ont pas pu être chargés. Rechargez la page pour réessayer."; });
+    return chargement;
+  }
+
+  function preparer() {
+    D.produits.forEach((p, i) => {
+      MOTS[i] = mots(p[0] + " " + D.varietes[p[1]]);
+      if (!PAR_VAR.has(p[1])) PAR_VAR.set(p[1], []);
+      PAR_VAR.get(p[1]).push(i);
+    });
+    const communes = [...new Set(D.magasins.map((m) => m[1]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+    if (commune && !communes.includes(commune)) commune = "";
+    $("commune-liste").innerHTML = '<option value="">Toute la Nouvelle-Calédonie</option>' +
+      communes.map((c) => "<option" + (c === commune ? " selected" : "") + ">" + esc(c) + "</option>").join("");
+  }
+  const nbMag = (i) => D.prix[i].length / 2;
+  const prixMin = (i) => D.prix[i][1];
+
+  /* Le moins cher équivalent : même variété, même unité, format à ±30 %. */
+  function equivalents(i) {
+    if (CACHE_EQ.has(i)) return CACHE_EQ.get(i);
+    const p = D.produits[i];
+    let out = [i];
+    if (D.varietes[p[1]]) {
+      out = (PAR_VAR.get(p[1]) || []).filter((j) => {
+        const q = D.produits[j];
+        if (q[2] !== p[2]) return false;
+        if (p[3] > 0 && q[3] > 0) { const r = q[3] / p[3]; return r >= 0.7 && r <= 1.4; }
+        return j === i;
+      });
+    }
+    CACHE_EQ.set(i, out);
+    return out;
+  }
+
+  /* Pour une ligne : meilleur prix par magasin -> [prix, produit, promo] */
+  function meilleurs(l) {
+    const cle = l.i + (l.exact ? "x" : "e");
+    if (CACHE_PRIX.has(cle)) return CACHE_PRIX.get(cle);
+    const m = new Map();
+    for (const j of l.exact ? [l.i] : equivalents(l.i)) {
+      const t = D.prix[j];
+      for (let k = 0; k < t.length; k += 2) {
+        const s = t[k] >> 1, prix = t[k + 1];
+        const cur = m.get(s);
+        if (!cur || prix < cur[0]) m.set(s, [prix, j, t[k] & 1]);
+      }
+    }
+    CACHE_PRIX.set(cle, m);
+    return m;
+  }
+
+  /* ---------- Recherche ---------- */
+  function rechercher(q, n) {
+    const toks = mots(sans(q).split(/\s+/).map((m) => SYNONYMES[m] || m).join(" "));
+    if (!toks.length) return [];
+    const res = [];
+    for (let i = 0; i < MOTS.length; i++) {
+      const w = MOTS[i];
+      let score = 0, ok = true;
+      for (const t of toks) {
+        const pos = w.findIndex((x) => x.startsWith(t));
+        if (pos < 0) { ok = false; break; }
+        score += pos < 3 ? 3 : 1;
+      }
+      if (ok) res.push([score * 1000 + Math.min(nbMag(i), 999), i]);
+    }
+    res.sort((a, b) => b[0] - a[0]);
+    return res.slice(0, n || 12).map((r) => r[1]);
+  }
+
+  const q = $("q"), sugg = $("suggestions");
+  let actif = -1, resultats = [], minuteur = null;
+  function montrerSuggestions() {
+    resultats = rechercher(q.value, 12); actif = -1;
+    if (!q.value.trim() || !D) { sugg.hidden = true; return; }
+    sugg.innerHTML = resultats.length ? resultats.map((i, k) =>
+      '<li role="option"><button type="button" data-k="' + k + '"><span>' + esc(D.produits[i][0]) + "</span><small>" +
+      esc(D.varietes[D.produits[i][1]] || "") + " · " + nbMag(i) + " magasin(s) · dès " + xpf(prixMin(i)) + "</small></button></li>").join("")
+      : '<li class="rien">Aucun produit trouvé. Essayez un mot plus court ou sans marque.</li>';
+    sugg.hidden = false;
+  }
+  q.addEventListener("input", () => { clearTimeout(minuteur); minuteur = setTimeout(montrerSuggestions, 120); });
+  q.addEventListener("keydown", (e) => {
+    const btns = sugg.querySelectorAll("button");
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!btns.length) return;
+      e.preventDefault();
+      actif = (actif + (e.key === "ArrowDown" ? 1 : -1) + btns.length) % btns.length;
+      btns.forEach((b, k) => b.classList.toggle("actif", k === actif));
+      btns[actif].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (resultats.length) ajouter(resultats[Math.max(actif, 0)], 1);
+    } else if (e.key === "Escape") { sugg.hidden = true; }
+  });
+  sugg.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-k]");
+    if (b) ajouter(resultats[+b.dataset.k], 1);
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".recherche")) sugg.hidden = true; });
+
+  /* ---------- Liste ---------- */
+  function sauver() {
+    ecrire("liste", JSON.stringify({ exemple, lignes: LISTE.map((l) => ({ ean: D.produits[l.i][4], nom: D.produits[l.i][0], qte: l.qte, exact: l.exact })) }));
+  }
+  function trouver(ean, nom) {
+    for (let i = 0; i < D.produits.length; i++) {
+      const p = D.produits[i];
+      if ((ean && p[4] === ean) || (!ean && p[0] === nom)) return i;
+    }
+    return -1;
+  }
+  function restaurer() {
+    let s = null;
+    try { s = JSON.parse(lire("liste", "null")); } catch (e) {}
+    if (s && Array.isArray(s.lignes)) {
+      exemple = !!s.exemple;
+      LISTE = s.lignes.map((l) => ({ i: trouver(l.ean, l.nom), qte: Math.max(1, l.qte | 0), exact: !!l.exact })).filter((l) => l.i >= 0);
+    } else {
+      exemple = true;
+      LISTE = EXEMPLE.map(([ean, qte]) => ({ i: trouver(ean), qte, exact: false })).filter((l) => l.i >= 0);
+    }
+  }
+  function modifier() { exemple = false; choisi = null; sauver(); rendre(); }
+  function ajouter(i, qte) {
+    const deja = LISTE.find((l) => l.i === i);
+    if (deja) deja.qte += qte; else LISTE.push({ i, qte, exact: false });
+    q.value = ""; sugg.hidden = true;
+    modifier();
+    q.focus();
+  }
+  $("vider").addEventListener("click", () => { LISTE = []; modifier(); });
+
+  function rendreLignes() {
+    const ol = $("lignes");
+    ol.innerHTML = "";
+    $("bandeau-exemple").hidden = !LISTE.length;
+    $("bandeau-texte").textContent = exemple ? "Exemple de liste, pour voir comment ça marche." :
+      LISTE.length + " produit(s), " + LISTE.reduce((s, l) => s + l.qte, 0) + " article(s) dans votre liste.";
+    $("liste-vide").hidden = LISTE.length > 0;
+    ol.hidden = !LISTE.length;
+    LISTE.forEach((l, k) => {
+      const p = D.produits[l.i];
+      const li = document.createElement("li");
+      li.className = "ligne";
+      li.innerHTML = '<div class="nom">' + esc(p[0]) + "<small>" + esc(D.varietes[p[1]] || "") +
+        (l.exact ? "" : " · " + equivalents(l.i).length + " produit(s) équivalent(s)") + "</small></div>" +
+        '<button type="button" class="retirer" aria-label="Retirer ' + esc(p[0]) + '">×</button>' +
+        '<div class="meta"><span class="qte"><button type="button" data-d="-1" aria-label="Un de moins">−</button><span>' + l.qte +
+        '</span><button type="button" data-d="1" aria-label="Un de plus">+</button></span>' +
+        '<button type="button" class="placard" aria-pressed="' + l.exact + '">' + (l.exact ? "Exactement ce produit" : "Le moins cher équivalent") + "</button></div>";
+      li.querySelector(".retirer").onclick = () => { LISTE.splice(k, 1); modifier(); };
+      li.querySelectorAll(".qte button").forEach((b) => b.onclick = () => {
+        l.qte = Math.max(1, l.qte + +b.dataset.d); modifier();
+      });
+      li.querySelector(".placard").onclick = () => { l.exact = !l.exact; modifier(); };
+      ol.appendChild(li);
+    });
+  }
+
+  /* ---------- Calcul ---------- */
+  function calculer() {
+    const mags = [];
+    D.magasins.forEach((m, s) => { if (!commune || m[1] === commune) mags.push(s); });
+    const mb = LISTE.map(meilleurs);
+    const parMag = mags.map((s) => {
+      let total = 0, n = 0;
+      const lignes = LISTE.map((l, k) => {
+        const o = mb[k].get(s);
+        if (o) { total += o[0] * l.qte; n++; }
+        return o || null;
+      });
+      return { s, total, n, lignes };
+    });
+    const complets = parMag.filter((r) => r.n === LISTE.length).sort((a, b) => a.total - b.total);
+    const partiels = parMag.filter((r) => r.n > 0 && r.n < LISTE.length).sort((a, b) => b.n - a.n || a.total - b.total);
+
+    // meilleur duo : chaque ligne achetée dans le moins cher des deux magasins
+    let duo = null;
+    const cands = parMag.filter((r) => r.n >= LISTE.length / 2);
+    for (let a = 0; a < cands.length; a++) {
+      for (let b = a + 1; b < cands.length; b++) {
+        if (D.magasins[cands[a].s][1] !== D.magasins[cands[b].s][1] || !D.magasins[cands[a].s][1]) continue;  // même commune
+        let tot = 0, ok = true;
+        for (let k = 0; k < LISTE.length; k++) {
+            const pa = cands[a].lignes[k], pb = cands[b].lignes[k];
+          if (!pa && !pb) { ok = false; break; }
+          tot += Math.min(pa ? pa[0] : Infinity, pb ? pb[0] : Infinity) * LISTE[k].qte;
+        }
+        if (ok && (!duo || tot < duo.total)) duo = { total: tot, a: cands[a], b: cands[b] };
+      }
+    }
+    return { complets, partiels, duo, nbMags: mags.length };
+  }
+
+  /* ---------- Rendu ---------- */
+  function rendre() {
+    if (!D) return;
+    rendreLignes();
+    const vide = !LISTE.length;
+    ["liste-verdict", "liste-duo", "liste-detail-bloc", "liste-classement-bloc"].forEach((id) => $(id).hidden = vide);
+    if (vide) return;
+    const R = calculer(), V = $("liste-verdict");
+    const nom = (s) => D.magasins[s][0], com = (s) => D.magasins[s][1] || "Commune non renseignée";
+    const best = R.complets[0];
+
+    if (best) {
+      const pire = R.complets[R.complets.length - 1], med = R.complets[Math.floor((R.complets.length - 1) / 2)];
+      V.innerHTML = '<div><div class="ou">La liste la moins chère ' + (commune ? "à " + esc(commune) : "en Nouvelle-Calédonie") + "</div>" +
+        '<div class="magasin">' + esc(nom(best.s)) + '</div><div class="commune">' + esc(com(best.s)) + "</div>" +
+        '<div class="total num" style="margin-top:12px">' + xpf(best.total) + "</div>" +
+        '<div class="parpers">' + LISTE.reduce((a, l) => a + l.qte, 0) + " article(s)</div></div>" +
+        '<div class="economies">' +
+        (R.complets.length > 1 ? '<div class="eco"><span>par rapport au magasin le plus cher</span><b class="num">− ' + xpf(pire.total - best.total) + "</b></div>" : "") +
+        (R.complets.length > 2 ? '<div class="eco"><span>par rapport au prix habituel (médiane)</span><b class="num">− ' + xpf(med.total - best.total) + "</b></div>" : "") +
+        '<div class="note">' + R.complets.length + " magasin(s) ont toute votre liste</div></div>";
+    } else {
+      const p = R.partiels[0];
+      V.innerHTML = '<div class="vide">Aucun magasin ' + (commune ? "de " + esc(commune) + " " : "") + "n'a toute votre liste." +
+        (p ? " Le plus complet, " + esc(nom(p.s)) + ", en a " + p.n + " sur " + LISTE.length + "." : "") +
+        " Passez une ligne en « Le moins cher équivalent », ou regardez la solution à deux magasins.</div>";
+    }
+
+    // duo
+    const Dd = $("liste-duo");
+    if (R.duo && (!best || (best.total - R.duo.total >= DUO_GAIN_F && best.total - R.duo.total >= DUO_GAIN_MIN * best.total))) {
+      const qui = { a: [], b: [] };
+      LISTE.forEach((l, k) => {
+        const pa = R.duo.a.lignes[k], pb = R.duo.b.lignes[k];
+        (pb && (!pa || pb[0] < pa[0]) ? qui.b : qui.a).push(D.produits[l.i][0]);
+      });
+      Dd.innerHTML = "<h3>En faisant deux magasins de " + esc(com(R.duo.a.s)) + " : " + xpf(R.duo.total) + "</h3>" +
+        "<p>" + (best ? "Soit <b>" + xpf(best.total - R.duo.total) + " de moins</b> qu'en un seul magasin." : "C'est la seule façon de trouver toute votre liste.") + "</p>" +
+        '<div class="deux">' + [["a", R.duo.a], ["b", R.duo.b]].map(([k, r]) =>
+          '<div class="mag"><b>' + esc(nom(r.s)) + "</b>" + esc(com(r.s)) + "<ul>" + qui[k].map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul></div>").join("") + "</div>";
+      Dd.hidden = false;
+    } else if (best && R.duo) {
+      Dd.innerHTML = "<h3>Un seul magasin suffit</h3><p>Faire deux magasins ne vous ferait gagner que " +
+        xpf(Math.max(0, best.total - R.duo.total)) + ".</p>";
+      Dd.hidden = false;
+    } else { Dd.hidden = true; }
+
+    // détail du magasin choisi
+    const liste = R.complets.length ? R.complets : R.partiels;
+    const sel = liste.find((r) => r.s === choisi) || liste[0];
+    const det = $("liste-detail");
+    det.innerHTML = "";
+    if (sel) {
+      $("liste-detail-titre").textContent = "Votre liste chez " + nom(sel.s);
+      LISTE.forEach((l, k) => {
+        const o = sel.lignes[k], div = document.createElement("div");
+        div.className = "ing";
+        const ref = D.produits[l.i][0];
+        div.innerHTML = '<div class="nom">' + esc(ref) + ' <span class="qte-txt" style="color:var(--doux);font-weight:400">× ' + l.qte + "</span></div>" +
+          '<div class="montant">' + (o ? '<b class="num">' + xpf(o[0] * l.qte) + '</b><small class="num">' + (l.qte > 1 ? l.qte + " × " + xpf(o[0]) : "") + "</small>" : "<b>—</b>") + "</div>" +
+          '<div class="produit">' + (o ? (o[1] !== l.i ? "Équivalent : " + esc(D.produits[o[1]][0]) : "Ce produit") +
+            (o[2] ? '<div class="puces"><span class="puce promo">promo</span></div>' : "") : '<span class="puce manque">pas vendu dans ce magasin</span>') + "</div>";
+        det.appendChild(div);
+      });
+      const tot = document.createElement("div");
+      tot.className = "ing total-ligne";
+      tot.innerHTML = '<div class="nom">Total</div><div class="montant"><b class="num">' + xpf(sel.total) + "</b><small>" +
+        sel.n + " ligne(s) sur " + LISTE.length + "</small></div>";
+      det.appendChild(tot);
+    }
+
+    // classement
+    const cl = $("liste-classement");
+    cl.innerHTML = "";
+    if (R.complets.length) {
+      const min = R.complets[0].total, etendue = R.complets[R.complets.length - 1].total - min || 1;
+      (tout ? R.complets : R.complets.slice(0, 8)).forEach((r, i) => {
+        const li = document.createElement("li"), b = document.createElement("button");
+        b.type = "button"; b.className = "rang";
+        b.setAttribute("aria-pressed", sel && r.s === sel.s ? "true" : "false");
+        b.innerHTML = '<span class="n">' + (i + 1) + '</span><span class="m">' + esc(nom(r.s)) + "<small>" + esc(com(r.s)) + "</small></span>" +
+          '<span class="p num">' + xpf(r.total) + "<small>" + (i ? "+ " + xpf(r.total - min) : "le moins cher") + "</small></span>" +
+          '<span class="barre" aria-hidden="true"><i style="width:' + (4 + 96 * (r.total - min) / etendue).toFixed(1) + '%"></i></span>';
+        b.onclick = () => { choisi = r.s; rendre(); $("liste-detail-titre").scrollIntoView({ behavior: "smooth", block: "start" }); };
+        li.appendChild(b); cl.appendChild(li);
+      });
+    }
+    $("liste-plus").hidden = R.complets.length <= 8;
+    $("liste-plus").textContent = tout ? "Afficher moins" : "Voir les " + R.complets.length + " magasins";
+    $("liste-partiels").textContent = R.partiels.length ? R.partiels.length + " autre(s) magasin(s) n'ont qu'une partie de votre liste." : "";
+  }
+  $("liste-plus").addEventListener("click", () => { tout = !tout; rendre(); });
+  $("commune-liste").addEventListener("change", (e) => { commune = e.target.value; choisi = null; ecrire("commune-liste", commune); rendre(); });
+
+  /* ---------- Photo de la liste, lue par Claude ---------- */
+  let SAMPLE = null, ctl = null, lus = [];
+  const CONSIGNE = "Cette image est la photo d'une liste de courses (manuscrite ou imprimée), faite en Nouvelle-Calédonie. " +
+    "Lis chaque article de la liste. Réponds uniquement par un tableau JSON d'objets " +
+    '{"texte": ce qui est écrit, "recherche": 1 à 4 mots simples en français pour trouver le produit dans un catalogue de supermarché ' +
+    "(développe les abréviations, par exemple PQ -> papier toilette ; garde la marque seulement si elle est écrite ; pas de quantité ni d'unité), " +
+    '"quantite": nombre entier d\'articles (1 si rien n\'est indiqué)}. Ignore ce qui n\'est pas un article (titres, dates, ratures). ' +
+    'Exemple : [{"texte":"2 pq","recherche":"papier toilette","quantite":2},{"texte":"lait x4","recherche":"lait","quantite":4}]. ' +
+    "Si l'image n'est pas une liste de courses, réponds [].";
+  const MSG = {
+    not_granted: "Vous n'avez pas autorisé Kaïkaï à utiliser Claude : la lecture de photo n'est pas disponible.",
+    sampling_disabled: "Claude n'est pas disponible pour votre compte : la lecture de photo n'est pas disponible.",
+    images_unavailable: "L'envoi de photos à Claude n'est pas disponible ici.",
+    image_rejected: "Cette image n'a pas pu être lue. Essayez une photo JPEG ou PNG plus petite.",
+    rate_limited: "Trop de demandes pour le moment. Réessayez dans quelques minutes.",
+    session_expired: "Votre session Claude a expiré : reconnectez-vous puis réessayez.",
+    invalid_json: "La lecture n'a rien donné d'exploitable. Réessayez avec une photo plus nette.",
+    refused: "Claude n'a pas voulu lire cette image. Essayez une autre photo.",
+  };
+  const PERMANENT = ["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed", "images_unavailable"];
+
+  async function initPhoto() {
+    if (!window.claude || !window.claude.use) return;
+    const s = await window.claude.use("sample");
+    if (!s) return;
+    const lim = await s.limits().catch(() => null);
+    if (!lim || !lim.images) return;
+    SAMPLE = s;
+    $("photo").accept = lim.images.mediaTypes.join(",");
+    $("bloc-photo").hidden = false;
+  }
+  const etatPhoto = (html) => { $("photo-etat").innerHTML = html; };
+  $("btn-photo").addEventListener("click", () => $("photo").click());
+  $("photo").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f || !SAMPLE) return;
+    ctl = new AbortController();
+    $("btn-photo").disabled = true;
+    $("photo-lignes").hidden = true; $("photo-actions").hidden = true;
+    etatPhoto('<p>Lecture de votre liste… cela peut prendre jusqu\'à une minute. <button type="button" class="btn" id="photo-stop">Arrêter</button></p>');
+    $("photo-stop").onclick = () => ctl && ctl.abort();
+    try {
+      const items = await SAMPLE.json(CONSIGNE, { images: [f], signal: ctl.signal });
+      const ok = Array.isArray(items) ? items.filter((x) => x && (x.recherche || x.texte)) : [];
+      if (!ok.length) { etatPhoto("<p>Aucun article reconnu sur cette photo. Essayez une photo plus nette, bien cadrée sur la liste.</p>"); return; }
+      afficherLus(ok);
+    } catch (err) {
+      if (err && err.code === "cancelled") { etatPhoto(""); return; }
+      etatPhoto("<p>" + esc(MSG[err && err.code] || "La lecture a échoué. Réessayez dans un instant.") + "</p>");
+      if (err && PERMANENT.includes(err.code)) $("btn-photo").hidden = true;
+    } finally {
+      $("btn-photo").disabled = false;
+    }
+  });
+
+  function afficherLus(items) {
+    lus = items.map((x) => {
+      const terme = String(x.recherche || x.texte);
+      return { texte: String(x.texte || terme), qte: Math.max(1, Math.round(+x.quantite) || 1), choix: rechercher(terme, 6) };
+    });
+    const trouves = lus.filter((x) => x.choix.length).length;
+    etatPhoto("<p>" + lus.length + " article(s) lu(s), " + trouves + " trouvé(s) dans les prix. Vérifiez puis ajoutez-les.</p>");
+    const ol = $("photo-lignes");
+    ol.innerHTML = "";
+    lus.forEach((x, k) => {
+      const li = document.createElement("li");
+      li.className = "photo-ligne";
+      li.innerHTML = '<input type="checkbox" id="lu-' + k + '"' + (x.choix.length ? " checked" : " disabled") + ">" +
+        '<label class="lu" for="lu-' + k + '">« ' + esc(x.texte) + " »" + (x.qte > 1 ? " × " + x.qte : "") + "</label>" +
+        (x.choix.length
+          ? '<select aria-label="Produit pour ' + esc(x.texte) + '">' + x.choix.map((i) =>
+              '<option value="' + i + '">' + esc(D.produits[i][0]) + " — dès " + xpf(prixMin(i)) + "</option>").join("") + "</select>"
+          : '<span class="introuvable">Introuvable dans les prix publiés : cherchez-le à la main.</span>');
+      ol.appendChild(li);
+    });
+    ol.hidden = false;
+    $("photo-actions").hidden = false;
+  }
+  $("photo-ajouter").addEventListener("click", () => {
+    $("photo-lignes").querySelectorAll(".photo-ligne").forEach((li, k) => {
+      const c = li.querySelector("input"), s = li.querySelector("select");
+      if (!c.checked || !s) return;
+      const i = +s.value, deja = LISTE.find((l) => l.i === i);
+      if (deja) deja.qte += lus[k].qte; else LISTE.push({ i, qte: lus[k].qte, exact: false });
+    });
+    $("photo-lignes").hidden = true; $("photo-actions").hidden = true; etatPhoto("<p>Articles ajoutés à votre liste.</p>");
+    modifier();
+  });
+  $("photo-annuler").addEventListener("click", () => { $("photo-lignes").hidden = true; $("photo-actions").hidden = true; etatPhoto(""); });
+  const h = location.hash.replace("#", "");
+  montrer(h === "liste" || h === "recettes" ? h : lire("onglet", "liste"));
 })();
 </script>

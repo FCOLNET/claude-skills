@@ -1,7 +1,12 @@
 # Kaïkaï — prototype
 
-Appli consommateur de démonstration : le coût de recettes calédoniennes au meilleur prix,
-magasin par magasin, à partir des prix publiés par l'observatoire prix.nc. Non officielle.
+Appli consommateur de démonstration, à partir des prix publiés par l'observatoire prix.nc.
+Non officielle. Deux onglets :
+
+- **Ma liste de courses** : on ajoute des produits par recherche, ou en lisant la photo d'une liste
+  manuscrite (lue par Claude, avec l'accord de l'utilisateur). L'appli donne le magasin le moins cher
+  pour toute la liste, et la meilleure combinaison de deux magasins de la même commune.
+- **Recettes** : le coût de 5 recettes calédoniennes au meilleur prix.
 
 Version en ligne : https://claude.ai/artifact/4rxympDnSY29hFxoCuxe9s (privée, à partager
 depuis le menu « Partager » de la page).
@@ -10,9 +15,11 @@ depuis le menu « Partager » de la page).
 
 | Fichier | Rôle |
 |---|---|
-| `kaikai.html` | Page prête à ouvrir, données du 17/10/2026 incluses |
-| `template.html` | Page sans données (le marqueur `__DATA__` reçoit le JSON) |
+| `kaikai.html` | Page, données des recettes du 17/10/2026 incluses |
+| `liste-data.json` | Tous les prix (24 700 produits, 238 magasins), chargés par l'onglet « Ma liste » ; publié à côté de la page |
+| `template.html` | Page sans données (le marqueur `__DATA__` reçoit le JSON des recettes) |
 | `construire.py` | Chiffre les recettes à partir d'un instantané et produit `kaikai.html` |
+| `construire_liste.py` | Produit `liste-data.json` à partir d'un instantané |
 
 ## Mettre à jour les prix
 
@@ -20,9 +27,24 @@ depuis le menu « Partager » de la page).
 # 1. Nouvel instantané (≈ 15 min)
 python3 .claude/skills/prix-nc/scripts/prix_nc.py collecter --dossier donnees/prix-nc
 
-# 2. Reconstruire la page
+# 2. Reconstruire la page et les données de la liste
 python3 prototypes/kaikai/construire.py donnees/prix-nc/AAAA-MM-JJ
+python3 prototypes/kaikai/construire_liste.py donnees/prix-nc/AAAA-MM-JJ
 ```
+
+La page doit être publiée avec `liste-data.json` à côté d'elle, et la capacité
+`sample` avec images (`{"sample": {"images": true}}`) pour la lecture de photo.
+Ouverte directement depuis le disque, l'onglet « Ma liste » ne peut pas charger les prix.
+
+## Règles de la liste de courses
+
+- « Le moins cher équivalent » (par défaut) : dans chaque magasin, le produit le moins cher de la même
+  variété prix.nc, de la même unité et d'un format à ±30 % du produit choisi.
+- « Exactement ce produit » : seulement ce code-barre.
+- Un magasin n'est classé que s'il a toute la liste. Le duo de magasins n'associe que deux magasins de la
+  même commune, et n'est proposé que s'il fait gagner au moins 5 % et 200 F.
+- La photo est envoyée à Claude, qui renvoie les articles lus ; chacun est rapproché du catalogue par la
+  recherche locale et l'utilisateur valide avant l'ajout.
 
 ## Ajouter ou modifier une recette
 
