@@ -440,13 +440,17 @@ function filtered(code,L){
       if(l.g==="CED"||l.g==="RRS") return false;
       var tr=(l.src||[]).some(function(x){ return x[0]!=="E" && x[0]!=="R"; });
       if(state.dispo==="ent" && !(stockEnt(a)>0)) return false;
-      if(state.dispo==="rec" && !(stockEnt(a)<=0 && a[12]>0)) return false;
+      if(state.dispo==="rec" && !(stockEnt(a)<=0 && recDispo(a)>0)) return false;
       if(state.dispo==="tr" && !tr) return false;
+      if(state.dispo==="prep" && !l.prep) return false;
     }
     if(u){ if(u.niv==="de" && dept(a)!==u.c) return false; if(u.niv==="sf" && a[2]!==u.c) return false; if(u.niv==="fa" && D.sf2fa[a[2]]!==u.c) return false; }
     if(q && (a[1].toLowerCase().indexOf(q)<0 && a[0].indexOf(q)<0 && (a[3]||"").toLowerCase().indexOf(q)<0)) return false;
     var st=statusOf(code,l).s;
-    if(state.statut!=="all" && st!==state.statut) return false;
+    /* « En préparation » choisi dans les disponibilités montre aussi les lignes
+       entièrement couvertes, que le statut « à traiter » écarterait. */
+    var vuPrep = state.dispo==="prep" && st==="prep" && state.statut==="todo";
+    if(state.statut!=="all" && st!==state.statut && !vuPrep) return false;
     return true;
   }).sort(function(x,y){
     if(state.tri==="mg") return y.mg-x.mg;
@@ -471,7 +475,7 @@ function renderList(app,code,L){
   f.appendChild(seg([["todo","À traiter"],["ok","Acceptées"],["ref","Refusées"],["prep","En préparation"],["all","Toutes"]],state.statut,function(v){ state.statut=v; state.limit=PAGE; render(); }));
   if(state.tab!=="CED"){
     var dsp=el("select"); dsp.id="fDispo"; dsp.setAttribute("aria-label","Disponibilité");
-    [["","Toutes les disponibilités"],["ent","En stock à l’entrepôt maintenant"],["rec","En réception seulement (2 à 3 jours)"],["tr","Transfert d’un autre magasin"]].forEach(function(o){ dsp.appendChild(new Option(o[1],o[0])); });
+    [["","Toutes les disponibilités"],["ent","En stock à l’entrepôt maintenant"],["rec","En réception seulement (2 à 3 jours)"],["tr","Transfert d’un autre magasin"],["prep","En préparation (réassort sous 48 h)"]].forEach(function(o){ dsp.appendChild(new Option(o[1],o[0])); });
     dsp.value=state.dispo; dsp.onchange=function(){ state.dispo=dsp.value; state.limit=PAGE; render(); }; f.appendChild(dsp);
   }
   if(state.tab==="SUB") f.appendChild(seg([["all","Toutes"],["SUB","Remplaçant trouvé"],["RRS","Sans remplaçant sûr"]],state.sub,function(v){ state.sub=v; state.limit=PAGE; render(); }));
@@ -964,7 +968,7 @@ function saveXlsx(name,sheets,btn){
   }).then(function(){ btn.disabled=false; btn.textContent=old; });
 }
 function filtresTxt(){ var f=[]; if(state.dept) f.push(cap(D.depts[state.dept]));
-  if(state.dispo) f.push({ent:"en stock à l’entrepôt",rec:"en réception seulement",tr:"transfert d’un autre magasin"}[state.dispo]);
+  if(state.dispo) f.push({ent:"en stock à l’entrepôt",rec:"en réception seulement",tr:"transfert d’un autre magasin",prep:"en préparation"}[state.dispo]);
   if(state.q.trim()) f.push("« "+state.q.trim()+" »"); if(state.unit) f.push(cap(state.unit.lib));
   if(state.statut!=="all") f.push({todo:"à traiter",ok:"acceptées",ref:"refusées",prep:"en préparation"}[state.statut]);
   return f.length?" · filtres : "+f.join(", "):""; }
