@@ -1,0 +1,11 @@
+reference,designation,categorie,mecanique,prix_reference,prix_min_30j,prix_promo,achetes,offerts,prix_achat_net,date_debut,date_fin
+A001,Café moulu 250 g,alimentaire,remise,4.20,4.20,2.95,,,2.40,04/11/2026,17/11/2026
+A002,Huile d'olive 1 L,alimentaire,remise,12.90,10.90,7.90,,,6.80,04/11/2026,17/11/2026
+A003,Yaourts nature x8,alimentaire,lot,2.10,2.10,,1,1,1.20,04/11/2026,17/11/2026
+A004,Pâtes 500 g,alimentaire,lot,1.35,1.35,,2,1,0.75,04/11/2026,17/11/2026
+A005,Croquettes chat 2 kg,animaux,remise,9.90,9.90,6.90,,,6.50,04/11/2026,17/11/2026
+D001,Lessive liquide 2 L,dph,remise,11.50,11.50,6.95,,,5.10,04/11/2026,17/11/2026
+D002,Gel douche 250 ml,dph,remise,3.20,3.20,1.80,,,1.10,04/11/2026,17/11/2026
+N001,Parapluie pliant,autre,soldes,19.90,19.90,9.95,,,11.00,13/01/2027,26/01/2027
+N002,Plaid polaire,autre,soldes,24.90,24.90,14.90,,,9.00,03/01/2027,26/01/2027
+N003,Mug céramique,autre,remise,6.50,6.50,4.90,,,,04/11/2026,17/11/2026

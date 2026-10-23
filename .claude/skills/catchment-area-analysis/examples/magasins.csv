@@ -1,0 +1,5 @@
+magasin,surface,attractivite,reseau
+Notre magasin Centre,850,1,oui
+Concurrent Sud,1400,1,non
+Concurrent Est,600,0.9,non
+Projet Nord,700,1,oui

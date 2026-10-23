@@ -1,0 +1,25 @@
+zone,magasin,minutes
+Centre-ville,Notre magasin Centre,4
+Centre-ville,Concurrent Sud,11
+Centre-ville,Concurrent Est,9
+Centre-ville,Projet Nord,8
+Quartier Nord,Notre magasin Centre,9
+Quartier Nord,Concurrent Sud,18
+Quartier Nord,Concurrent Est,14
+Quartier Nord,Projet Nord,3
+Quartier Est,Notre magasin Centre,10
+Quartier Est,Concurrent Sud,14
+Quartier Est,Concurrent Est,4
+Quartier Est,Projet Nord,11
+Commune A,Notre magasin Centre,16
+Commune A,Concurrent Sud,9
+Commune A,Concurrent Est,20
+Commune A,Projet Nord,19
+Commune B,Notre magasin Centre,18
+Commune B,Concurrent Sud,22
+Commune B,Concurrent Est,25
+Commune B,Projet Nord,9
+Commune C,Notre magasin Centre,21
+Commune C,Concurrent Sud,8
+Commune C,Concurrent Est,17
+Commune C,Projet Nord,24

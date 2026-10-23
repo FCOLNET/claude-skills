@@ -210,14 +210,14 @@ Spécialisé multi-sites, centaines de SKUs :
 
 ## 4. Lacunes identifiées — Opportunités de création
 
-| Domaine manquant | Pourquoi c'est un gap | Skill à créer |
-|---|---|---|
-| **Planogramme / implantation rayon** | Aucun skill public dédié | `planogram-builder` |
-| **Merchandising visuel** | Pas de skill spécifique retail physique | `visual-merchandising` |
-| **Réglementation retail** (affichage prix, étiquetage, normes hygiène) | Gap réglementaire sectoriel | `retail-compliance-fr` |
-| **Caisse / POS** | Skills POS = code, pas opérations métier | `pos-operations` |
-| **Gestion zones de chalandise** | Pas de skill géo-marketing local | `catchment-area-analysis` |
-| **Formation vendeurs** | Pas de skill dédié retail terrain | `sales-training-retail` |
+| Domaine manquant | Pourquoi c'est un gap | Skill | Statut |
+|---|---|---|---|
+| **Planogramme / implantation rayon** | Aucun skill public dédié | `planogram-builder` | ✅ créé |
+| **Merchandising visuel** | Pas de skill spécifique retail physique | `visual-merchandising` | ✅ créé |
+| **Réglementation retail** (affichage prix, promotions, étiquetage, hygiène) | Gap réglementaire sectoriel | `retail-compliance-fr` | ✅ créé |
+| **Caisse / POS** | Skills POS = code, pas opérations métier | `pos-operations` | ✅ créé |
+| **Gestion zones de chalandise** | Pas de skill géo-marketing local | `catchment-area-analysis` | ✅ créé |
+| **Formation vendeurs** | Pas de skill dédié retail terrain | `sales-training-retail` | ✅ créé |
 
 ---
 
