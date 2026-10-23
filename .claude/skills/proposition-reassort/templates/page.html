@@ -102,6 +102,9 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .why .proof{color:var(--muted);font-size:12px;margin-top:3px}
 .tag{display:inline-block;border-radius:4px;padding:0 6px;font-size:11px;font-weight:650;letter-spacing:.04em;text-transform:uppercase;font-stretch:var(--w-cond);vertical-align:1px}
 .tag.noel{background:var(--bad-soft);color:var(--bad)}
+.tag.fin{background:var(--warn-soft);color:var(--warn)}
+.row.st-prep{border-left:4px solid var(--accent)}
+.prep{color:var(--accent);font-weight:600}
 .tag.new{background:var(--accent-soft);color:var(--accent)}
 .spark{display:block;margin-top:5px}
 .src{font-size:12.5px}
@@ -215,14 +218,20 @@ function storeIx(code){ return D.magasins.indexOf(code); }
 function keyOf(l){ return (l.g==="CED"?"c":l.g==="RRS"?"r":"a")+art(l.a)[0]; }
 function stockAt(a,code){ return a[9][POS.indexOf(code)]; }
 function autresMag(a,code){ var t=0; D.magasins.forEach(function(s){ if(s!==code) t+=Math.max(0,stockAt(a,s)); }); return t; }
-function stockEnt(a){ return Math.max(0,a[9][0])+Math.max(0,a[9][7]); }
-function reserve(a){ return Math.max(0,a[9][0])+Math.max(0,a[9][7])+Math.max(0,a[12]); }
+/* Stock de l'entrepôt (entrepôt + Gallieni) net des préparations en cours, qui
+   y sont encore comptées mais déjà réservées ; puis la réception disponible. */
+function stockPhys(a){ return Math.max(0,a[9][0])+Math.max(0,a[9][7]); }
+function reservePrep(a){ return a[17]||0; }
+function stockEnt(a){ return Math.max(0,stockPhys(a)-reservePrep(a)); }
+function recDispo(a){ return Math.max(0,Math.max(0,a[12])-Math.max(0,reservePrep(a)-stockPhys(a))); }
+function reserve(a){ return stockEnt(a)+recDispo(a); }
+function dateCourte(iso){ return iso ? new Date(iso+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : ""; }
 function dept(a){ return a[2].slice(0,2); }
 function try_(f){ try{ return f(); }catch(e){ return null; } }
 
 function statusOf(code,l){
   var d=(decisions[code]||{})[keyOf(l)];
-  if(!d) return {s:"todo"};
+  if(!d) return {s: l.couv ? "prep" : "todo"};
   if(d.st==="ref" && d.at && (Date.now()-Date.parse(d.at))/864e5>REFUS_JOURS) return {s:"todo",ancien:d};
   return {s:d.st,d:d};
 }
@@ -459,7 +468,7 @@ function renderList(app,code,L){
   var s=el("input"); s.type="search"; s.id="fSearch"; s.placeholder="Chercher un article, un code, un fournisseur"; s.value=state.q; s.setAttribute("aria-label","Chercher");
   s.oninput=function(){ state.q=s.value; state.limit=PAGE; clearTimeout(s._t); s._t=setTimeout(function(){ render(); var x=document.getElementById("fSearch"); if(x){ x.focus(); x.setSelectionRange(x.value.length,x.value.length);} },250); };
   f.appendChild(s);
-  f.appendChild(seg([["todo","À traiter"],["ok","Acceptées"],["ref","Refusées"],["all","Toutes"]],state.statut,function(v){ state.statut=v; state.limit=PAGE; render(); }));
+  f.appendChild(seg([["todo","À traiter"],["ok","Acceptées"],["ref","Refusées"],["prep","En préparation"],["all","Toutes"]],state.statut,function(v){ state.statut=v; state.limit=PAGE; render(); }));
   if(state.tab!=="CED"){
     var dsp=el("select"); dsp.id="fDispo"; dsp.setAttribute("aria-label","Disponibilité");
     [["","Toutes les disponibilités"],["ent","En stock à l’entrepôt maintenant"],["rec","En réception seulement (2 à 3 jours)"],["tr","Transfert d’un autre magasin"]].forEach(function(o){ dsp.appendChild(new Option(o[1],o[0])); });
@@ -519,7 +528,7 @@ function row(code,l){
   // pourquoi
   var w=el("div","cell why"), M=D.meta.mois;
   if(l.g==="RUP"){ w.appendChild(txt("Vous en avez vendu "+nf.format(l.v12)+" en 12 mois, le dernier en "+M[l.der]+", votre stock est à 0.")); w.appendChild(spark(l.m,D.meta.params.recent)); }
-  else if(l.g==="DEJ"){ var t=txt("Vendu "+nf.format(l.v12)+" fois chez vous, plus depuis "+M[l.der]+", stock à 0. "); if(l.noel){ t.appendChild(el("span","tag noel","Noël")); } w.appendChild(t); w.appendChild(spark(l.m,0)); }
+  else if(l.g==="DEJ"){ var t=txt("Vendu "+nf.format(l.v12)+" fois chez vous, plus depuis "+M[l.der]+", stock à 0. "); t.appendChild(tagSaison(l)); w.appendChild(t); w.appendChild(spark(l.m,0)); }
   else if(l.g==="ABS"||l.g==="NOU"){ var t2=txt("Vendu par "+Object.keys(l.por).length+" autre"+(Object.keys(l.por).length>1?"s":"")+" magasin"+(Object.keys(l.por).length>1?"s":"")+", jamais chez vous. "); if(l.g==="NOU") t2.appendChild(el("span","tag new","Nouveauté")); w.appendChild(t2); w.appendChild(el("div","proof","Ventes 12 mois : "+porteurs(l.por))); }
   else if(l.g==="NVD"){ var t3=txt("En réserve depuis "+l.age+" jour"+(l.age>1?"s":"")+", aucun magasin ne l’a. "); t3.appendChild(el("span","tag new","Jamais sortie")); w.appendChild(t3); w.appendChild(el("div","proof","Estimation d’après "+nf.format(l.nref)+" produit"+(l.nref>1?"s":"")+" de la même sous-famille à prix voisin.")); }
   else if(l.g==="SUB"){ var o=art(l.orig); var orow=el("div","orig"); orow.appendChild(thumb(o,40)); orow.appendChild(txt("Remplace "+o[0]+" « "+o[1]+" » ("+F(o[5])+")"+(l.v12!=null?" : vous en avez vendu "+nf.format(l.v12)+", plus de stock nulle part.":"."))); w.appendChild(orow);
@@ -545,8 +554,10 @@ function row(code,l){
       else { var dort=(a[15][storeIx(x[0])]||0)===0; s.appendChild(el("div",null,"À transférer de "+nom(x[0])+" : "+nf.format(x[1]))); s.appendChild(el("div","muted",dort?"où il ne se vend pas":"qui en a trop")); }
     });
     var res=reserve(a), tk=takenElsewhere(code,a);
+    if(l.prep) s.appendChild(el("div","prep","En préparation pour vous : "+nf.format(l.prep)+(l.prepLiv?" · livraison le "+dateCourte(l.prepLiv):"")));
     s.appendChild(el("div","muted","Entrepôt disponible : "+nf.format(stockEnt(a))+(tk?" · déjà pris par d’autres magasins : "+nf.format(tk):"")));
-    if(a[12]>0) s.appendChild(el("div","muted","En réception (2 à 3 jours) : "+nf.format(a[12])));
+    if(reservePrep(a)>0) s.appendChild(el("div","muted","Réservé pour les préparations en cours : "+nf.format(reservePrep(a))));
+    if(recDispo(a)>0) s.appendChild(el("div","muted","En réception (2 à 3 jours) : "+nf.format(recDispo(a))));
     var autres=autresMag(a,code); if(autres>0) s.appendChild(el("div","muted","Dans les autres magasins : "+nf.format(autres)));
     if(a[11]>0) s.appendChild(el("div","muted","Flottant, en mer, non disponible : "+nf.format(a[11])));
     if(a[10]>0) s.appendChild(el("div","muted","En commande fournisseur : "+nf.format(a[10])));
@@ -560,11 +571,13 @@ function row(code,l){
   qd.appendChild(inp);
   var lot=a[6], cv=l.vm>0 ? (+inp.value)/(l.vm/4.33) : null, info=[];
   if(l.g!=="CED"){ if(lot>1) info.push("sous-colis "+lot); if(cv!=null) info.push("≈ "+(cv<1?"moins d’1":Math.round(cv))+" sem. de vente"); var cp=a[16][ix]; if(cp>0) info.push("capacité rayon "+cp); }
+  if(st.s==="prep"){ inp.value=l.prep; info=["quantité en préparation"]; }
   qd.appendChild(el("small",null,info.join(" · ")));
   r.appendChild(qd);
   // estimation
   var e=el("div","cell est");
   if(l.g==="CED"){ e.appendChild(el("b",null,F(stockAt(a,code)>0?Math.min(l.q,stockAt(a,code))*a[4]:0))); e.appendChild(el("small",null,"de stock libéré (prix de revient)")); }
+  else if(st.s==="prep"){ e.appendChild(el("b",null,"—")); e.appendChild(el("small",null,"besoin couvert par la préparation en cours")); }
   else { e.appendChild(el("b",null,F(l.mg))); e.appendChild(el("small",null,"de marge HT, "+F(l.ca)+" de CA sur "+D.meta.params.horizon+" mois")); e.appendChild(el("small",null,"vente estimée "+nf1.format(l.vm)+" / mois")); }
   var cf=el("span","conf "+l.cf,"Confiance "+l.cf); e.appendChild(cf);
   r.appendChild(e);
@@ -585,6 +598,10 @@ function row(code,l){
       var no=el("button","btn","Refuser"); no.type="button"; no.disabled=!writable(); no.onclick=function(){ state.openRefus=keyOf(l); render(); };
       ac.appendChild(yes); ac.appendChild(no);
     }
+  } else if(st.s==="prep"){
+    var sp=el("div","state"); sp.appendChild(el("b",null,"Déjà en préparation · "+nf.format(l.prep)+" u"));
+    sp.appendChild(el("div","who","réassort sous 48 h"+(l.prepLiv?", livraison le "+dateCourte(l.prepLiv):"")));
+    ac.appendChild(sp);
   } else {
     var d=st.d, stt=el("div","state");
     var b2=el("b",null,d.st==="ok"?(l.g==="CED"?"Cession acceptée":"Acceptée")+" · "+nf.format(d.q)+" u":"Refusée · "+(d.motif||""));
@@ -597,6 +614,11 @@ function row(code,l){
   return r;
 }
 function txt(t){ var d=el("div"); d.textContent=t; return d; }
+function tagSaison(l){
+  if(l.sai==="noel") return el("span","tag noel","Noël");
+  if(l.sai==="fin"){ var t=el("span","tag fin","Pic nov.–déc."); t.title=l.pnd+" % des ventes du réseau en novembre-décembre"; return t; }
+  return document.createTextNode("");
+}
 function thumb(a,px){
   var d=el("div","thumb"), m=PH_.map && PH_.map[a[0]];
   d.style.width=d.style.height=px+"px";
@@ -723,7 +745,7 @@ function renderMine(app,code){
   var cp=el("button","btn","Copier le tableau"); cp.type="button"; cp.disabled=!M.length; cp.onclick=function(){ copyTsv(M,code,cp); }; tb.appendChild(cp);
   if(dlCap){ var dl=el("button","btn yes","Télécharger en Excel"); dl.type="button"; dl.disabled=!M.length; tb.appendChild(dl);
     dl.onclick=function(){
-      var bon=rec.map(function(x){ var a=art(x.l.a), rp=remplace(x.l); return [a[0],a[1],x.d.q,srcText(x.l,code),stockEnt(a),Math.max(0,a[12]),a[4],x.d.q*a[4],Math.round(x.d.mg||0),tabName(x.l.g),rp[0]]; });
+      var bon=rec.map(function(x){ var a=art(x.l.a), rp=remplace(x.l); return [a[0],a[1],x.d.q,srcText(x.l,code),stockEnt(a),recDispo(a),a[4],x.d.q*a[4],Math.round(x.d.mg||0),tabName(x.l.g),rp[0]]; });
       var ce=ced.map(function(x){ var a=art(x.l.a); return [a[0],a[1],x.d.q,x.l.vers.map(function(v){ return nom(v[0])+" ("+v[1]+")"; }).join(", "),a[4],x.d.q*a[4]]; });
       saveXlsx("reassort-"+token(code)+"-mes-choix-"+D.meta.fin+".xlsx",[
         {n:"Bon de demande",title:"Bon de demande · "+nom(code),sub:"Réassort proposé · données au "+dateTxt()+" · préparé le "+new Date().toLocaleDateString("fr-FR"),
@@ -809,14 +831,14 @@ function renderNetwork(app){
 
 /* ---------- exports Excel ---------- */
 var PH=["Magasin","Liste","Code","Article","Code remplacé","Article remplacé","Département","Sous-famille","Fournisseur","PV TTC (F)","PR (F)","Pourquoi",
-  "Vendu ici 12 mois","Vendu ailleurs 12 mois","Source","Stock entrepôt dispo","En réception (2-3 j)","Flottant (en mer, non dispo)","En commande fournisseur","Stock autres magasins","Capacité rayon","Quantité proposée","Sous-colis",
+  "Vendu ici 12 mois","Vendu ailleurs 12 mois","Source","En préparation pour ce magasin","Livraison prévue","Stock entrepôt dispo","Réservé préparations (tous magasins)","En réception (2-3 j)","Flottant (en mer, non dispo)","En commande fournisseur","Stock autres magasins","Capacité rayon","Quantité proposée","Sous-colis",
   "Vente estimée / mois","CA estimé 3 mois (F TTC)","Marge estimée 3 mois (F HT)","Confiance","Statut","Quantité décidée","Motif","Décidé par","Date décision"];
-var PW=[12,18,9,38,14,34,20,24,20,11,10,60,10,34,26,12,12,14,12,12,10,11,9,11,14,14,10,11,11,20,18,12];
+var PW=[12,18,9,38,14,34,20,24,20,11,10,60,10,34,26,13,12,12,14,12,14,12,12,10,11,9,11,14,14,10,13,11,20,18,12];
 function whoName(d){ var p=d && d.by && profiles[d.by]; return p && p.name ? p.name : (d && d.by && d.by===myId ? "moi" : ""); }
 function why(code,l){
   var a=art(l.a), M=D.meta.mois;
   if(l.g==="RUP") return "Vendu "+l.v12+" en 12 mois, dernier en "+M[l.der]+", stock à 0.";
-  if(l.g==="DEJ") return "Vendu "+l.v12+" en 12 mois, plus depuis "+M[l.der]+", stock à 0."+(l.noel?" Saison Noël.":"");
+  if(l.g==="DEJ") return "Vendu "+l.v12+" en 12 mois, plus depuis "+M[l.der]+", stock à 0."+(l.sai==="noel"?" Noël.":l.sai==="fin"?" Pic nov.–déc. ("+l.pnd+" % des ventes réseau).":"");
   if(l.g==="ABS"||l.g==="NOU") return "Vendu par "+Object.keys(l.por).length+" autre(s) magasin(s), jamais ici."+(l.g==="NOU"?" Nouveauté.":"");
   if(l.g==="NVD") return "En réserve depuis "+l.age+" j, aucun magasin ne l’a. Estimation d’après "+l.nref+" produit(s) comparable(s).";
   if(l.g==="SUB"){ var o=l.orig!=null?art(l.orig):null; return (o?"Remplace "+o[0]+" "+o[1]+" ("+o[5]+" F)"+(l.v12!=null?", vendu "+l.v12+" ici, en rupture partout.":"."):"Remplaçant.")+(l.typ&&l.typ.length?" Même type : "+l.typ.join(", ")+".":"")+(l.via==="claude"?" Choisi avec Claude"+(l.raison?" : "+l.raison:"")+".":"")+(l.attendu>0?" L’original revient : "+l.attendu+" en commande ou en mer.":""); }
@@ -829,8 +851,8 @@ function propRow(code,l){
   var ail=D.magasins.map(function(s,k){ return k!==ix && a[15][k]>0 ? nom(s)+" "+a[15][k] : null; }).filter(Boolean).join(", ");
   var rp=remplace(l);
   return [nom(code), tabName(l.g), a[0], a[1], rp[0], rp[1], cap(D.depts[dept(a)]||dept(a)), cap(D.sfams[a[2]]||a[2]), a[3], a[5], a[4], why(code,l),
-    a[15][ix]||0, ail, srcText(l,code), stockEnt(a), Math.max(0,a[12]), Math.max(0,a[11]), Math.max(0,a[10]), autresMag(a,code), a[16][ix]||0, l.q, a[6], Math.round(l.vm*10)/10,
-    l.g==="CED"||l.g==="RRS"?"":l.ca, l.g==="CED"||l.g==="RRS"?"":l.mg, l.cf, {todo:"À traiter",ok:"Acceptée",ref:"Refusée"}[st.s],
+    a[15][ix]||0, ail, srcText(l,code), l.prep||"", l.prepLiv?dateCourte(l.prepLiv):"", stockEnt(a), reservePrep(a), recDispo(a), Math.max(0,a[11]), Math.max(0,a[10]), autresMag(a,code), a[16][ix]||0, l.q, a[6], Math.round(l.vm*10)/10,
+    l.g==="CED"||l.g==="RRS"?"":l.ca, l.g==="CED"||l.g==="RRS"?"":l.mg, l.cf, {todo:"À traiter",ok:"Acceptée",ref:"Refusée",prep:"En préparation"}[st.s],
     dec?d.q:"", d.motif||"", dec?whoName(d):"", dec?new Date(d.at).toLocaleDateString("fr-FR"):""];
 }
 /* ExcelJS écrit la mise en forme (SheetJS gratuit ne le fait pas) : bandeau de
@@ -944,7 +966,7 @@ function saveXlsx(name,sheets,btn){
 function filtresTxt(){ var f=[]; if(state.dept) f.push(cap(D.depts[state.dept]));
   if(state.dispo) f.push({ent:"en stock à l’entrepôt",rec:"en réception seulement",tr:"transfert d’un autre magasin"}[state.dispo]);
   if(state.q.trim()) f.push("« "+state.q.trim()+" »"); if(state.unit) f.push(cap(state.unit.lib));
-  if(state.statut!=="all") f.push({todo:"à traiter",ok:"acceptées",ref:"refusées"}[state.statut]);
+  if(state.statut!=="all") f.push({todo:"à traiter",ok:"acceptées",ref:"refusées",prep:"en préparation"}[state.statut]);
   return f.length?" · filtres : "+f.join(", "):""; }
 function dateTxt(){ return new Date(D.meta.fin+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}); }
 var TOT_PROP=["Quantité proposée","CA estimé 3 mois (F TTC)","Marge estimée 3 mois (F HT)","Quantité décidée"];
@@ -952,13 +974,13 @@ function exportStore(code,btn){
   var L=D.lignes[code], sheets=[], syn=[];
   TABS.forEach(function(t){ if(t.id==="MES") return;
     var Lt=L.filter(function(l){ return (l.g==="NVD"?"NOU":l.g==="RRS"?"SUB":l.g)===t.id; });
-    var o={todo:0,ok:0,ref:0,mg:0,mgOk:0};
+    var o={todo:0,ok:0,ref:0,prep:0,mg:0,mgOk:0};
     Lt.forEach(function(l){ var st=statusOf(code,l); o[st.s]++; if(l.g!=="CED"&&l.g!=="RRS"){ o.mg+=l.mg; if(st.s==="ok") o.mgOk+=st.d.mg||0; } });
-    syn.push([t.l,Lt.length,o.todo,o.ok,o.ref,Math.round(o.mg),Math.round(o.mgOk)]);
+    syn.push([t.l,Lt.length,o.todo,o.prep,o.ok,o.ref,Math.round(o.mg),Math.round(o.mgOk)]);
     sheets.push({n:t.l,title:t.l+" · "+nom(code),sub:t.d,h:PH,r:Lt.map(function(l){ return propRow(code,l); }),w:PW,freeze:4,tot:TOT_PROP}); });
   var R=(D.rayons[code]||[]).map(function(x){ return [{de:"Département",fa:"Famille",sf:"Sous-famille"}[x.niv],x.c,cap(x.lib),x.por,x.n]; });
   sheets.unshift({n:"Synthèse",title:"Réassort proposé · "+nom(code),sub:"Données au "+dateTxt()+" · un onglet par liste, avec les décisions déjà prises",
-    h:["Liste","Lignes","À traiter","Acceptées","Refusées","Marge possible 3 mois (F HT)","Marge acceptée (F HT)"],r:syn,w:[22,10,11,11,11,22,20],tot:["Lignes","À traiter","Acceptées","Refusées","Marge possible 3 mois (F HT)","Marge acceptée (F HT)"]});
+    h:["Liste","Lignes","À traiter","En préparation","Acceptées","Refusées","Marge possible 3 mois (F HT)","Marge acceptée (F HT)"],r:syn,w:[22,10,11,13,11,11,22,20],tot:["Lignes","À traiter","En préparation","Acceptées","Refusées","Marge possible 3 mois (F HT)","Marge acceptée (F HT)"]});
   sheets.push({n:"Rayons absents",title:"Rayons absents · "+nom(code),sub:"Vendus par d’autres magasins, ni vente ni stock chez vous, du stock en réserve",
     h:["Niveau","Code","Libellé","Autres magasins qui le vendent","Références proposables"],r:R,w:[14,10,32,16,14]});
   saveXlsx("reassort-"+token(code)+"-"+D.meta.fin+".xlsx",sheets,btn);
@@ -997,6 +1019,8 @@ function method(){
    "Stock qui dort : aucune vente en 12 mois dans le magasin, et pas de livraison récente de l’entrepôt (plus de "+P.dort+" jours). Surstock : plus de "+P.surstock+" jours de couverture ; le cédant garde "+P.garde+" jours de ses propres ventes.",
    "Nouveauté : aucune vente sur l’île l’an dernier, ni avant les six derniers mois. « Jamais sortie » : reçue à l’entrepôt il y a moins de "+P.nvd+" jours, aucun magasin ne l’a.",
    "Rayon absent : vendu par au moins "+P.rayon_min+" autres magasins, ni vente ni stock chez vous, et quelque chose en réserve.",
+   "Préparations en cours (réassort sous 48 h) : un article déjà en préparation pour votre magasin n’est plus proposé, ou seulement pour le complément. Les quantités en préparation sont réservées : elles sont retirées du stock entrepôt disponible pour les autres magasins."+(D.meta.prepa?" Source : "+D.meta.prepa.fichier+".":""),
+   "Repères de saison : « Noël » pour la décoration et les jouets de Noël ; « Pic nov.–déc. » quand le réseau fait plus de 60 % des ventes de l’article en novembre-décembre (fêtes et été austral). Les quelques ventes d’un seul magasin ne suffisent pas.",
    "Un refus sort la ligne de la liste pendant "+REFUS_JOURS/7+" semaines ; elle revient ensuite si elle est toujours valable. Une référence n’apparaît qu’une fois par magasin, dans la liste la plus sûre.",
    "Sources : "+D.meta.fichiers.base+", "+D.meta.fichiers.analyse+" ("+D.meta.periode+"), "+D.meta.fichiers.glissant+"."
   ].forEach(function(t){ ul.appendChild(el("li",null,t)); });

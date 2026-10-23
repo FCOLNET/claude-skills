@@ -16,6 +16,7 @@ Outil d'aide au choix, séparé du pilotage : on propose tout à chaque magasin,
 | `suivi_tout_12_glissants.csv` | ventes N-1 (détection des nouveautés), taux de TGC et de marge par article | oui |
 | `suivi_tout_DDEXF.csv` | complète les taux de TGC sur l'exercice en cours | non |
 | `suivi_tout_DDM.csv` | contrôle du mois en cours | non |
+| `ecart_prepa.xls` | préparations en cours (réassort sous 48 h) par magasin : `site`, `article`, `qte_demande`, `livr_demande` ; converti par LibreOffice s'il est en .xls | recommandé |
 
 Les exports « suivi » et « analyse » écrivent les décimales avec une virgule dans un CSV séparé par des virgules : `scripts/exports.py` les relit avec le schéma de chaque colonne. Les lignes illisibles (libellé cassé, < 0,1 %) sont comptées et affichées.
 
@@ -24,7 +25,7 @@ Les exports « suivi » et « analyse » écrivent les décimales avec une virgu
 ```bash
 python3 scripts/build_data.py \
   --base art_superviseur.CSV --analyse ANALYSE_STOCK_VENTE_SUR_12_MOIS.CSV \
-  --glissant suivi_tout_12_glissants.csv --exercice suivi_tout_DDEXF.csv --mois suivi_tout_DDM.csv \
+  --glissant suivi_tout_12_glissants.csv --exercice suivi_tout_DDEXF.csv --mois suivi_tout_DDM.csv --prepa ecart_prepa.xls \
   --out <scratchpad>/reassort/data.json
 cp templates/page.html <scratchpad>/reassort/index.html
 ```
@@ -61,6 +62,14 @@ La page génère des `.xlsx` mis en forme avec ExcelJS 4.4.0 (chargé depuis jsD
 - **CED** à céder : stock qui dort (aucune vente en 12 mois, pas de livraison depuis 90 jours) ou surstock (> 180 jours de couverture, on garde 60 jours) quand un autre magasin en a besoin.
 
 Une référence n'apparaît qu'une fois par magasin, sous le signal le plus sûr. Les rayons absents (département, famille, sous-famille vendus par au moins 3 autres magasins, rien ici, du stock en réserve) s'affichent en tête.
+
+## Préparations en cours
+
+Un article déjà en préparation pour un magasin n'est plus proposé (statut « En préparation », hors des compteurs « à traiter ») ou seulement pour le complément ; la ligne affiche la quantité et la date de livraison. Les quantités en préparation sont déduites du stock entrepôt disponible (elles y sont encore comptées mais sont réservées), d'abord sur le stock physique puis sur la réception.
+
+## Repères de saison
+
+« Noël » : département 08 ou famille contenant NOEL (jouets, emballage, habits de Noël). « Pic nov.–déc. » : au moins 60 % des ventes réseau de l'article en novembre-décembre sur 30 pièces ou plus (ou sous-famille saisonnière à 50 % et article à 50 %). Jamais sur les seules ventes d'un magasin.
 
 ## Estimations
 

@@ -102,3 +102,33 @@ def code(champ):
 
 def libelle(champ):
     return champ.split(".", 1)[1].strip() if "." in champ else champ.strip()
+
+
+def _vers_csv(chemin):
+    """Un .xls/.xlsx est converti en CSV par LibreOffice (séparateur virgule, UTF-8)."""
+    import os
+    import subprocess
+    import tempfile
+    sortie = tempfile.mkdtemp(prefix="prepa-")
+    subprocess.run(["soffice", "--headless", "--convert-to",
+                    'csv:Text - txt - csv (StarCalc):44,34,76,1,,0,false,true,false,false,false,-1',
+                    "--outdir", sortie, chemin], check=True, capture_output=True, timeout=300)
+    csvs = [f for f in os.listdir(sortie) if f.endswith(".csv")]
+    if not csvs:
+        raise RuntimeError("conversion de %s impossible" % chemin)
+    return os.path.join(sortie, sorted(csvs)[0])
+
+
+def lire_preparations(chemin):
+    """Export « écart préparation » : une ligne par article d'une préparation en
+    cours pour un site (colonnes site, article, qte_demande, qte_prepa,
+    livr_demande, lib_prepa, date). Accepte .xls, .xlsx ou .csv."""
+    if chemin.lower().endswith((".xls", ".xlsx")):
+        chemin = _vers_csv(chemin)
+    for enc in ("utf-8-sig", "latin1"):
+        try:
+            with open(chemin, encoding=enc, newline="") as fh:
+                return list(csv.DictReader(fh))
+        except UnicodeDecodeError:
+            continue
+    return []

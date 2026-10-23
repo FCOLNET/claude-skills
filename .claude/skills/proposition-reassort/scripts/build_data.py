@@ -73,6 +73,23 @@ def num(s, defaut=0.0):
         return defaut
 
 
+def date_souple(s, ref):
+    """Date jj/mm/aaaa ou mm/jj/aaaa (selon le logiciel qui a converti) : on
+    garde la lecture la plus proche de la date des données."""
+    s = (s or "").strip()
+    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+    if not m:
+        return None
+    a_, b_, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    cands = []
+    for jj, mm in ((a_, b_), (b_, a_)):
+        try:
+            cands.append(dt.date(y, mm, jj))
+        except ValueError:
+            pass
+    return min(cands, key=lambda d: abs((d - ref).days)) if cands else None
+
+
 def proche_tgc(x):
     return min(TGC, key=lambda v: abs(v - x))
 
@@ -116,6 +133,7 @@ def main():
     ap.add_argument("--glissant", required=True)
     ap.add_argument("--exercice")
     ap.add_argument("--mois")
+    ap.add_argument("--prepa", help="écart préparation (.xls, .xlsx ou .csv) : réassorts en cours, sous 48 h")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
@@ -238,13 +256,63 @@ def main():
         t = vend_tot[i]
         for k in range(12):
             t[k] += v[k]
+    # Repère de saison : constaté sur le réseau, pas sur les quelques ventes d'un
+    # magasin (six supports de tringle vendus en décembre ne font pas une saison).
+    # « Noël » ne qualifie que la déco et les jouets de Noël ; ailleurs on parle
+    # de pic de novembre-décembre, qui est aussi l'été austral : un set de
+    # plongée n'est pas un article de Noël.
+    sf_mois = defaultdict(lambda: [0] * 12)
+    for i_, t_ in vend_tot.items():
+        m_ = sf_mois[arts[i_]["sf"]]
+        for k in range(12):
+            m_[k] += t_[k]
+    def saison(i):
+        """(« noel » | « fin » | None, part des ventes réseau en nov.-déc. en %)."""
+        o = arts[i]
+        t, sf = vend_tot[i], sf_mois[o["sf"]]
+        part = round(100 * sum(t[k] for k in mois_noel) / sum(t)) if sum(t) else 0
+        if o["de"] == "08" or "NOEL" in E.libelle(fams.get(o["fa"], "")).upper().replace("Ë", "E"):
+            return "noel", part
+        if sum(t) >= 30 and part >= 60:
+            return "fin", part
+        if sum(sf) >= 100 and sum(sf[k] for k in mois_noel) >= 0.5 * sum(sf) and part >= 50:
+            return "fin", part
+        return None, part
+
     def nouveau(i):
         return n1[arts[i]["c"]] <= 0 and sum(vend_tot[i][:6]) <= 0
 
-    # --- l'offre de l'île : réserves, réception, stock qui dort ---
-    def reserve(i):
+    # --- préparations en cours : réassort déjà parti pour le magasin, sous 48 h ---
+    # La quantité est prise sur le stock de l'entrepôt, qui la compte encore :
+    # elle n'est plus disponible pour un autre magasin.
+    prep, prep_liv, prep_tot = Counter(), {}, Counter()
+    nb_prep = 0
+    if a.prepa:
+        for x in E.lire_preparations(a.prepa):
+            s_, c_ = E.code(x.get("site", "")), (x.get("article") or "").strip()
+            if s_ not in MAGASINS or c_ not in idx:
+                continue
+            qd = num(x.get("qte_demande"))
+            if qd <= 0:
+                continue
+            i_ = idx[c_]
+            prep[(s_, i_)] += qd
+            prep_tot[i_] += qd
+            nb_prep += 1
+            d_ = date_souple(x.get("livr_demande", ""), fin)
+            if d_ and ((s_, i_) not in prep_liv or d_ < prep_liv[(s_, i_)]):
+                prep_liv[(s_, i_)] = d_
+
+    # --- l'offre de l'île : entrepôt (net des préparations), réception, stock qui dort ---
+    def dispo_ent(i):
+        """(stock entrepôt disponible, réception disponible), préparations déduites."""
         o = arts[i]
-        return sum(max(0, o["st"][r]) for r in RESERVES) + max(0, o["rec"])
+        phys = sum(max(0, o["st"][r]) for r in RESERVES)
+        res = prep_tot[i]
+        return max(0, phys - res), max(0, max(0, o["rec"]) - max(0, res - phys))
+
+    def reserve(i):
+        return sum(dispo_ent(i))
 
     donneurs = defaultdict(list)  # i -> [(site, qte, motif)]
     for i, o in enumerate(arts):
@@ -292,14 +360,13 @@ def main():
             reste -= p
         # l'entrepôt : d'abord le stock en rayon de réserve, puis la réception
         # (disponible sous deux à trois jours) ; jamais le flottant ni le commandé
-        o = arts[i]
-        phys = sum(max(0, o["st"][r]) for r in RESERVES)
+        phys, rec_d = dispo_ent(i)
         if reste > 0 and phys > 0:
             p = min(reste, phys)
             out.append(["E", p])
             reste -= p
-        if reste > 0:
-            out.append(["R", reste])
+        if reste > 0 and rec_d > 0:
+            out.append(["R", min(reste, rec_d)])
         return out
 
     lignes = {s: [] for s in MAGASINS}
@@ -375,12 +442,13 @@ def main():
                 vm = rythme(s, i)
                 v = q[(s, i)]
                 der = max(k for k in range(12) if v[k] > 0)
-                noel = sum(v[k] for k in mois_noel) >= 0.6 * v12 or o["de"] == "08"
+                sai, part = saison(i)
+                noel = sai is not None
                 if dispo > 0:
                     sig = "RUP" if recent(s, i) else "DEJ"
                     conf = "forte" if sig == "RUP" else ("moyenne" if not noel else "forte")
                     pousse(s, sig, i, quantite(vm, i, s, dispo), vm, conf,
-                           v12=v12, der=der, m=v, noel=1 if noel else 0)
+                           v12=v12, der=der, m=v, sai=sai, pnd=part)
                 elif recent(s, i):
                     # rupture partout : un produit du même type en réserve, ou rien
                     cands = substituts(i, s)
@@ -446,6 +514,30 @@ def main():
                     k["pour"].append(l["orig"])
         lignes[s] = list(garde.values())
 
+    # Ce qui est déjà en préparation pour le magasin ne se redemande pas : la
+    # ligne passe « en préparation » si la préparation couvre le besoin, sinon
+    # elle ne propose que le complément.
+    for s in MAGASINS:
+        for l in lignes[s]:
+            if l["g"] in ("CED", "RRS"):
+                continue
+            p = prep.get((s, l["a"]), 0)
+            if not p:
+                continue
+            i = l["a"]
+            l["prep"] = int(p)
+            if (s, i) in prep_liv:
+                l["prepLiv"] = prep_liv[(s, i)].isoformat()
+            reste = l["q"] - p
+            if reste <= 0:
+                l.update(q=0, ca=0, mg=0, sc=0, src=[], couv=1)
+                continue
+            lot = arts[i]["lot"]
+            q2 = int(min(math.ceil(reste / lot) * lot, offre(i, s)))
+            u = min(q2, max(0, l["vm"] * HORIZON_MOIS - p))
+            l.update(q=q2, ca=round(u * arts[i]["pv"]), mg=round(u * arts[i]["mu"]), src=source(i, s, q2))
+            l["sc"] = round(l["mg"] * CONF_POIDS[l["cf"]])
+
     # à céder : le stock qui dort, quand quelqu'un en a besoin
     besoin = defaultdict(list)
     for s, L in lignes.items():
@@ -507,6 +599,7 @@ def main():
             (fin - o["dEntr"]).days if o["dEntr"] else None,
             (fin - o["dLiv"]).days if o["dLiv"] else None,
             [ventes12(s, i) for s in MAGASINS], [o["capa"].get(s, 0) for s in MAGASINS],
+            int(prep_tot[i]),
         ])
     for s, L in lignes.items():
         for l in L:
@@ -526,6 +619,7 @@ def main():
             "fichiers": {"base": a.base.rsplit("/", 1)[-1], "analyse": a.analyse.rsplit("/", 1)[-1],
                          "glissant": a.glissant.rsplit("/", 1)[-1]},
             "rejets": rejets,
+            "prepa": {"fichier": a.prepa.rsplit("/", 1)[-1], "lignes": nb_prep} if a.prepa else None,
             "params": {"couv": COUV_JOURS, "horizon": HORIZON_MOIS, "recent": RECENT_MOIS,
                        "prudence": PRUDENCE_ABS, "report": REPORT_SUB, "dort": DORT_LIV_JOURS,
                        "surstock": SURSTOCK_JOURS, "garde": GARDE_JOURS, "nvd": NVD_RECEP_JOURS,
