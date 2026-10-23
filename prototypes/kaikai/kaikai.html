@@ -204,6 +204,13 @@ select {
 .suggestions .rien { padding: 10px; color: var(--doux); }
 .bloc-photo { background: var(--carte); border: 1.5px dashed var(--doux); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 10px; }
 .bloc-photo p { margin: 0; font-size: .9rem; color: var(--doux); }
+.bloc-photo.survol { border-color: var(--laterite); background: var(--laterite-pale); }
+/* le vrai champ fichier recouvre le bouton : le toucher l'ouvre directement, sans clic simulé */
+.btn-fichier { position: relative; overflow: hidden; }
+.btn-fichier input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
+.btn-fichier:focus-within { outline: 3px solid var(--laterite); outline-offset: 2px; }
+.boutons.occupe .btn-fichier { opacity: .5; pointer-events: none; }
+@media (hover: hover) and (pointer: fine) { .seulement-mobile { display: none; } }
 .btn {
   justify-self: start; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700;
   border-radius: 99px; padding: 8px 16px; border: 1.5px solid var(--laterite); color: var(--laterite); background: transparent;
@@ -276,9 +283,11 @@ select {
           <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
         </div>
         <div class="bloc-photo" id="bloc-photo" hidden>
-          <button type="button" class="btn" id="btn-photo">Lire la photo de ma liste</button>
-          <input id="photo" type="file" accept="image/*" hidden>
-          <p id="photo-aide">Prenez en photo votre liste écrite à la main : Claude la lit et vous proposez les produits. La photo est envoyée à Claude avec votre accord.</p>
+          <div class="boutons" id="photo-boutons">
+            <label class="btn btn-fichier seulement-mobile">Prendre une photo<input id="photo-camera" type="file" accept="image/*" capture="environment"></label>
+            <label class="btn btn-fichier">Choisir une image<input id="photo" type="file" accept="image/*"></label>
+          </div>
+          <p id="photo-aide">Photographiez votre liste écrite à la main, ou glissez-déposez ou collez (Ctrl+V) une image ici : Claude la lit et vous propose les produits. La photo est envoyée à Claude avec votre accord.</p>
           <div id="photo-etat" aria-live="polite"></div>
           <ol class="photo-lignes" id="photo-lignes" hidden></ol>
           <div class="boutons" id="photo-actions" hidden>
@@ -990,13 +999,29 @@ select {
     $("bloc-photo").hidden = false;
   }
   const etatPhoto = (html) => { $("photo-etat").innerHTML = html; };
-  $("btn-photo").addEventListener("click", () => $("photo").click());
-  $("photo").addEventListener("change", async (e) => {
+  ["photo", "photo-camera"].forEach((id) => $(id).addEventListener("change", (e) => {
     const f = e.target.files && e.target.files[0];
     e.target.value = "";
-    if (!f || !SAMPLE) return;
+    lireImage(f);
+  }));
+  // glisser-déposer et coller une image
+  const bloc = $("bloc-photo");
+  bloc.addEventListener("dragover", (e) => { e.preventDefault(); bloc.classList.add("survol"); });
+  bloc.addEventListener("dragleave", () => bloc.classList.remove("survol"));
+  bloc.addEventListener("drop", (e) => {
+    e.preventDefault(); bloc.classList.remove("survol");
+    lireImage([...(e.dataTransfer ? e.dataTransfer.files : [])].find((f) => f.type.startsWith("image/")));
+  });
+  document.addEventListener("paste", (e) => {
+    if ($("vue-liste").hidden || !SAMPLE) return;
+    const it = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith("image/"));
+    if (it) { e.preventDefault(); lireImage(it.getAsFile()); }
+  });
+
+  async function lireImage(f) {
+    if (!f || !SAMPLE || $("photo-boutons").classList.contains("occupe")) return;
     ctl = new AbortController();
-    $("btn-photo").disabled = true;
+    $("photo-boutons").classList.add("occupe");
     $("photo-lignes").hidden = true; $("photo-actions").hidden = true;
     etatPhoto('<p>Lecture de votre liste… cela peut prendre jusqu\'à une minute. <button type="button" class="btn" id="photo-stop">Arrêter</button></p>');
     $("photo-stop").onclick = () => ctl && ctl.abort();
@@ -1008,11 +1033,11 @@ select {
     } catch (err) {
       if (err && err.code === "cancelled") { etatPhoto(""); return; }
       etatPhoto("<p>" + esc(MSG[err && err.code] || "La lecture a échoué. Réessayez dans un instant.") + "</p>");
-      if (err && PERMANENT.includes(err.code)) $("btn-photo").hidden = true;
+      if (err && PERMANENT.includes(err.code)) $("photo-boutons").hidden = true;
     } finally {
-      $("btn-photo").disabled = false;
+      $("photo-boutons").classList.remove("occupe");
     }
-  });
+  }
 
   function afficherLus(items) {
     lus = items.map((x) => {
