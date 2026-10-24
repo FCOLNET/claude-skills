@@ -92,6 +92,12 @@ id="trajet-config">` de `template.html` : **prix du litre à mettre à jour chaq
 - Carburant : litres × prix maximum du mois (octobre 2026 : essence 182,4 F, gazole 190,6 F).
   Consommation par défaut : 7 L (essence), 6 L (diesel), 4,5 L (hybride), modifiable.
 - CO2 : 2,7 kg par litre d'essence, 3,1 par litre de gazole (ADEME, production et combustion).
+- Voiture électrique : 17 kWh aux 100 km, 41,81 F le kWh (tarif domestique d'octobre 2026),
+  0,31 kg de CO2 par kWh (estimation : 66 % de renouvelables dans la distribution publique selon
+  Enercal, le reste au fioul et au charbon).
+- « Mon bilan carbone » : CO2 et coût du trajet par course et par an (fréquence au choix),
+  face au magasin le plus proche, au moins cher en caisse et aux autres moyens de déplacement.
+  Seul le trajet est compté (ni la fabrication du véhicule, ni l'empreinte des produits).
 - Temps passé : compté seulement si l'utilisateur lui donne une valeur en F de l'heure.
 - À pied, à vélo ou en bus : trajet gratuit, magasins à moins de 8 km seulement.
 - Classement au choix : tout compris (caisse − cagnotte + trajet), en caisse, le plus proche.

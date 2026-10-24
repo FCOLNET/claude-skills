@@ -261,6 +261,16 @@ select {
 .eco.alerte { background: var(--alerte-pale); }
 .eco.alerte b { color: var(--alerte); }
 
+/* Bilan carbone */
+.bilan .frequence { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.bilan table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.bilan th, .bilan td { text-align: right; padding: 6px 4px; border-top: 1px solid var(--trait); }
+.bilan td { white-space: nowrap; }
+.bilan th:first-child, .bilan td:first-child { text-align: left; white-space: normal; }
+.bilan thead th { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--doux); border-top: 0; }
+.bilan tr.actuel td { font-weight: 700; background: var(--niaouli-pale); }
+.bilan .chiffre { font-family: var(--f-titre); font-weight: 800; font-size: 1.8rem; color: var(--niaouli); line-height: 1; }
+
 /* Cartes de fidélité */
 .cartes { background: var(--carte); border: 1px solid var(--trait); border-radius: var(--r); padding: 0; }
 .cartes > summary { cursor: pointer; padding: 12px 16px; font-weight: 700; list-style-position: inside; }
@@ -379,11 +389,12 @@ select {
                 <option value="essence">en voiture essence</option>
                 <option value="gazole">en voiture diesel</option>
                 <option value="hybride">en voiture hybride</option>
+                <option value="electrique">en voiture électrique</option>
                 <option value="doux">à pied, à vélo ou en bus</option>
               </select></label>
             <div class="trajet-chiffres" id="trajet-voiture">
-              <label class="reglage" for="conso"><span>Litres aux 100 km</span><input id="conso" type="number" min="2" max="25" step="0.5" inputmode="decimal"></label>
-              <label class="reglage" for="prix-litre"><span>Prix du litre (F)</span><input id="prix-litre" type="number" min="50" max="400" step="0.1" inputmode="decimal"></label>
+              <label class="reglage" for="conso"><span id="lbl-conso">Litres aux 100 km</span><input id="conso" type="number" min="2" max="25" step="0.5" inputmode="decimal"></label>
+              <label class="reglage" for="prix-litre"><span id="lbl-prix">Prix du litre (F)</span><input id="prix-litre" type="number" min="50" max="400" step="0.1" inputmode="decimal"></label>
             </div>
             <label class="reglage" for="valeur-temps"><span>Mon temps vaut (F de l'heure, 0 = ne pas compter)</span><input id="valeur-temps" type="number" min="0" max="20000" step="100" inputmode="numeric"></label>
             <p class="note" id="trajet-note"></p>
@@ -401,6 +412,7 @@ select {
         <p class="chargement" id="liste-chargement">Chargement des 222 000 prix…</p>
         <section class="verdict" id="liste-verdict" aria-live="polite" hidden></section>
         <section class="duo" id="liste-duo" hidden></section>
+        <section class="duo bilan" id="liste-bilan" hidden></section>
         <section class="duo valeur-cartes" id="liste-cartes" hidden></section>
         <section class="section" id="liste-detail-bloc" hidden>
           <h3 id="liste-detail-titre"></h3>
@@ -478,7 +490,8 @@ select {
     <p>« Ma liste de courses » compare les 24 700 produits publiés sur prix.nc. Votre liste reste dans votre navigateur.
       La lecture d'une photo passe par Claude, avec votre accord, et utilise votre compte Claude.</p>
     <p>Trajet : distance à vol d'oiseau multipliée par un coefficient de détour, aller et retour ; carburant au prix maximum
-      fixé chaque mois par le gouvernement ; CO2 selon les facteurs de l'ADEME (production et combustion du carburant).
+      fixé chaque mois par le gouvernement, électricité au tarif domestique ; CO2 selon les facteurs de l'ADEME
+      (production et combustion du carburant) et, pour l'électricité, la part de renouvelables publiée par Enercal.
       Positions des magasins : prix.nc, complétées par OpenStreetMap ; à défaut, le quartier ou le centre de la commune.
       Votre point de départ reste dans votre navigateur.</p>
     <p>Cartes de fidélité : les règles viennent des sites des enseignes et de relevés publics ; celles marquées
@@ -488,7 +501,7 @@ select {
 
 <script type="application/json" id="donnees">__DATA__</script>
 <script type="application/json" id="liste-donnees">__LISTE__</script>
-<!-- Paramètres du trajet. co2 : kg de CO2 par litre (ADEME, production et combustion). prix : F par litre, prix maximum du mois. -->
+<!-- Paramètres du trajet. co2 : kg de CO2 par litre ou par kWh. prix : F par litre (prix maximum du mois) ou par kWh. -->
 <script type="application/json" id="trajet-config">
 {
   "verifie": "octobre 2026",
@@ -496,8 +509,10 @@ select {
   "vehicules": {
     "essence": { "nom": "d'essence", "prix": 182.4, "conso": 7, "co2": 2.7 },
     "gazole": { "nom": "de gazole", "prix": 190.6, "conso": 6, "co2": 3.1 },
-    "hybride": { "nom": "d'essence", "prix": 182.4, "conso": 4.5, "co2": 2.7 }
+    "hybride": { "nom": "d'essence", "prix": 182.4, "conso": 4.5, "co2": 2.7 },
+    "electrique": { "nom": "d'électricité", "prix": 41.81, "conso": 17, "co2": 0.31, "unite": "kWh" }
   },
+  "sources": "Carburants : prix maximums d'octobre 2026 (Observatoire de l'énergie). Électricité : tarif basse tension domestique d'octobre 2026, 41,81 F le kWh ; CO2 estimé à 0,31 kg par kWh d'après la part de 66 % de renouvelables de la distribution publique (Enercal), le reste au fioul et au charbon.",
   "detour": 1.3,
   "vitesseVille": 30, "vitesseRoute": 70, "kmVille": 10,
   "rayonProche": 15,
@@ -824,6 +839,7 @@ select {
   try { CARTES = new Set(JSON.parse(lire("cartes", "[]"))); } catch (e) {}
   let compter = lire("cartes-compter", "1") === "1";
   const TC = JSON.parse($("trajet-config").textContent);
+  let frequence = +lire("frequence", "52") || 52;   // courses par an
   let DEPART = null, TRAJET = null, tri = lire("tri", "total");
   try { DEPART = JSON.parse(lire("depart", "null")); } catch (e) {}
   try { TRAJET = JSON.parse(lire("trajet", "null")); } catch (e) {}
@@ -872,12 +888,15 @@ select {
   }
   const versMag = (s) => { const m = D.magasins[s]; return m[2] == null ? null : vol(DEPART.lat, DEPART.lon, m[2], m[3]) * TC.detour; };
   /* Coût d'un parcours de km kilomètres (aller-retour déjà compté). */
-  function cout(km) {
+  /* v : véhicule ({vehicule, conso, prix}) ; par défaut celui de l'utilisateur. */
+  function cout(km, v) {
+    v = v || TRAJET;
     const ville = Math.min(km, 2 * TC.kmVille), min = Math.round(60 * (ville / TC.vitesseVille + (km - ville) / TC.vitesseRoute));
-    if (TRAJET.vehicule === "doux") return { km, min: null, f: 0, co2: 0, ft: 0, tot: 0 };
-    const litres = km * TRAJET.conso / 100, f = litres * TRAJET.prix, ft = TRAJET.temps > 0 ? min / 60 * TRAJET.temps : 0;
-    return { km, min, f, co2: litres * TC.vehicules[TRAJET.vehicule].co2, ft, tot: f + ft };
+    if (v.vehicule === "doux") return { km, min: null, f: 0, co2: 0, ft: 0, tot: 0 };
+    const q = km * v.conso / 100, f = q * v.prix, ft = TRAJET.temps > 0 ? min / 60 * TRAJET.temps : 0;
+    return { km, min, f, co2: q * TC.vehicules[v.vehicule].co2, ft, tot: f + ft };
   }
+  const vehiculeType = (k) => (k === TRAJET.vehicule ? TRAJET : TC.vehicules[k] ? { vehicule: k, conso: TC.vehicules[k].conso, prix: TC.vehicules[k].prix } : { vehicule: "doux" });
   function trajet(s) {
     if (!DEPART) return null;
     const d = versMag(s);
@@ -909,12 +928,18 @@ select {
     $("vehicule").value = TRAJET.vehicule;
     $("conso").value = TRAJET.conso; $("prix-litre").value = TRAJET.prix; $("valeur-temps").value = TRAJET.temps;
     $("trajet-voiture").hidden = TRAJET.vehicule === "doux";
+    const kwh = (TC.vehicules[TRAJET.vehicule] || {}).unite === "kWh";
+    $("lbl-conso").textContent = kwh ? "kWh aux 100 km" : "Litres aux 100 km";
+    $("lbl-prix").textContent = kwh ? "Prix du kWh (F)" : "Prix du litre (F)";
+    $("prix-litre").min = kwh ? 5 : 50; $("conso").max = kwh ? 40 : 25;
     $("ma-position").hidden = !("geolocation" in navigator);
     $("trajet-resume").textContent = DEPART ? "depuis " + DEPART.nom : "non renseigné";
     $("tri-bloc").hidden = !DEPART;
     $("tri").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tri === tri ? "true" : "false"));
     $("trajet-note").textContent = TRAJET.vehicule === "doux" ? "Le trajet ne coûte rien et n'émet pas de CO2 : seule la distance est indiquée." :
-      "Prix du litre : maximum fixé pour " + TC.verifie + " (" + TC.vehicules[TRAJET.vehicule].prix.toLocaleString("fr-FR") + " F). Distance estimée par la route, aller et retour.";
+      ((TC.vehicules[TRAJET.vehicule].unite === "kWh" ? "Prix du kWh : tarif domestique d'" : "Prix du litre : maximum fixé pour ") + TC.verifie + " (" + TC.vehicules[TRAJET.vehicule].prix.toLocaleString("fr-FR") + " F). " +
+       (TRAJET.vehicule === "electrique" ? "CO2 de l'électricité calédonienne : environ " + TC.vehicules.electrique.co2.toLocaleString("fr-FR") + " kg par kWh (66 % de renouvelables). " : "") +
+       "Distance estimée par la route, aller et retour.");
   }
   function changerTrajet() {
     ecrire("depart", JSON.stringify(DEPART)); ecrire("trajet", JSON.stringify(TRAJET));
@@ -1197,7 +1222,7 @@ select {
     if (!D) return;
     rendreLignes();
     const vide = !LISTE.length;
-    ["liste-verdict", "liste-duo", "liste-cartes", "liste-detail-bloc", "liste-classement-bloc"].forEach((id) => $(id).hidden = vide);
+    ["liste-verdict", "liste-duo", "liste-bilan", "liste-cartes", "liste-detail-bloc", "liste-classement-bloc"].forEach((id) => $(id).hidden = vide);
     if (vide) return;
     const R = calculer(), V = $("liste-verdict");
     const nom = (s) => D.magasins[s][0], com = (s) => D.magasins[s][1] || "Commune non renseignée";
@@ -1258,6 +1283,7 @@ select {
       Dd.hidden = false;
     } else { Dd.hidden = true; }
 
+    rendreBilan(R, best);
     rendreValeurCartes(R);
 
     // détail du magasin choisi
@@ -1359,6 +1385,43 @@ select {
   $("cartes-compter").addEventListener("change", (e) => {
     compter = e.target.checked; ecrire("cartes-compter", compter ? "1" : "0"); choisi = null; rendre();
   });
+
+  /* Bilan carbone du trajet : par course et par an, face au plus proche, au moins cher en caisse et aux autres véhicules. */
+  const FREQUENCES = [[104, "2 fois par semaine"], [52, "1 fois par semaine"], [24, "2 fois par mois"], [12, "1 fois par mois"]];
+  const VEHICULES = [["essence", "Voiture essence"], ["gazole", "Voiture diesel"], ["hybride", "Voiture hybride"], ["electrique", "Voiture électrique"], ["doux", "À pied, à vélo, en bus"]];
+  function rendreBilan(R, best) {
+    const P = $("liste-bilan");
+    if (!DEPART || !best || !best.tr) { P.hidden = true; return; }
+    const an = (x) => x * frequence, kg = (x) => km1(x) + " kg";
+    const ligne = (titre, r) => {
+      const c = cout(r.tr.km);
+      return "<tr><td>" + titre + "</td><td>" + km1(r.tr.km) + " km</td><td>" + kg(an(c.co2)) + "</td><td>" + xpf(an(r.caisse + c.tot)) + "</td></tr>";
+    };
+    const proche = R.complets.reduce((a, r) => (r.tr && (!a.tr || r.tr.km < a.tr.km) ? r : a));
+    const raisonnables = R.complets.filter((r) => r.tr && r.tr.km / 2 <= 2 * TC.rayonProche);
+    const caissePlus = raisonnables.length ? raisonnables.reduce((a, r) => (r.caisse < a.caisse ? r : a)) : null;
+    const cBest = cout(best.tr.km);
+    let html = "<h3>Mon bilan carbone</h3>" +
+      '<label class="frequence" for="frequence">Je fais ces courses <select id="frequence">' +
+      FREQUENCES.map(([n, t]) => '<option value="' + n + '"' + (n === frequence ? " selected" : "") + ">" + t + "</option>").join("") + "</select></label>" +
+      '<p><span class="chiffre num">' + kg(an(cBest.co2)) + "</span> de CO2 par an pour aller chez " + esc(D.magasins[best.s][0]) + " depuis " + esc(DEPART.nom) +
+      " (" + kg(cBest.co2) + " par course" + (cBest.f ? ", " + xpf(an(cBest.f)) + " de trajet par an" : "") + ").</p>" +
+      '<table><thead><tr><th>Où</th><th>Aller-retour</th><th>CO2 par an</th><th>Courses + trajet par an</th></tr></thead><tbody>' +
+      ligne("Ce magasin", best) +
+      (proche.tr && proche.s !== best.s ? ligne("Le plus proche : " + esc(D.magasins[proche.s][0]), proche) : "") +
+      (caissePlus && caissePlus.s !== best.s && caissePlus.s !== proche.s ? ligne("Le moins cher en caisse : " + esc(D.magasins[caissePlus.s][0]), caissePlus) : "") +
+      "</tbody></table>" +
+      '<table><thead><tr><th>Même trajet</th><th>CO2 par an</th><th>Trajet par an</th></tr></thead><tbody>' +
+      VEHICULES.map(([k, t]) => {
+        const c = cout(best.tr.km, vehiculeType(k));
+        return '<tr' + (k === TRAJET.vehicule ? ' class="actuel"' : "") + "><td>" + t + "</td><td>" + kg(an(c.co2)) + "</td><td>" + xpf(an(c.f)) + "</td></tr>";
+      }).join("") + "</tbody></table>" +
+      '<p class="note">Seul le trajet est compté : pas la fabrication du véhicule, ni l\'empreinte des produits achetés. Électricité : environ ' +
+      TC.vehicules.electrique.co2.toLocaleString("fr-FR") + " kg de CO2 par kWh en Nouvelle-Calédonie (66 % de renouvelables).</p>";
+    P.innerHTML = html;
+    $("frequence").onchange = (e) => { frequence = +e.target.value; ecrire("frequence", String(frequence)); rendre(); };
+    P.hidden = false;
+  }
 
   /* Pour la liste en cours : le meilleur magasin de chaque enseigne à carte, cagnotte déduite, face au moins cher sans carte. */
   function rendreValeurCartes(R) {
