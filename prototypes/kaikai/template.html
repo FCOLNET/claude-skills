@@ -261,6 +261,15 @@ select {
 .eco.alerte { background: var(--alerte-pale); }
 .eco.alerte b { color: var(--alerte); }
 
+/* Pièges du rayon */
+.puce.piege { background: var(--alerte-pale); color: var(--alerte); }
+.puce.vraie { background: var(--niaouli-pale); color: var(--niaouli); }
+.piege-texte { font-size: .85rem; color: var(--alerte); margin-top: 4px; }
+.piege-texte.ok { color: var(--niaouli); }
+.piege-texte button { font: inherit; font-size: .82rem; margin-left: 6px; padding: 2px 10px; border-radius: 99px; border: 1.5px solid var(--alerte); background: transparent; color: var(--alerte); cursor: pointer; }
+.pieges-resume { background: var(--alerte-pale); color: var(--encre); border-radius: 10px; padding: 10px 14px; margin: 0 0 8px; font-size: .92rem; }
+.pieges-resume b { color: var(--alerte); }
+
 /* Bilan carbone */
 .bilan .frequence { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .bilan table { width: 100%; border-collapse: collapse; font-size: .9rem; }
@@ -494,6 +503,9 @@ select {
       (production et combustion du carburant) et, pour l'électricité, la part de renouvelables publiée par Enercal.
       Positions des magasins : prix.nc, complétées par OpenStreetMap ; à défaut, le quartier ou le centre de la commune.
       Votre point de départ reste dans votre navigateur.</p>
+    <p>Pièges du rayon : une promotion est « trompeuse » quand son prix est égal ou supérieur au prix habituel du produit,
+      c'est-à-dire la médiane de ses prix hors promotion dans au moins trois magasins. Un grand format est un « piège » quand,
+      dans le même magasin, plusieurs petits formats du même produit (même quantité à ±10 %) coûtent moins cher.</p>
     <p>Cartes de fidélité : les règles viennent des sites des enseignes et de relevés publics ; celles marquées
       « à confirmer » peuvent avoir changé. Les offres ciblées (remises personnelles, opérations points × 2) ne sont pas comptées.</p>
   </footer>
@@ -866,6 +878,7 @@ select {
     const regs = F.programmes.map((p) => [new RegExp(p.magasins, "i"), p]);
     PROG = D.magasins.map((m) => { const r = regs.find(([re]) => re.test(m[0])); return r ? r[1] : null; });
     initCartes();
+    preparerPieges();
     const communes = [...new Set(D.magasins.map((m) => m[1]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
     COMMUNES = communes;
     if (commune && commune !== "__proche" && !communes.includes(commune)) commune = "";
@@ -976,6 +989,42 @@ select {
     if (!b) return;
     tri = b.dataset.tri; ecrire("tri", tri); initTrajet(); choisi = null; rendre();
   });
+  /* Prix habituel d'un produit : médiane des prix hors promotion (au moins 3 magasins). */
+  let HABITUEL = null, FORMATS = new Map();
+  function preparerPieges() {
+    HABITUEL = new Float64Array(D.prix.length);
+    D.prix.forEach((t, i) => {
+      const hp = [];
+      for (let k = 0; k < t.length; k += 2) if (!(t[k] & 1)) hp.push(t[k + 1]);
+      if (hp.length >= 3) { hp.sort((a, b) => a - b); const m = hp.length >> 1; HABITUEL[i] = hp.length % 2 ? hp[m] : (hp[m - 1] + hp[m]) / 2; }
+    });
+    for (const [j, m, k, n] of D.formats || []) FORMATS.set(j * 256 + m, [k, n]);
+  }
+  function prixA(j, s) {
+    const t = D.prix[j];
+    for (let k = 0; k < t.length; k += 2) if (t[k] >> 1 === s) return t[k + 1];
+    return null;
+  }
+  /* Pièges du rayon pour une ligne de la liste achetée dans le magasin s (o = [prix, produit, promo]). */
+  function pieges(o, s, l) {
+    const out = [];
+    if (!o) return out;
+    const h = HABITUEL[o[1]];
+    if (o[2] && h) {
+      const d = o[0] - h, pc = Math.round(-100 * d / h);
+      if (d >= 0) out.push({ type: "trompeuse", puce: "promo trompeuse", gain: 0,
+        texte: "Promo trompeuse : " + (d ? xpf(d) + " de plus que" : "au même prix que") + " le prix habituel sans promotion (" + xpf(h) + ")." });
+      else if (pc < 5) out.push({ type: "faible", puce: "promo faible", gain: 0, texte: "Promo faible : seulement −" + Math.max(pc, 1) + " % sur le prix habituel (" + xpf(h) + ")." });
+      else out.push({ type: "vraie", puce: "vraie promo −" + pc + " %", gain: 0, texte: "" });
+    }
+    const f = FORMATS.get(o[1] * 256 + s);
+    if (f) {
+      const [k, n] = f, pk = prixA(k, s);
+      if (pk) out.push({ type: "format", puce: "grand format piège", gain: (o[0] - n * pk) * l.qte, k, n,
+        texte: n + " × " + D.produits[k][0] + " = " + xpf(n * pk) + " au lieu de " + xpf(o[0]) + "." });
+    }
+    return out;
+  }
   const nbMag = (i) => D.prix[i].length / 2;
   const prixMin = (i) => D.prix[i][1];
 
@@ -1208,6 +1257,20 @@ select {
     return { complets, partiels, duo, minT, seul, avecTrajet, nbMags: mags.length };
   }
 
+  /* Résumé des pièges du rayon pour un magasin (ligne du verdict, ou bandeau du détail). */
+  function resumePieges(r, verdict) {
+    let nT = 0, nF = 0, gain = 0;
+    LISTE.forEach((l, k) => pieges(r.lignes[k], r.s, l).forEach((p) => {
+      if (p.type === "trompeuse") nT++;
+      if (p.type === "format") { nF++; gain += p.gain; }
+    }));
+    if (!nT && !nF) return "";
+    const quoi = [nT ? nT + " promo" + (nT > 1 ? "s" : "") + " trompeuse" + (nT > 1 ? "s" : "") : "", nF ? nF + " grand" + (nF > 1 ? "s" : "") + " format" + (nF > 1 ? "s" : "") + " piège" + (nF > 1 ? "s" : "") : ""].filter(Boolean).join(" et ");
+    return verdict
+      ? '<div class="eco alerte"><span>Pièges du rayon dans ce magasin : ' + quoi + " (voir le détail)</span>" + (gain ? '<b class="num">− ' + xpf(gain) + "</b>" : "") + "</div>"
+      : '<p class="pieges-resume">Pièges du rayon : <b>' + quoi + "</b>" + (gain ? ". En prenant les petits formats, vous économisez <b>" + xpf(gain) + "</b>." : ".") + "</p>";
+  }
+
   /* Mode tout compris : le gagnant face au magasin le plus proche qui a toute la liste. */
   function comparerProche(R, best) {
     const proche = R.complets.reduce((a, r) => (r.tr && (!a.tr || r.tr.km < a.tr.km) ? r : a));
@@ -1246,6 +1309,7 @@ select {
         (DEPART ? '<div class="trajet-ligne">Trajet depuis ' + esc(DEPART.nom) + " : <b>" + texteTrajet(best.tr) + "</b>" + precisionMag(best.s) +
           (best.tr && best.tr.tot ? "<br>Tout compris : <b>" + xpf(best.caisse + best.tr.tot) + "</b>" : "") + "</div>" : "") + "</div>" +
         '<div class="economies">' +
+        resumePieges(best, true) +
         (DEPART && tri === "total" ? comparerProche(R, best) : "") +
         (!DEPART || tri === "caisse" ? (R.complets.length > 1 ? '<div class="eco"><span>par rapport au magasin le plus cher' + (DEPART && tri === "total" ? ", trajet compris" : "") + '</span><b class="num">− ' + xpf(pire.cle - best.cle) + "</b></div>" : "") +
           (R.complets.length > 2 ? '<div class="eco"><span>par rapport au prix habituel (médiane)</span><b class="num">− ' + xpf(med.cle - best.cle) + "</b></div>" : "") : "") +
@@ -1294,15 +1358,21 @@ select {
     if (sel) {
       $("liste-detail-titre").textContent = "Votre liste chez " + nom(sel.s);
       const fidSel = aLaCarte(sel.s);
+      const rp = resumePieges(sel, false);
+      if (rp) det.insertAdjacentHTML("beforeend", rp);
       LISTE.forEach((l, k) => {
-        const o = sel.lignes[k], div = document.createElement("div");
+        const o = sel.lignes[k], div = document.createElement("div"), pg = pieges(o, sel.s, l);
         div.className = "ing";
         const ref = D.produits[l.i][0];
         div.innerHTML = '<div class="nom">' + esc(ref) + ' <span class="qte-txt" style="color:var(--doux);font-weight:400">× ' + l.qte + "</span></div>" +
           '<div class="montant">' + (o ? '<b class="num">' + xpf(o[0] * l.qte) + '</b><small class="num">' + (l.qte > 1 ? l.qte + " × " + xpf(o[0]) : "") + "</small>" : "<b>—</b>") + "</div>" +
           '<div class="produit">' + (o ? (o[1] !== l.i ? "Équivalent : " + esc(D.produits[o[1]][0]) : "Ce produit") +
-            (o[2] || (fidSel && remise(PROG[sel.s], o[1], o[2])) ? '<div class="puces">' + (o[2] ? '<span class="puce promo">promo</span>' : "") +
-              (fidSel && remise(PROG[sel.s], o[1], o[2]) ? '<span class="puce fid">' + esc(PROG[sel.s].nom) + " " + Math.round(PROG[sel.s].taux * 100) + " %</span>" : "") + "</div>" : "")
+            (o[2] || pg.length || (fidSel && remise(PROG[sel.s], o[1], o[2])) ? '<div class="puces">' +
+              (o[2] && !pg.some((p) => p.type !== "format") ? '<span class="puce promo">promo</span>' : "") +
+              pg.map((p) => '<span class="puce ' + (p.type === "vraie" ? "vraie" : p.type === "faible" ? "promo" : "piege") + '">' + esc(p.puce) + "</span>").join("") +
+              (fidSel && remise(PROG[sel.s], o[1], o[2]) ? '<span class="puce fid">' + esc(PROG[sel.s].nom) + " " + Math.round(PROG[sel.s].taux * 100) + " %</span>" : "") + "</div>" : "") +
+            pg.filter((p) => p.texte).map((p) => '<div class="piege-texte">' + esc(p.texte) +
+              (p.type === "format" ? ' <button type="button" data-k="' + k + '" data-petit="' + p.k + '" data-n="' + p.n + '">Prendre ' + p.n + " petits formats</button>" : "") + "</div>").join("")
             : '<span class="puce manque">pas vendu dans ce magasin</span>') + "</div>";
         det.appendChild(div);
       });
@@ -1327,6 +1397,13 @@ select {
       }
     }
 
+    det.querySelectorAll("button[data-petit]").forEach((b) => b.onclick = () => {
+      const l = LISTE[+b.dataset.k], n = +b.dataset.n, petit = +b.dataset.petit;
+      const deja = LISTE.find((x) => x.i === petit && x !== l);
+      if (deja) { deja.qte += l.qte * n; LISTE.splice(+b.dataset.k, 1); }
+      else { l.i = petit; l.qte *= n; l.exact = true; }
+      const garde = sel.s; modifier(); choisi = garde; rendre();
+    });
     if (sel && DEPART) {
       const t = document.createElement("div");
       t.className = "ing total-ligne";

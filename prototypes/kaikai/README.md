@@ -51,6 +51,18 @@ les calculs et les recettes fonctionnent ; la lecture de photo est masquée.
 - La photo est envoyée à Claude, qui renvoie les articles lus ; chacun est rapproché du catalogue par la
   recherche locale et l'utilisateur valide avant l'ajout.
 
+## Pièges du rayon
+
+Dans le détail d'un magasin (et en résumé dans le verdict), chaque ligne de la liste est vérifiée :
+
+- **Promo trompeuse** : prix en promotion égal ou supérieur au prix habituel du produit (médiane
+  de ses prix hors promotion dans au moins 3 magasins). Au 17/10/2026 : 816 promotions sur 8 182
+  comparables. « Promo faible » sous −5 %, sinon « vraie promo −X % ».
+- **Grand format piège** : dans le même magasin, n petits formats du même produit (même nom hors
+  contenance, même quantité à ±10 %, moins chers à l'unité) coûtent au moins 3 % et 20 F de moins
+  que le grand. 734 cas au 17/10/2026, calculés par `construire_liste.py` (champ `formats`).
+  Le bouton « Prendre n petits formats » remplace la ligne.
+
 ## Cartes de fidélité
 
 Les règles sont dans le bloc `<script type="application/json" id="fidelite">` de `template.html` :

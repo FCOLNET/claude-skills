@@ -11,6 +11,8 @@ Format (tableaux parallèles, pour tenir en quelques Mo) :
                 marque propre : 0 aucune, 1 Casino, 2 Auchan, 3 U, 4 Carrefour (pour les cartes de fidélité)
     prix      : [[m1*2+promo1, prix1, m2*2+promo2, prix2, ...], ...]   un tableau par produit
     departs   : [[commune, nom, lat, lon], ...]   points de départ proposés (quartiers, centres des communes)
+    formats   : [[grand, magasin, petit, n], ...]   piège du grand format : dans ce magasin, n petits formats
+                (même variété, marque et unité, même quantité à ±10 %) coûtent moins cher que le grand
 """
 import csv, json, re, statistics as st, sys
 from collections import defaultdict
@@ -53,6 +55,7 @@ def position(id_magasin, nom, commune):
 ref = lire("produits.csv")
 variete = {p["id_produit"]: (p["variete"] or p["sous_secteur"] or p["secteur"] or "").strip() for p in ref}
 famille = {p["id_produit"]: marque_propre(p["marque"]) for p in ref}
+marque = {p["id_produit"]: (p["marque"] or "").strip().lower() for p in ref}
 par_produit = defaultdict(list)
 for r in lire("releves.csv"):
     try:
@@ -63,7 +66,7 @@ for r in lire("releves.csv"):
         par_produit[r["id_produit"]].append(r)
 
 magasins, idx_mag, varietes, idx_var = [], {}, [], {}
-produits, prix_tab, ecartes = [], [], 0
+produits, prix_tab, ecartes, pids = [], [], 0, []
 for pid, rs in sorted(par_produit.items(), key=lambda x: x[1][0]["produit"]):
     med = st.median(int(r["prix"]) for r in rs)
     if len(rs) >= 3:   # prix aberrants : plus de 3x ou moins de 1/3 de la médiane
@@ -84,12 +87,42 @@ for pid, rs in sorted(par_produit.items(), key=lambda x: x[1][0]["produit"]):
     produits.append([rs[0]["produit"].strip(), idx_var[v], rs[0]["unite"], round(st.median(tailles), 3) if tailles else 0, rs[0]["ean"],
                      famille.get(pid, 0)])
     prix_tab.append(ligne)
+    pids.append(pid)
+
+# Piège du grand format : même nom une fois retirés les chiffres et les unités de contenance
+CONTENANCE = re.compile(r"\b(\d+([.,]\d+)?|x|kg|g|mg|l|cl|ml|dl|cs|c|u|unités?|pièces?|rouleaux)\b")
+def nom_sans_taille(n):
+    return " ".join(CONTENANCE.sub(" ", re.sub(r"(\d)(x|kg|g|l|cl|ml)\b", r"\1 \2", n.lower())).split())
+
+rayons = defaultdict(list)   # (magasin, nom sans taille, unité) -> [(produit, taille, prix)]
+for j, (p, ligne) in enumerate(zip(produits, prix_tab)):
+    if not marque.get(pids[j]) or p[3] <= 0:
+        continue
+    cle = nom_sans_taille(p[0])
+    for k in range(0, len(ligne), 2):
+        rayons[(ligne[k] >> 1, cle, p[2])].append((j, p[3], ligne[k + 1]))
+formats = []
+for (m, *_), l in rayons.items():
+    for j, tj, pj in l:
+        meilleur = None
+        for k, tk, pk in l:
+            if tk >= tj:
+                continue
+            n = round(tj / tk)
+            if n < 2 or abs(n * tk - tj) / tj > 0.1:
+                continue
+            gain = pj - n * pk
+            moins_cher_a_l_unite = pk / tk <= 0.97 * pj / tj   # pas seulement parce qu'il y a moins de produit
+            if gain >= 20 and gain >= 0.03 * pj and moins_cher_a_l_unite and (not meilleur or gain > meilleur[0]):
+                meilleur = (gain, k, n)
+        if meilleur:
+            formats.append([j, m, meilleur[1], meilleur[2]])
 
 departs = [[q["commune"], q["quartier"], float(q["lat"]), float(q["lon"])] for q in lire_pos("quartiers.csv")]
 departs += [[c, c + " (centre)", lat, lon] for c, (lat, lon) in centres.items() if c not in {d[0] for d in departs}]
 donnees = dict(instantane=Path(SNAP).name, releves_de=manifeste["releve_le_plus_ancien"], releves_a=manifeste["releve_le_plus_recent"],
-               magasins=magasins, varietes=varietes, produits=produits, prix=prix_tab, departs=departs)
+               magasins=magasins, varietes=varietes, produits=produits, prix=prix_tab, departs=departs, formats=formats)
 Path(OUT).write_text(json.dumps(donnees, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print(f"{OUT} : {len(produits)} produits, {len(magasins)} magasins ({sum(m[4] == 0 for m in magasins)} situés précisément, "
       f"{sum(m[4] == 1 for m in magasins)} au quartier, {sum(m[4] == 2 for m in magasins)} à la commune, {sum(m[2] is None for m in magasins)} sans position), "
-      f"{sum(len(p) // 2 for p in prix_tab)} prix, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)
+      f"{sum(len(p) // 2 for p in prix_tab)} prix, {len(formats)} grands formats pièges, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)
