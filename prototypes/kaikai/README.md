@@ -6,7 +6,8 @@ Non officielle. Deux onglets :
 - **Ma liste de courses** : on ajoute des produits par recherche, ou en lisant la photo d'une liste
   manuscrite (lue par Claude, avec l'accord de l'utilisateur). L'appli donne le magasin le moins cher
   pour toute la liste, et la meilleure combinaison de deux magasins de la même commune. Les cartes
-  de fidélité cochées par l'utilisateur sont prises en compte (voir plus bas).
+  de fidélité cochées par l'utilisateur sont prises en compte, et le coût du trajet depuis son
+  quartier (carburant, temps, CO2) quand il l'indique (voir plus bas).
 - **Recettes** : le coût de 5 recettes calédoniennes au meilleur prix.
 
 Version en ligne : https://claude.ai/artifact/4rxympDnSY29hFxoCuxe9s (privée, à partager
@@ -22,6 +23,7 @@ depuis le menu « Partager » de la page).
 | `template.html` | Page sans données (le marqueur `__DATA__` reçoit le JSON des recettes) |
 | `construire.py` | Chiffre les recettes à partir d'un instantané et produit `kaikai.html` |
 | `construire_liste.py` | Produit `liste-data.json` à partir d'un instantané |
+| `positions/` | Positions ajoutées aux magasins sans coordonnées prix.nc, centres des communes, quartiers de départ |
 
 ## Mettre à jour les prix
 
@@ -77,6 +79,32 @@ Dans l'appli :
 - Le duo de magasins est calculé sur le prix en caisse seul.
 - Non comptés : offres ciblées (Happy Remises…), opérations points × 2, cotisation Mon Club
   (1 000 F par an après la 1re année).
+
+## Trajet
+
+« Mon trajet » : l'utilisateur choisit son quartier (ou sa position, si le navigateur la donne) et
+son moyen de déplacement. Les paramètres sont dans le bloc `<script type="application/json"
+id="trajet-config">` de `template.html` : **prix du litre à mettre à jour chaque mois**
+(prix maximums publiés par l'Observatoire de l'énergie, observatoire-energie.gouv.nc).
+
+- Distance : vol d'oiseau × 1,3 (détour), aller et retour. Pas de calcul d'itinéraire.
+- Temps : 30 km/h sur les 20 premiers km, 70 km/h au-delà.
+- Carburant : litres × prix maximum du mois (octobre 2026 : essence 182,4 F, gazole 190,6 F).
+  Consommation par défaut : 7 L (essence), 6 L (diesel), 4,5 L (hybride), modifiable.
+- CO2 : 2,7 kg par litre d'essence, 3,1 par litre de gazole (ADEME, production et combustion).
+- Temps passé : compté seulement si l'utilisateur lui donne une valeur en F de l'heure.
+- À pied, à vélo ou en bus : trajet gratuit, magasins à moins de 8 km seulement.
+- Classement au choix : tout compris (caisse − cagnotte + trajet), en caisse, le plus proche.
+  « À moins de 15 km de mon point de départ » remplace la commune par défaut.
+- Duo de magasins : avec un point de départ, n'importe quels deux magasins, tournée
+  départ → A → B → départ comprise ; il disparaît souvent une fois le détour compté.
+
+Positions des magasins (`construire_liste.py`) : coordonnées prix.nc (154 magasins, vérifiées
+à moins de 100 m d'OpenStreetMap pour les enseignes) ; sinon `positions/magasins.csv`
+(OpenStreetMap ou quartier, une ligne commençant par `~` est une expression régulière) ;
+sinon le centre de la commune (`positions/communes.csv`). L'appli signale les positions
+approximatives. À compléter en priorité : Hyper U Païta, Super U Koumac, K-Gou Pouembout,
+Leader Price Poindimié, Carrefour Eco Kim Chi (au centre de leur commune aujourd'hui).
 
 ## Ajouter ou modifier une recette
 

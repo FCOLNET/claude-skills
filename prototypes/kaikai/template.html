@@ -88,7 +88,7 @@ button, select { font: inherit; color: inherit; }
 .titre-recette p { margin: 0; color: var(--doux); }
 
 .reglages { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; }
-.reglage { display: grid; gap: 6px; min-width: 0; }
+.reglage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; max-width: 100%; }
 .reglage > span { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color: var(--doux); font-weight: 700; }
 .segments { display: inline-flex; background: var(--carte); border: 1.5px solid var(--trait); border-radius: 99px; padding: 3px; }
 .segments button {
@@ -251,6 +251,16 @@ select {
 .duo .mag b { display: block; }
 .duo .mag ul { margin: 6px 0 0; padding-left: 18px; color: var(--doux); }
 
+/* Trajet */
+#tri button { padding: 6px 11px; }
+.trajet-chiffres { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cartes-corps input[type="number"] { font: inherit; color: inherit; background: var(--carte); border: 1.5px solid var(--trait); border-radius: 10px; padding: 6px 10px; width: 100%; }
+.cartes-corps .reglage select { width: 100%; }
+.verdict .trajet-ligne { margin-top: 8px; font-size: .92rem; color: var(--doux); }
+.verdict .trajet-ligne b { color: var(--encre); }
+.eco.alerte { background: var(--alerte-pale); }
+.eco.alerte b { color: var(--alerte); }
+
 /* Cartes de fidélité */
 .cartes { background: var(--carte); border: 1px solid var(--trait); border-radius: var(--r); padding: 0; }
 .cartes > summary { cursor: pointer; padding: 12px 16px; font-weight: 700; list-style-position: inside; }
@@ -349,7 +359,36 @@ select {
             <span>Commune</span>
             <select id="commune-liste"></select>
           </label>
+          <div class="reglage" id="tri-bloc" hidden>
+            <span id="lbl-tri">Classer par</span>
+            <div class="segments" id="tri" role="group" aria-labelledby="lbl-tri">
+              <button type="button" data-tri="total" aria-pressed="true">Tout compris</button>
+              <button type="button" data-tri="caisse" aria-pressed="false">En caisse</button>
+              <button type="button" data-tri="proche" aria-pressed="false">Le plus proche</button>
+            </div>
+          </div>
         </div>
+        <details class="cartes" id="trajet">
+          <summary>Mon trajet <small id="trajet-resume"></small></summary>
+          <div class="cartes-corps">
+            <label class="reglage" for="depart"><span>Je pars de</span><select id="depart"></select></label>
+            <div><button type="button" class="btn" id="ma-position" hidden>Utiliser ma position</button></div>
+            <p class="note" id="position-etat" aria-live="polite"></p>
+            <label class="reglage" for="vehicule"><span>Je me déplace</span>
+              <select id="vehicule">
+                <option value="essence">en voiture essence</option>
+                <option value="gazole">en voiture diesel</option>
+                <option value="hybride">en voiture hybride</option>
+                <option value="doux">à pied, à vélo ou en bus</option>
+              </select></label>
+            <div class="trajet-chiffres" id="trajet-voiture">
+              <label class="reglage" for="conso"><span>Litres aux 100 km</span><input id="conso" type="number" min="2" max="25" step="0.5" inputmode="decimal"></label>
+              <label class="reglage" for="prix-litre"><span>Prix du litre (F)</span><input id="prix-litre" type="number" min="50" max="400" step="0.1" inputmode="decimal"></label>
+            </div>
+            <label class="reglage" for="valeur-temps"><span>Mon temps vaut (F de l'heure, 0 = ne pas compter)</span><input id="valeur-temps" type="number" min="0" max="20000" step="100" inputmode="numeric"></label>
+            <p class="note" id="trajet-note"></p>
+          </div>
+        </details>
         <details class="cartes" id="cartes">
           <summary>Mes cartes de fidélité <small id="cartes-resume"></small></summary>
           <div class="cartes-corps">
@@ -369,7 +408,7 @@ select {
         </section>
         <section class="section" id="liste-classement-bloc" hidden>
           <h3>Tous les magasins</h3>
-          <p class="sous">Magasins qui ont toute votre liste. Touchez un magasin pour voir le détail.</p>
+          <p class="sous" id="liste-classement-sous">Magasins qui ont toute votre liste. Touchez un magasin pour voir le détail.</p>
           <ol class="classement" id="liste-classement"></ol>
           <button type="button" class="plus" id="liste-plus" hidden></button>
           <p class="note" id="liste-partiels"></p>
@@ -438,6 +477,10 @@ select {
       Ces choix restent enregistrés dans votre navigateur. Le sel, le poivre et l'eau ne sont pas comptés.</p>
     <p>« Ma liste de courses » compare les 24 700 produits publiés sur prix.nc. Votre liste reste dans votre navigateur.
       La lecture d'une photo passe par Claude, avec votre accord, et utilise votre compte Claude.</p>
+    <p>Trajet : distance à vol d'oiseau multipliée par un coefficient de détour, aller et retour ; carburant au prix maximum
+      fixé chaque mois par le gouvernement ; CO2 selon les facteurs de l'ADEME (production et combustion du carburant).
+      Positions des magasins : prix.nc, complétées par OpenStreetMap ; à défaut, le quartier ou le centre de la commune.
+      Votre point de départ reste dans votre navigateur.</p>
     <p>Cartes de fidélité : les règles viennent des sites des enseignes et de relevés publics ; celles marquées
       « à confirmer » peuvent avoir changé. Les offres ciblées (remises personnelles, opérations points × 2) ne sont pas comptées.</p>
   </footer>
@@ -445,6 +488,22 @@ select {
 
 <script type="application/json" id="donnees">__DATA__</script>
 <script type="application/json" id="liste-donnees">__LISTE__</script>
+<!-- Paramètres du trajet. co2 : kg de CO2 par litre (ADEME, production et combustion). prix : F par litre, prix maximum du mois. -->
+<script type="application/json" id="trajet-config">
+{
+  "verifie": "octobre 2026",
+  "source": "Observatoire de l'énergie de la Nouvelle-Calédonie, prix maximums du 1er au 31 octobre 2026",
+  "vehicules": {
+    "essence": { "nom": "d'essence", "prix": 182.4, "conso": 7, "co2": 2.7 },
+    "gazole": { "nom": "de gazole", "prix": 190.6, "conso": 6, "co2": 3.1 },
+    "hybride": { "nom": "d'essence", "prix": 182.4, "conso": 4.5, "co2": 2.7 }
+  },
+  "detour": 1.3,
+  "vitesseVille": 30, "vitesseRoute": 70, "kmVille": 10,
+  "rayonProche": 15,
+  "rayonDoux": 8
+}
+</script>
 <!-- Règles des cartes de fidélité. type : "marque" (taux sur une marque propre), "tranches" (gain par tranche
      de ticket), "conso" (barème CONSO+). famille : 1 Casino, 2 Auchan, 3 U, 4 Carrefour (6e champ des produits). -->
 <script type="application/json" id="fidelite">
@@ -764,6 +823,11 @@ select {
   let CARTES = new Set();
   try { CARTES = new Set(JSON.parse(lire("cartes", "[]"))); } catch (e) {}
   let compter = lire("cartes-compter", "1") === "1";
+  const TC = JSON.parse($("trajet-config").textContent);
+  let DEPART = null, TRAJET = null, tri = lire("tri", "total");
+  try { DEPART = JSON.parse(lire("depart", "null")); } catch (e) {}
+  try { TRAJET = JSON.parse(lire("trajet", "null")); } catch (e) {}
+  if (!TRAJET || !TC.vehicules[TRAJET.vehicule] && TRAJET.vehicule !== "doux") TRAJET = { vehicule: "essence", conso: TC.vehicules.essence.conso, prix: TC.vehicules.essence.prix, temps: 0 };
 
   function demarrer() {
     if (chargement) return chargement;
@@ -787,10 +851,106 @@ select {
     PROG = D.magasins.map((m) => { const r = regs.find(([re]) => re.test(m[0])); return r ? r[1] : null; });
     initCartes();
     const communes = [...new Set(D.magasins.map((m) => m[1]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
-    if (commune && !communes.includes(commune)) commune = "";
-    $("commune-liste").innerHTML = '<option value="">Toute la Nouvelle-Calédonie</option>' +
-      communes.map((c) => "<option" + (c === commune ? " selected" : "") + ">" + esc(c) + "</option>").join("");
+    COMMUNES = communes;
+    if (commune && commune !== "__proche" && !communes.includes(commune)) commune = "";
+    remplirCommunes();
+    initTrajet();
   }
+  let COMMUNES = [];
+  function remplirCommunes() {
+    if (commune === "__proche" && !DEPART) commune = "";
+    $("commune-liste").innerHTML = (DEPART ? '<option value="__proche"' + (commune === "__proche" ? " selected" : "") + ">À moins de " + TC.rayonProche + " km de mon point de départ</option>" : "") +
+      '<option value=""' + (commune === "" ? " selected" : "") + ">Toute la Nouvelle-Calédonie</option>" +
+      COMMUNES.map((c) => "<option" + (c === commune ? " selected" : "") + ">" + esc(c) + "</option>").join("");
+  }
+
+  /* ---------- Trajet ---------- */
+  const rad = (x) => x * Math.PI / 180;
+  function vol(a, b, c, d) {   // km à vol d'oiseau
+    const h = Math.sin(rad(c - a) / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(rad(d - b) / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(h));
+  }
+  const versMag = (s) => { const m = D.magasins[s]; return m[2] == null ? null : vol(DEPART.lat, DEPART.lon, m[2], m[3]) * TC.detour; };
+  /* Coût d'un parcours de km kilomètres (aller-retour déjà compté). */
+  function cout(km) {
+    const ville = Math.min(km, 2 * TC.kmVille), min = Math.round(60 * (ville / TC.vitesseVille + (km - ville) / TC.vitesseRoute));
+    if (TRAJET.vehicule === "doux") return { km, min: null, f: 0, co2: 0, ft: 0, tot: 0 };
+    const litres = km * TRAJET.conso / 100, f = litres * TRAJET.prix, ft = TRAJET.temps > 0 ? min / 60 * TRAJET.temps : 0;
+    return { km, min, f, co2: litres * TC.vehicules[TRAJET.vehicule].co2, ft, tot: f + ft };
+  }
+  function trajet(s) {
+    if (!DEPART) return null;
+    const d = versMag(s);
+    return d == null ? null : cout(2 * d);
+  }
+  function tournee(a, b) {   // départ -> a -> b -> départ
+    const ma = D.magasins[a], mb = D.magasins[b];
+    if (!DEPART || ma[2] == null || mb[2] == null) return null;
+    return cout((vol(DEPART.lat, DEPART.lon, ma[2], ma[3]) + vol(ma[2], ma[3], mb[2], mb[3]) + vol(mb[2], mb[3], DEPART.lat, DEPART.lon)) * TC.detour);
+  }
+  const km1 = (n) => n.toLocaleString("fr-FR", { maximumFractionDigits: n < 10 ? 1 : 0 });
+  function texteTrajet(tr, court) {
+    if (!tr) return "position inconnue";
+    if (tr.km < 1) return "moins de 1 km";
+    if (TRAJET.vehicule === "doux") return km1(tr.km) + " km aller-retour";
+    return km1(tr.km) + " km" + (court ? "" : " aller-retour") + " · " + tr.min + " min · " + xpf(tr.f) + (court ? "" : " " + TC.vehicules[TRAJET.vehicule].nom) +
+      " · " + km1(tr.co2) + " kg de CO2" + (tr.ft ? " · temps " + xpf(tr.ft) : "");
+  }
+  const precisionMag = (s) => [null, " (position au quartier)", " (position au centre de la commune)"][D.magasins[s][4]] || "";
+
+  function initTrajet() {
+    const groupes = new Map();
+    for (const [c, nom, lat, lon] of D.departs) { if (!groupes.has(c)) groupes.set(c, []); groupes.get(c).push([nom, lat, lon]); }
+    const sel = (nom) => DEPART && DEPART.nom === nom ? " selected" : "";
+    $("depart").innerHTML = '<option value="">Choisir mon quartier…</option>' +
+      (DEPART && DEPART.nom === "Ma position" ? '<option value="pos" selected>Ma position</option>' : "") +
+      [...groupes].map(([c, l]) => '<optgroup label="' + esc(c) + '">' +
+        l.map(([nom, lat, lon]) => '<option value="' + lat + "," + lon + '"' + sel(nom) + ">" + esc(nom) + "</option>").join("") + "</optgroup>").join("");
+    $("vehicule").value = TRAJET.vehicule;
+    $("conso").value = TRAJET.conso; $("prix-litre").value = TRAJET.prix; $("valeur-temps").value = TRAJET.temps;
+    $("trajet-voiture").hidden = TRAJET.vehicule === "doux";
+    $("ma-position").hidden = !("geolocation" in navigator);
+    $("trajet-resume").textContent = DEPART ? "depuis " + DEPART.nom : "non renseigné";
+    $("tri-bloc").hidden = !DEPART;
+    $("tri").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tri === tri ? "true" : "false"));
+    $("trajet-note").textContent = TRAJET.vehicule === "doux" ? "Le trajet ne coûte rien et n'émet pas de CO2 : seule la distance est indiquée." :
+      "Prix du litre : maximum fixé pour " + TC.verifie + " (" + TC.vehicules[TRAJET.vehicule].prix.toLocaleString("fr-FR") + " F). Distance estimée par la route, aller et retour.";
+  }
+  function changerTrajet() {
+    ecrire("depart", JSON.stringify(DEPART)); ecrire("trajet", JSON.stringify(TRAJET));
+    initTrajet(); remplirCommunes(); choisi = null; rendre();
+  }
+  $("depart").addEventListener("change", (e) => {
+    const v = e.target.value, premier = !DEPART;
+    if (v === "pos") return;
+    if (!v) DEPART = null;
+    else { const [lat, lon] = v.split(",").map(Number); DEPART = { nom: e.target.selectedOptions[0].textContent, lat, lon }; }
+    if (DEPART && premier) { commune = "__proche"; ecrire("commune-liste", commune); }
+    changerTrajet();
+  });
+  $("ma-position").addEventListener("click", () => {
+    $("position-etat").textContent = "Recherche de votre position…";
+    navigator.geolocation.getCurrentPosition((p) => {
+      const premier = !DEPART;
+      DEPART = { nom: "Ma position", lat: +p.coords.latitude.toFixed(4), lon: +p.coords.longitude.toFixed(4) };
+      $("position-etat").textContent = "";
+      if (premier) { commune = "__proche"; ecrire("commune-liste", commune); }
+      changerTrajet();
+    }, () => { $("position-etat").textContent = "Position indisponible ici : choisissez votre quartier dans la liste."; },
+    { timeout: 10000, maximumAge: 600000 });
+  });
+  $("vehicule").addEventListener("change", (e) => {
+    const v = e.target.value; TRAJET.vehicule = v;
+    if (TC.vehicules[v]) { TRAJET.conso = TC.vehicules[v].conso; TRAJET.prix = TC.vehicules[v].prix; }
+    changerTrajet();
+  });
+  [["conso", "conso"], ["prix-litre", "prix"], ["valeur-temps", "temps"]].forEach(([id, k]) =>
+    $(id).addEventListener("change", (e) => { const n = parseFloat(e.target.value); if (n >= 0) { TRAJET[k] = n; changerTrajet(); } }));
+  $("tri").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tri]");
+    if (!b) return;
+    tri = b.dataset.tri; ecrire("tri", tri); initTrajet(); choisi = null; rendre();
+  });
   const nbMag = (i) => D.prix[i].length / 2;
   const prixMin = (i) => D.prix[i][1];
 
@@ -973,7 +1133,12 @@ select {
   /* ---------- Calcul ---------- */
   function calculer() {
     const mags = [];
-    D.magasins.forEach((m, s) => { if (!commune || m[1] === commune) mags.push(s); });
+    const doux = DEPART && TRAJET.vehicule === "doux";
+    D.magasins.forEach((m, s) => {
+      if (doux) { const d = versMag(s); if (d == null || d > TC.rayonDoux) return; }
+      if (commune === "__proche") { const d = DEPART ? versMag(s) : null; if (d != null && d <= TC.rayonProche) mags.push(s); }
+      else if (!commune || m[1] === commune) mags.push(s);
+    });
     const mb = LISTE.map(meilleurs);
     const somme = (lignes) => lignes.reduce((a, o, k) => a + (o ? o[0] * LISTE[k].qte : 0), 0);
     const parMag = mags.map((s) => {
@@ -984,29 +1149,47 @@ select {
       const totalE = prog ? somme(le) : totalT, gainE = cagnotte(prog, le).gain;
       const carte = aLaCarte(s), lignes = carte && compter ? le : lt;
       const total = carte && compter ? totalE : totalT, fid = carte ? cagnotte(prog, lignes) : { gain: 0, manque: 0 };
-      return { s, n, lignes, lt, total, totalT, gain: fid.gain, manque: fid.manque, net: total - fid.gain,
-               cle: compter ? total - fid.gain : total, netE: totalE - gainE, totalE, gainE };
+      const caisse = compter ? total - fid.gain : total, tr = trajet(s);
+      return { s, n, lignes, lt, total, totalT, gain: fid.gain, manque: fid.manque, net: total - fid.gain, caisse, tr,
+               cle: !DEPART || tri === "caisse" ? caisse : tri === "proche" ? (tr ? tr.km : 1e9) + caisse / 1e7 : caisse + (tr ? tr.tot : 1e9),
+               netE: totalE - gainE, totalE, gainE };
     });
-    const complets = parMag.filter((r) => r.n === LISTE.length).sort((a, b) => a.cle - b.cle);
+    const situe = (r) => !DEPART || tri === "caisse" || r.tr;   // sans position, un magasin n'est pas classé sur le trajet
+    const complets = parMag.filter((r) => r.n === LISTE.length && situe(r)).sort((a, b) => a.cle - b.cle);
     const partiels = parMag.filter((r) => r.n > 0 && r.n < LISTE.length).sort((a, b) => b.n - a.n || a.cle - b.cle);
 
     // meilleur duo : chaque ligne achetée dans le moins cher des deux magasins
     let duo = null;
-    const cands = parMag.filter((r) => r.n >= LISTE.length / 2);
+    // avec un point de départ : n'importe quels deux magasins, détour compris ; sinon deux magasins de la même commune
+    const avecTrajet = DEPART && TRAJET.vehicule !== "doux";
+    const cands = parMag.filter((r) => r.n >= LISTE.length / 2 && (!avecTrajet || r.tr));
     for (let a = 0; a < cands.length; a++) {
       for (let b = a + 1; b < cands.length; b++) {
-        if (D.magasins[cands[a].s][1] !== D.magasins[cands[b].s][1] || !D.magasins[cands[a].s][1]) continue;  // même commune
+        if (!avecTrajet && (D.magasins[cands[a].s][1] !== D.magasins[cands[b].s][1] || !D.magasins[cands[a].s][1])) continue;  // même commune
         let tot = 0, ok = true;
         for (let k = 0; k < LISTE.length; k++) {
             const pa = cands[a].lt[k], pb = cands[b].lt[k];
           if (!pa && !pb) { ok = false; break; }
           tot += Math.min(pa ? pa[0] : Infinity, pb ? pb[0] : Infinity) * LISTE[k].qte;
         }
-        if (ok && (!duo || tot < duo.total)) duo = { total: tot, a: cands[a], b: cands[b] };
+        if (!ok) continue;
+        const tg = avecTrajet ? tournee(cands[a].s, cands[b].s) : null, score = tot + (tg ? tg.tot : 0);
+        if (!duo || score < duo.score) duo = { total: tot, a: cands[a], b: cands[b], tg, score };
       }
     }
     const minT = complets.length ? Math.min(...complets.map((r) => r.totalT)) : 0;
-    return { complets, partiels, duo, minT, nbMags: mags.length };
+    // meilleur magasin seul, comparable au duo : prix en caisse + trajet
+    const seul = complets.length ? Math.min(...complets.map((r) => r.totalT + (avecTrajet && r.tr ? r.tr.tot : 0))) : 0;
+    return { complets, partiels, duo, minT, seul, avecTrajet, nbMags: mags.length };
+  }
+
+  /* Mode tout compris : le gagnant face au magasin le plus proche qui a toute la liste. */
+  function comparerProche(R, best) {
+    const proche = R.complets.reduce((a, r) => (r.tr && (!a.tr || r.tr.km < a.tr.km) ? r : a));
+    if (!proche.tr || proche.s === best.s) return "";
+    const d = proche.caisse + proche.tr.tot - best.caisse - best.tr.tot;
+    return '<div class="eco"><span>par rapport au magasin le plus proche, ' + esc(D.magasins[proche.s][0]) + " (" + km1(proche.tr.km / 2) + " km), trajet compris</span>" +
+      '<b class="num">' + (d >= 0 ? "− " : "+ ") + xpf(Math.abs(d)) + "</b></div>";
   }
 
   /* ---------- Rendu ---------- */
@@ -1023,16 +1206,28 @@ select {
     if (best) {
       const pire = R.complets[R.complets.length - 1], med = R.complets[Math.floor((R.complets.length - 1) / 2)];
       const avecCartes = compter && R.complets.some((r) => r.gain > 0);
-      V.innerHTML = '<div><div class="ou">La liste la moins chère ' + (commune ? "à " + esc(commune) : "en Nouvelle-Calédonie") +
-        (avecCartes ? ", cagnottes déduites" : "") + "</div>" +
+      const ou = DEPART && TRAJET.vehicule === "doux" ? "à moins de " + TC.rayonDoux + " km" : commune === "__proche" ? "à moins de " + TC.rayonProche + " km" : commune ? "à " + esc(commune) : "en Nouvelle-Calédonie";
+      const titre = DEPART && tri === "proche" ? "Le magasin le plus proche qui a toute votre liste" :
+        "La liste la moins chère " + (DEPART && tri === "total" && TRAJET.vehicule !== "doux" ? "trajet compris, " : "") + ou + (avecCartes ? ", cagnottes déduites" : "");
+      // pour la comparaison, le moins cher en caisse parmi les magasins à une distance raisonnable (2 x le rayon)
+      const raisonnables = R.complets.filter((r) => !DEPART || (r.tr && r.tr.km / 2 <= 2 * TC.rayonProche));
+      const caissePlus = (raisonnables.length ? raisonnables : R.complets).reduce((a, r) => (r.caisse < a.caisse ? r : a));
+      V.innerHTML = '<div><div class="ou">' + titre + "</div>" +
         '<div class="magasin">' + esc(nom(best.s)) + '</div><div class="commune">' + esc(com(best.s)) + "</div>" +
         '<div class="total num" style="margin-top:12px">' + xpf(best.total) + "</div>" +
         '<div class="parpers">' + LISTE.reduce((a, l) => a + l.qte, 0) + " article(s) · prix en caisse</div>" +
         (best.gain > 0 ? '<div class="fid-gain num">+ ' + xpf(best.gain) + " sur votre " + (PROG[best.s].forme === "cagnotte" ? "cagnotte " : "compte ") + esc(PROG[best.s].nom) +
-          "<small>soit " + xpf(best.net) + " une fois la cagnotte dépensée</small></div>" : "") + "</div>" +
+          "<small>soit " + xpf(best.net) + " une fois la cagnotte dépensée</small></div>" : "") +
+        (DEPART ? '<div class="trajet-ligne">Trajet depuis ' + esc(DEPART.nom) + " : <b>" + texteTrajet(best.tr) + "</b>" + precisionMag(best.s) +
+          (best.tr && best.tr.tot ? "<br>Tout compris : <b>" + xpf(best.caisse + best.tr.tot) + "</b>" : "") + "</div>" : "") + "</div>" +
         '<div class="economies">' +
-        (R.complets.length > 1 ? '<div class="eco"><span>par rapport au magasin le plus cher</span><b class="num">− ' + xpf(pire.cle - best.cle) + "</b></div>" : "") +
-        (R.complets.length > 2 ? '<div class="eco"><span>par rapport au prix habituel (médiane)</span><b class="num">− ' + xpf(med.cle - best.cle) + "</b></div>" : "") +
+        (DEPART && tri === "total" ? comparerProche(R, best) : "") +
+        (!DEPART || tri === "caisse" ? (R.complets.length > 1 ? '<div class="eco"><span>par rapport au magasin le plus cher' + (DEPART && tri === "total" ? ", trajet compris" : "") + '</span><b class="num">− ' + xpf(pire.cle - best.cle) + "</b></div>" : "") +
+          (R.complets.length > 2 ? '<div class="eco"><span>par rapport au prix habituel (médiane)</span><b class="num">− ' + xpf(med.cle - best.cle) + "</b></div>" : "") : "") +
+        (DEPART && caissePlus.s !== best.s && caissePlus.tr && best.tr ? '<div class="eco alerte"><span>Le moins cher en caisse, ' + esc(nom(caissePlus.s)) + ", coûte " + xpf(best.caisse - caissePlus.caisse) +
+          " de moins en caisse mais " + km1(caissePlus.tr.km) + " km aller-retour" +
+          (TRAJET.vehicule === "doux" ? "" : " (" + (caissePlus.tr.tot - best.tr.tot >= 0 ? "+ " : "− ") + xpf(Math.abs(caissePlus.tr.tot - best.tr.tot)) + " de trajet, " +
+            (caissePlus.tr.co2 >= best.tr.co2 ? "+ " : "− ") + km1(Math.abs(caissePlus.tr.co2 - best.tr.co2)) + " kg de CO2)") + "</span></div>" : "") +
         '<div class="note">' + R.complets.length + " magasin(s) ont toute votre liste</div></div>";
     } else {
       const p = R.partiels[0];
@@ -1043,20 +1238,23 @@ select {
 
     // duo
     const Dd = $("liste-duo");
-    if (R.duo && (!best || (R.minT - R.duo.total >= DUO_GAIN_F && R.minT - R.duo.total >= DUO_GAIN_MIN * R.minT))) {
+    const duoCout = R.duo ? R.duo.score : 0;
+    if (R.duo && (!best || (R.seul - duoCout >= DUO_GAIN_F && R.seul - duoCout >= DUO_GAIN_MIN * R.seul))) {
       const qui = { a: [], b: [] };
       LISTE.forEach((l, k) => {
         const pa = R.duo.a.lt[k], pb = R.duo.b.lt[k];
         (pb && (!pa || pb[0] < pa[0]) ? qui.b : qui.a).push(D.produits[l.i][0]);
       });
-      Dd.innerHTML = "<h3>En faisant deux magasins de " + esc(com(R.duo.a.s)) + " : " + xpf(R.duo.total) + "</h3>" +
-        "<p>" + (best ? "Soit <b>" + xpf(R.minT - R.duo.total) + " de moins</b> en caisse qu'en un seul magasin" + (CARTES.size ? ", sans compter les cagnottes." : ".") : "C'est la seule façon de trouver toute votre liste.") + "</p>" +
+      Dd.innerHTML = "<h3>En faisant deux magasins" + (R.avecTrajet ? "" : " de " + esc(com(R.duo.a.s))) + " : " + xpf(R.duo.total) + "</h3>" +
+        (R.duo.tg ? "<p>Tournée depuis " + esc(DEPART.nom) + " : " + texteTrajet(R.duo.tg) + ".</p>" : "") +
+        "<p>" + (best ? "Soit <b>" + xpf(R.seul - duoCout) + " de moins</b> qu'en un seul magasin" + (R.avecTrajet ? ", trajets compris" : " en caisse") + (CARTES.size ? ", sans compter les cagnottes." : ".") : "C'est la seule façon de trouver toute votre liste.") + "</p>" +
         '<div class="deux">' + [["a", R.duo.a], ["b", R.duo.b]].map(([k, r]) =>
           '<div class="mag"><b>' + esc(nom(r.s)) + "</b>" + esc(com(r.s)) + "<ul>" + qui[k].map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul></div>").join("") + "</div>";
       Dd.hidden = false;
     } else if (best && R.duo) {
-      Dd.innerHTML = "<h3>Un seul magasin suffit</h3><p>Faire deux magasins ne vous ferait gagner que " +
-        xpf(Math.max(0, R.minT - R.duo.total)) + ".</p>";
+      const g = R.seul - duoCout;
+      Dd.innerHTML = "<h3>Un seul magasin suffit</h3><p>" + (R.avecTrajet && g < 0 ? "Avec le détour, faire deux magasins vous coûterait " + xpf(-g) + " de plus" + (R.duo.tg ? " et " + km1(R.duo.tg.km) + " km de route" : "") + "." :
+        "Faire deux magasins ne vous ferait gagner que " + xpf(Math.max(0, g)) + (R.avecTrajet ? ", trajets compris" : "") + ".") + "</p>";
       Dd.hidden = false;
     } else { Dd.hidden = true; }
 
@@ -1103,6 +1301,15 @@ select {
       }
     }
 
+    if (sel && DEPART) {
+      const t = document.createElement("div");
+      t.className = "ing total-ligne";
+      t.innerHTML = '<div class="nom">Trajet depuis ' + esc(DEPART.nom) + '<div class="produit" style="font-weight:400">' + texteTrajet(sel.tr) + precisionMag(sel.s) + "</div></div>" +
+        '<div class="montant"><b class="num">' + (sel.tr && sel.tr.tot ? "+ " + xpf(sel.tr.tot) : "0 F") + "</b>" +
+        (sel.tr ? '<small class="num">tout compris ' + xpf(sel.caisse + sel.tr.tot) + "</small>" : "") + "</div>";
+      det.appendChild(t);
+    }
+
     // classement
     const cl = $("liste-classement");
     cl.innerHTML = "";
@@ -1113,8 +1320,10 @@ select {
         b.type = "button"; b.className = "rang";
         b.setAttribute("aria-pressed", sel && r.s === sel.s ? "true" : "false");
         b.innerHTML = '<span class="n">' + (i + 1) + '</span><span class="m">' + esc(nom(r.s)) + "<small>" + esc(com(r.s)) + "</small></span>" +
-          '<span class="p num">' + xpf(r.cle) + "<small>" + (i ? "+ " + xpf(r.cle - min) : "le moins cher") +
-            (r.gain > 0 ? (compter ? " · caisse " + xpf(r.total) : " · cagnotte " + xpf(r.gain)) : "") + "</small></span>" +
+          '<span class="p num">' + (DEPART && tri === "proche" ? km1(r.tr ? r.tr.km / 2 : 0) + " km" : xpf(r.cle)) + "<small>" +
+            (DEPART && tri === "proche" ? xpf(r.caisse) + " en caisse" : (i ? "+ " + xpf(r.cle - min) : "le moins cher") +
+              (r.gain > 0 ? (compter ? " · caisse " + xpf(r.total) : " · cagnotte " + xpf(r.gain)) : "") +
+              (DEPART && tri === "total" ? " · " + (r.tr ? km1(r.tr.km) + " km, " + xpf(r.tr.tot) + (TRAJET.vehicule === "doux" ? "" : ", " + km1(r.tr.co2) + " kg CO2") : "position inconnue") : "")) + "</small></span>" +
           '<span class="barre" aria-hidden="true"><i style="width:' + (4 + 96 * (r.cle - min) / etendue).toFixed(1) + '%"></i></span>';
         b.onclick = () => { choisi = r.s; rendre(); $("liste-detail-titre").scrollIntoView({ behavior: "smooth", block: "start" }); };
         li.appendChild(b); cl.appendChild(li);
@@ -1155,32 +1364,34 @@ select {
   function rendreValeurCartes(R) {
     const P = $("liste-cartes");
     if (!R.complets.length) { P.hidden = true; return; }
-    const sansCarte = R.complets.reduce((a, r) => (r.totalT < a.totalT ? r : a));
+    const tt = (r) => (DEPART && r.tr ? r.tr.tot : 0);
+    const sansCarte = R.complets.reduce((a, r) => (r.totalT + tt(r) < a.totalT + tt(a) ? r : a));
     const lignes = [];
     for (const p of F.programmes) {
       const rs = R.complets.filter((r) => PROG[r.s] === p);
       if (!rs.length) continue;
-      const r = rs.reduce((a, b) => (b.netE < a.netE ? b : a));
+      const r = rs.reduce((a, b) => (b.netE + tt(b) < a.netE + tt(a) ? b : a));
       if (r.gainE <= 0 && !CARTES.has(p.id)) continue;
       lignes.push({ p, r });
     }
     if (!lignes.length) { P.hidden = true; return; }
-    lignes.sort((a, b) => a.r.netE - b.r.netE);
+    lignes.sort((a, b) => a.r.netE + tt(a.r) - b.r.netE - tt(b.r));
     const nom = (s) => D.magasins[s][0];
     P.innerHTML = "<h3>Quelle carte vaut le coup pour cette liste ?</h3>" +
-      "<p>Le moins cher sans carte : <b>" + esc(nom(sansCarte.s)) + "</b>, " + xpf(sansCarte.totalT) + " en caisse.</p><ol>" +
+      "<p>Le moins cher sans carte : <b>" + esc(nom(sansCarte.s)) + "</b>, " + xpf(sansCarte.totalT) + " en caisse" +
+        (tt(sansCarte) ? ", " + xpf(sansCarte.totalT + tt(sansCarte)) + " trajet compris" : "") + ".</p><ol>" +
       lignes.map(({ p, r }) => {
-        const ecart = r.netE - sansCarte.totalT;
+        const ecart = r.netE + tt(r) - sansCarte.totalT - tt(sansCarte);
         return '<li><div class="quoi"><b>' + esc(p.nom) + "</b> chez " + esc(nom(r.s)) +
           (p.confirmer ? ' <span class="puce confirmer">à confirmer</span>' : "") +
           "<small>" + xpf(r.totalE) + " en caisse, " + (p.forme === "cagnotte" ? "cagnotte " : "bon d'achat ") + xpf(r.gainE) +
           (r.gainE > 0 ? " · environ " + xpf(r.gainE * 52) + " par an pour cette liste chaque semaine"
             : p.type === "tranches" ? " · la cagnotte commence à " + xpf(p.tranche) + " d'achats hors promotion" : "") + "</small></div>" +
-          '<div class="net num">' + xpf(r.netE) + "<small>" + (ecart < 0 ? xpf(-ecart) + " de moins" : ecart > 0 ? xpf(ecart) + " de plus" : "au même prix") +
+          '<div class="net num">' + xpf(r.netE + tt(r)) + "<small>" + (ecart < 0 ? xpf(-ecart) + " de moins" : ecart > 0 ? xpf(ecart) + " de plus" : "au même prix") +
           "</small></div>" +
           '<button type="button" data-carte="' + p.id + '" aria-pressed="' + CARTES.has(p.id) + '">' + (CARTES.has(p.id) ? "J'ai cette carte ✓" : "J'ai cette carte") + "</button></li>";
       }).join("") + "</ol>" +
-      '<p class="note">Net = prix en caisse moins la cagnotte ou le bon d\'achat gagné, comparé au magasin le moins cher sans carte.</p>';
+      '<p class="note">Net = prix en caisse moins la cagnotte ou le bon d\'achat gagné' + (DEPART ? ", plus le trajet" : "") + ", comparé au magasin le moins cher sans carte.</p>";
     P.querySelectorAll("button[data-carte]").forEach((b) => b.onclick = () => basculerCarte(b.dataset.carte, b.getAttribute("aria-pressed") !== "true"));
     P.hidden = false;
   }

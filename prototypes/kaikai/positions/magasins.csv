@@ -1,0 +1,34 @@
+magasin;commune;lat;lon;precision;source
+AUCHAN QUAI FERRY;Nouméa;-22.27211;166.43827;magasin;OpenStreetMap
+KORAIL DUCOS;Nouméa;-22.23882;166.44805;magasin;OpenStreetMap
+CARREFOUR MARKET DUCOS;Nouméa;-22.23545;166.44247;magasin;OpenStreetMap
+KORAIL APOGOTI;Dumbéa;-22.19018;166.44208;magasin;OpenStreetMap (Korail Market)
+CASINO PORT PLAISANCE - SUPERMARCHE;Nouméa;-22.29098;166.43911;magasin;OpenStreetMap
+KORAIL BACO;Koné;-21.09994;164.89586;magasin;OpenStreetMap
+LEADER PRICE KOUMAC;Koumac;-20.58105;164.30415;magasin;OpenStreetMap
+MICHEL-ANGE SUPERMARKET;Nouméa;-22.29162;166.44807;magasin;OpenStreetMap
+MYSHOP SUPERMARCHE;Nouméa;-22.26805;166.40998;magasin;OpenStreetMap
+LE CALEDONIA;Nouméa;-22.26535;166.44304;magasin;OpenStreetMap (Alimentation Caledonia)
+NEMOG DISTRIBUTION;Kaala-Gomen;-20.66811;164.39724;magasin;OpenStreetMap
+LGO ALIMENTATION;Koumac;-20.56405;164.28864;magasin;OpenStreetMap
+POINDIMIE MARKET;Poindimié;-20.93671;165.34990;magasin;OpenStreetMap
+MAGASIN G. CREUGNET;Boulouparis;-21.86352;166.04923;magasin;OpenStreetMap
+~MARCH[EÉ] MUN[I]?CIPAL (DE )?NOUM[EÉ]A;Nouméa;-22.27566;166.44091;magasin;OpenStreetMap (marché municipal)
+~MARCH[EÉ] MUNICIPAL DU MONT-DORE;Mont-Dore;-22.22850;166.52060;quartier;quartier Boulari
+KORAIL NORMANDIE;Nouméa;-22.22342;166.48133;quartier;quartier Normandie
+K-GOU (Boulari);Mont-Dore;-22.22849;166.52057;quartier;quartier Boulari
+LEADER PRICE APOGOTI;Dumbéa;-22.20208;166.44164;quartier;quartier Baie d'Apogoti
+DECATHLON APOGOTI;Dumbéa;-22.20208;166.44164;quartier;quartier Baie d'Apogoti
+NOUMEA PAS CHER (MOTOR POOL);Nouméa;-22.29405;166.45043;quartier;quartier Motor Pool
+BOKO PORTES DE FER;Nouméa;-22.25937;166.46307;quartier;quartier Portes de Fer
+SUPER U TONTOUTA;Païta;-22.01280;166.22267;quartier;village de Tontouta
+ALIMENTATION BEAUVALLON;Païta;-22.12459;166.33649;quartier;quartier Beauvallon
+BOUCHERIE DE SAVANNAH;Païta;-22.16117;166.39076;quartier;quartier Savannah
+BOUCHERIE COTE OUEST DUCOS;Nouméa;-22.23889;166.42468;quartier;quartier Ducos
+GEMO CHAUSSURES DUCOS;Nouméa;-22.23889;166.42468;quartier;quartier Ducos
+TROUV'TOO DUCOS;Nouméa;-22.23889;166.42468;quartier;quartier Ducos
+BOUCHERIE COTE OUEST Anse Vata;Nouméa;-22.30021;166.44445;quartier;quartier Anse Vata
+STATION SHELL TOMO;Boulouparis;-21.95844;166.15105;quartier;village de Tomo
+AUCHAN SAVANNAH SUPERMARCHE;;-22.16374;166.38710;magasin;OpenStreetMap (commune absente de prix.nc : Païta)
+KORAIL LIFOU;;-20.90677;167.25430;magasin;OpenStreetMap (commune absente de prix.nc : Lifou)
+K-GOU - POUEMBOUT;;-21.12171;164.89665;quartier;centre de Pouembout (commune absente de prix.nc)
