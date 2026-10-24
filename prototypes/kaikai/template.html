@@ -250,6 +250,30 @@ select {
 .duo .mag { background: var(--sol); border-radius: 10px; padding: 10px 12px; font-size: .9rem; }
 .duo .mag b { display: block; }
 .duo .mag ul { margin: 6px 0 0; padding-left: 18px; color: var(--doux); }
+
+/* Cartes de fidélité */
+.cartes { background: var(--carte); border: 1px solid var(--trait); border-radius: var(--r); padding: 0; }
+.cartes > summary { cursor: pointer; padding: 12px 16px; font-weight: 700; list-style-position: inside; }
+.cartes > summary small { font-weight: 400; color: var(--doux); margin-left: 6px; }
+.cartes-corps { display: grid; gap: 10px; padding: 0 16px 14px; }
+.carte-fid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: start; padding: 10px 0; border-top: 1px solid var(--trait); }
+.carte-fid input, .interrupteur input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--niaouli); }
+.carte-fid b small { font-weight: 400; color: var(--doux); }
+.carte-fid .regle { grid-column: 2; font-size: .88rem; color: var(--doux); }
+.interrupteur { display: flex; gap: 10px; align-items: start; font-size: .92rem; padding-top: 10px; border-top: 1px solid var(--trait); }
+.puce.fid { background: var(--niaouli-pale); color: var(--niaouli); }
+.puce.confirmer { background: var(--alerte-pale); color: var(--alerte); }
+.verdict .fid-gain { margin-top: 8px; color: var(--niaouli); font-weight: 700; }
+.verdict .fid-gain small { display: block; color: var(--doux); font-weight: 400; }
+.fid-incite { font-size: .88rem; color: var(--niaouli); background: var(--niaouli-pale); border-radius: 10px; padding: 8px 12px; margin: 0; }
+.valeur-cartes ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.valeur-cartes li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; background: var(--sol); border-radius: 10px; padding: 10px 12px; }
+.valeur-cartes li .quoi { font-size: .9rem; }
+.valeur-cartes li .quoi small { display: block; color: var(--doux); }
+.valeur-cartes li .net { text-align: right; font-weight: 700; white-space: nowrap; }
+.valeur-cartes li .net small { display: block; font-weight: 400; color: var(--doux); font-size: .8rem; }
+.valeur-cartes li button { grid-column: 1 / -1; justify-self: start; font-size: .85rem; padding: 4px 12px; border-radius: 99px; border: 1.5px solid var(--niaouli); background: transparent; color: var(--niaouli); cursor: pointer; }
+.valeur-cartes li button[aria-pressed="true"] { background: var(--niaouli); color: var(--carte); }
 .chargement { color: var(--doux); }
 
 /* Pied */
@@ -326,9 +350,19 @@ select {
             <select id="commune-liste"></select>
           </label>
         </div>
+        <details class="cartes" id="cartes">
+          <summary>Mes cartes de fidélité <small id="cartes-resume"></small></summary>
+          <div class="cartes-corps">
+            <div id="cartes-liste"></div>
+            <label class="interrupteur"><input type="checkbox" id="cartes-compter">
+              <span>Déduire mes cagnottes et bons d'achat pour classer les magasins<br><small class="note">Le ticket reste le même : la cagnotte sert aux courses suivantes.</small></span></label>
+            <p class="note" id="cartes-maj"></p>
+          </div>
+        </details>
         <p class="chargement" id="liste-chargement">Chargement des 222 000 prix…</p>
         <section class="verdict" id="liste-verdict" aria-live="polite" hidden></section>
         <section class="duo" id="liste-duo" hidden></section>
+        <section class="duo valeur-cartes" id="liste-cartes" hidden></section>
         <section class="section" id="liste-detail-bloc" hidden>
           <h3 id="liste-detail-titre"></h3>
           <div class="ingredients" id="liste-detail"></div>
@@ -404,11 +438,50 @@ select {
       Ces choix restent enregistrés dans votre navigateur. Le sel, le poivre et l'eau ne sont pas comptés.</p>
     <p>« Ma liste de courses » compare les 24 700 produits publiés sur prix.nc. Votre liste reste dans votre navigateur.
       La lecture d'une photo passe par Claude, avec votre accord, et utilise votre compte Claude.</p>
+    <p>Cartes de fidélité : les règles viennent des sites des enseignes et de relevés publics ; celles marquées
+      « à confirmer » peuvent avoir changé. Les offres ciblées (remises personnelles, opérations points × 2) ne sont pas comptées.</p>
   </footer>
 </div>
 
 <script type="application/json" id="donnees">__DATA__</script>
 <script type="application/json" id="liste-donnees">__LISTE__</script>
+<!-- Règles des cartes de fidélité. type : "marque" (taux sur une marque propre), "tranches" (gain par tranche
+     de ticket), "conso" (barème CONSO+). famille : 1 Casino, 2 Auchan, 3 U, 4 Carrefour (6e champ des produits). -->
+<script type="application/json" id="fidelite">
+{
+  "verifie": "octobre 2026",
+  "programmes": [
+    { "id": "monclub", "nom": "Mon Club", "enseignes": "Géant, Casino", "magasins": "^(GEANT|CASINO) ",
+      "type": "marque", "famille": 1, "taux": 0.10, "horsPromo": true, "forme": "cagnotte",
+      "regle": "10 % des produits de marque Casino reversés sur la cagnotte, hors produits en promotion.",
+      "notes": "Gratuite la 1re année, puis 1 000 F par an prélevés sur la cagnotte. Les Happy Remises ciblées ne sont pas comptées.",
+      "sources": ["https://monclub.nc/cagnottes-hremises-casino/"] },
+    { "id": "cado", "nom": "Cado", "enseignes": "Korail, K-Gou", "magasins": "^(KORAIL|K-GOU)",
+      "type": "tranches", "tranche": 5000, "gain": 100, "horsPromo": true, "forme": "cagnotte",
+      "regle": "100 F de cagnotte par tranche de 5 000 F sur le ticket, hors promotions.",
+      "notes": "Cagnotte valable 12 mois.",
+      "sources": ["https://cado.nc/"] },
+    { "id": "consoplus", "nom": "CONSO+", "enseignes": "Carrefour Market, Carrefour Express", "magasins": "^CARREFOUR (MARKET|EXPRESS)",
+      "type": "conso", "forme": "bon d'achat",
+      "regle": "20 points par tranche de 2 000 F (1 ou 2 points pour le reste) ; 1 point = 1 F en bon d'achat dès 1 000 points.",
+      "notes": "Bon valable 60 jours, dans le magasin où il est retiré ; points valables 24 mois.",
+      "confirmer": "La FAQ et le comparatif 2022 donnent ce barème ; une page Carrefour de 2025 annonce 2 points par ticket et 10 points par 1 000 F de produits Carrefour.",
+      "sources": ["https://consoplus.nc/faqs/bons-dachat.html", "https://consoplus.nc/page/7-carte-consoplus-tout-savoir-sur-nos-enseignes-partenaires"] },
+    { "id": "waaoh", "nom": "Waaoh", "enseignes": "Auchan", "magasins": "^AUCHAN ",
+      "type": "marque", "famille": 2, "taux": 0.05, "horsPromo": false, "forme": "bon d'achat",
+      "regle": "5 % des produits de marque Auchan crédités sur le compte, en bon d'achat.",
+      "notes": "",
+      "confirmer": "Taux relevé dans le comparatif 2022.",
+      "sources": [] },
+    { "id": "carteu", "nom": "Carte U", "enseignes": "Hyper U, Super U", "magasins": "^(HYPER|SUPER) U ",
+      "type": "marque", "famille": 3, "taux": 0.05, "horsPromo": false, "forme": "cagnotte",
+      "regle": "5 % des produits de marque U reversés sur la carte.",
+      "notes": "",
+      "confirmer": "Taux relevé en 2022 au Super U Auteuil.",
+      "sources": [] }
+  ]
+}
+</script>
 <script>
 (function () {
   "use strict";
@@ -686,6 +759,11 @@ select {
   let D = null, MOTS = [], PAR_VAR = new Map(), CACHE_PRIX = new Map(), CACHE_EQ = new Map();
   let LISTE = [], exemple = false, commune = lire("commune-liste", "Nouméa"), choisi = null, tout = false;
   let chargement = null;
+  const F = JSON.parse($("fidelite").textContent);
+  let PROG = [];   // programme de fidélité de chaque magasin (ou null)
+  let CARTES = new Set();
+  try { CARTES = new Set(JSON.parse(lire("cartes", "[]"))); } catch (e) {}
+  let compter = lire("cartes-compter", "1") === "1";
 
   function demarrer() {
     if (chargement) return chargement;
@@ -705,6 +783,9 @@ select {
       if (!PAR_VAR.has(p[1])) PAR_VAR.set(p[1], []);
       PAR_VAR.get(p[1]).push(i);
     });
+    const regs = F.programmes.map((p) => [new RegExp(p.magasins, "i"), p]);
+    PROG = D.magasins.map((m) => { const r = regs.find(([re]) => re.test(m[0])); return r ? r[1] : null; });
+    initCartes();
     const communes = [...new Set(D.magasins.map((m) => m[1]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
     if (commune && !communes.includes(commune)) commune = "";
     $("commune-liste").innerHTML = '<option value="">Toute la Nouvelle-Calédonie</option>' +
@@ -730,22 +811,55 @@ select {
     return out;
   }
 
-  /* Pour une ligne : meilleur prix par magasin -> [prix, produit, promo] */
+  /* Part du prix rendue par la carte du magasin, pour un produit (programmes « marque »). */
+  function remise(prog, j, promo) {
+    return prog && prog.type === "marque" && D.produits[j][5] === prog.famille && !(prog.horsPromo && promo) ? prog.taux : 0;
+  }
+
+  /* Pour une ligne : meilleur prix par magasin -> [prix, produit, promo].
+     t : le moins cher en caisse ; e : le moins cher une fois la remise de la carte du magasin déduite. */
   function meilleurs(l) {
     const cle = l.i + (l.exact ? "x" : "e");
     if (CACHE_PRIX.has(cle)) return CACHE_PRIX.get(cle);
-    const m = new Map();
+    const t = new Map(), e = new Map();
     for (const j of l.exact ? [l.i] : equivalents(l.i)) {
-      const t = D.prix[j];
-      for (let k = 0; k < t.length; k += 2) {
-        const s = t[k] >> 1, prix = t[k + 1];
-        const cur = m.get(s);
-        if (!cur || prix < cur[0]) m.set(s, [prix, j, t[k] & 1]);
+      const p = D.prix[j];
+      for (let k = 0; k < p.length; k += 2) {
+        const s = p[k] >> 1, prix = p[k + 1], promo = p[k] & 1;
+        const cur = t.get(s);
+        if (!cur || prix < cur[0]) t.set(s, [prix, j, promo]);
+        const net = prix * (1 - remise(PROG[s], j, promo)), cure = e.get(s);
+        if (!cure || net < cure[3]) e.set(s, [prix, j, promo, net]);
       }
     }
+    const m = { t, e };
     CACHE_PRIX.set(cle, m);
     return m;
   }
+
+  /* Cagnotte gagnée avec la carte prog sur les lignes achetées dans un magasin. */
+  function cagnotte(prog, lignes) {
+    const r = { gain: 0, manque: 0 };
+    if (!prog) return r;
+    let eligible = 0, total = 0;
+    lignes.forEach((o, k) => {
+      if (!o) return;
+      const m = o[0] * LISTE[k].qte;
+      total += m;
+      if (prog.type === "marque") r.gain += m * remise(prog, o[1], o[2]);
+      else if (!(prog.horsPromo && o[2])) eligible += m;
+    });
+    if (prog.type === "tranches") {
+      r.gain = Math.floor(eligible / prog.tranche) * prog.gain;
+      r.manque = prog.tranche - eligible % prog.tranche;
+    } else if (prog.type === "conso") {
+      const reste = total % 2000;
+      r.gain = Math.floor(total / 2000) * 20 + (reste >= 1000 ? 2 : reste >= 1 ? 1 : 0);
+    }
+    r.gain = Math.floor(r.gain);
+    return r;
+  }
+  const aLaCarte = (s) => !!PROG[s] && CARTES.has(PROG[s].id);
 
   /* ---------- Recherche ---------- */
   function rechercher(q, n) {
@@ -861,17 +975,20 @@ select {
     const mags = [];
     D.magasins.forEach((m, s) => { if (!commune || m[1] === commune) mags.push(s); });
     const mb = LISTE.map(meilleurs);
+    const somme = (lignes) => lignes.reduce((a, o, k) => a + (o ? o[0] * LISTE[k].qte : 0), 0);
     const parMag = mags.map((s) => {
-      let total = 0, n = 0;
-      const lignes = LISTE.map((l, k) => {
-        const o = mb[k].get(s);
-        if (o) { total += o[0] * l.qte; n++; }
-        return o || null;
-      });
-      return { s, total, n, lignes };
+      const lt = LISTE.map((l, k) => mb[k].t.get(s) || null);
+      const n = lt.filter(Boolean).length, totalT = somme(lt);
+      // potentiel avec la carte de l'enseigne (pour « Quelle carte vaut le coup ? »)
+      const prog = PROG[s], le = prog ? LISTE.map((l, k) => mb[k].e.get(s) || null) : lt;
+      const totalE = prog ? somme(le) : totalT, gainE = cagnotte(prog, le).gain;
+      const carte = aLaCarte(s), lignes = carte && compter ? le : lt;
+      const total = carte && compter ? totalE : totalT, fid = carte ? cagnotte(prog, lignes) : { gain: 0, manque: 0 };
+      return { s, n, lignes, lt, total, totalT, gain: fid.gain, manque: fid.manque, net: total - fid.gain,
+               cle: compter ? total - fid.gain : total, netE: totalE - gainE, totalE, gainE };
     });
-    const complets = parMag.filter((r) => r.n === LISTE.length).sort((a, b) => a.total - b.total);
-    const partiels = parMag.filter((r) => r.n > 0 && r.n < LISTE.length).sort((a, b) => b.n - a.n || a.total - b.total);
+    const complets = parMag.filter((r) => r.n === LISTE.length).sort((a, b) => a.cle - b.cle);
+    const partiels = parMag.filter((r) => r.n > 0 && r.n < LISTE.length).sort((a, b) => b.n - a.n || a.cle - b.cle);
 
     // meilleur duo : chaque ligne achetée dans le moins cher des deux magasins
     let duo = null;
@@ -881,14 +998,15 @@ select {
         if (D.magasins[cands[a].s][1] !== D.magasins[cands[b].s][1] || !D.magasins[cands[a].s][1]) continue;  // même commune
         let tot = 0, ok = true;
         for (let k = 0; k < LISTE.length; k++) {
-            const pa = cands[a].lignes[k], pb = cands[b].lignes[k];
+            const pa = cands[a].lt[k], pb = cands[b].lt[k];
           if (!pa && !pb) { ok = false; break; }
           tot += Math.min(pa ? pa[0] : Infinity, pb ? pb[0] : Infinity) * LISTE[k].qte;
         }
         if (ok && (!duo || tot < duo.total)) duo = { total: tot, a: cands[a], b: cands[b] };
       }
     }
-    return { complets, partiels, duo, nbMags: mags.length };
+    const minT = complets.length ? Math.min(...complets.map((r) => r.totalT)) : 0;
+    return { complets, partiels, duo, minT, nbMags: mags.length };
   }
 
   /* ---------- Rendu ---------- */
@@ -896,7 +1014,7 @@ select {
     if (!D) return;
     rendreLignes();
     const vide = !LISTE.length;
-    ["liste-verdict", "liste-duo", "liste-detail-bloc", "liste-classement-bloc"].forEach((id) => $(id).hidden = vide);
+    ["liste-verdict", "liste-duo", "liste-cartes", "liste-detail-bloc", "liste-classement-bloc"].forEach((id) => $(id).hidden = vide);
     if (vide) return;
     const R = calculer(), V = $("liste-verdict");
     const nom = (s) => D.magasins[s][0], com = (s) => D.magasins[s][1] || "Commune non renseignée";
@@ -904,13 +1022,17 @@ select {
 
     if (best) {
       const pire = R.complets[R.complets.length - 1], med = R.complets[Math.floor((R.complets.length - 1) / 2)];
-      V.innerHTML = '<div><div class="ou">La liste la moins chère ' + (commune ? "à " + esc(commune) : "en Nouvelle-Calédonie") + "</div>" +
+      const avecCartes = compter && R.complets.some((r) => r.gain > 0);
+      V.innerHTML = '<div><div class="ou">La liste la moins chère ' + (commune ? "à " + esc(commune) : "en Nouvelle-Calédonie") +
+        (avecCartes ? ", cagnottes déduites" : "") + "</div>" +
         '<div class="magasin">' + esc(nom(best.s)) + '</div><div class="commune">' + esc(com(best.s)) + "</div>" +
         '<div class="total num" style="margin-top:12px">' + xpf(best.total) + "</div>" +
-        '<div class="parpers">' + LISTE.reduce((a, l) => a + l.qte, 0) + " article(s)</div></div>" +
+        '<div class="parpers">' + LISTE.reduce((a, l) => a + l.qte, 0) + " article(s) · prix en caisse</div>" +
+        (best.gain > 0 ? '<div class="fid-gain num">+ ' + xpf(best.gain) + " sur votre " + (PROG[best.s].forme === "cagnotte" ? "cagnotte " : "compte ") + esc(PROG[best.s].nom) +
+          "<small>soit " + xpf(best.net) + " une fois la cagnotte dépensée</small></div>" : "") + "</div>" +
         '<div class="economies">' +
-        (R.complets.length > 1 ? '<div class="eco"><span>par rapport au magasin le plus cher</span><b class="num">− ' + xpf(pire.total - best.total) + "</b></div>" : "") +
-        (R.complets.length > 2 ? '<div class="eco"><span>par rapport au prix habituel (médiane)</span><b class="num">− ' + xpf(med.total - best.total) + "</b></div>" : "") +
+        (R.complets.length > 1 ? '<div class="eco"><span>par rapport au magasin le plus cher</span><b class="num">− ' + xpf(pire.cle - best.cle) + "</b></div>" : "") +
+        (R.complets.length > 2 ? '<div class="eco"><span>par rapport au prix habituel (médiane)</span><b class="num">− ' + xpf(med.cle - best.cle) + "</b></div>" : "") +
         '<div class="note">' + R.complets.length + " magasin(s) ont toute votre liste</div></div>";
     } else {
       const p = R.partiels[0];
@@ -921,22 +1043,24 @@ select {
 
     // duo
     const Dd = $("liste-duo");
-    if (R.duo && (!best || (best.total - R.duo.total >= DUO_GAIN_F && best.total - R.duo.total >= DUO_GAIN_MIN * best.total))) {
+    if (R.duo && (!best || (R.minT - R.duo.total >= DUO_GAIN_F && R.minT - R.duo.total >= DUO_GAIN_MIN * R.minT))) {
       const qui = { a: [], b: [] };
       LISTE.forEach((l, k) => {
-        const pa = R.duo.a.lignes[k], pb = R.duo.b.lignes[k];
+        const pa = R.duo.a.lt[k], pb = R.duo.b.lt[k];
         (pb && (!pa || pb[0] < pa[0]) ? qui.b : qui.a).push(D.produits[l.i][0]);
       });
       Dd.innerHTML = "<h3>En faisant deux magasins de " + esc(com(R.duo.a.s)) + " : " + xpf(R.duo.total) + "</h3>" +
-        "<p>" + (best ? "Soit <b>" + xpf(best.total - R.duo.total) + " de moins</b> qu'en un seul magasin." : "C'est la seule façon de trouver toute votre liste.") + "</p>" +
+        "<p>" + (best ? "Soit <b>" + xpf(R.minT - R.duo.total) + " de moins</b> en caisse qu'en un seul magasin" + (CARTES.size ? ", sans compter les cagnottes." : ".") : "C'est la seule façon de trouver toute votre liste.") + "</p>" +
         '<div class="deux">' + [["a", R.duo.a], ["b", R.duo.b]].map(([k, r]) =>
           '<div class="mag"><b>' + esc(nom(r.s)) + "</b>" + esc(com(r.s)) + "<ul>" + qui[k].map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul></div>").join("") + "</div>";
       Dd.hidden = false;
     } else if (best && R.duo) {
       Dd.innerHTML = "<h3>Un seul magasin suffit</h3><p>Faire deux magasins ne vous ferait gagner que " +
-        xpf(Math.max(0, best.total - R.duo.total)) + ".</p>";
+        xpf(Math.max(0, R.minT - R.duo.total)) + ".</p>";
       Dd.hidden = false;
     } else { Dd.hidden = true; }
+
+    rendreValeurCartes(R);
 
     // détail du magasin choisi
     const liste = R.complets.length ? R.complets : R.partiels;
@@ -945,6 +1069,7 @@ select {
     det.innerHTML = "";
     if (sel) {
       $("liste-detail-titre").textContent = "Votre liste chez " + nom(sel.s);
+      const fidSel = aLaCarte(sel.s);
       LISTE.forEach((l, k) => {
         const o = sel.lignes[k], div = document.createElement("div");
         div.className = "ing";
@@ -952,7 +1077,9 @@ select {
         div.innerHTML = '<div class="nom">' + esc(ref) + ' <span class="qte-txt" style="color:var(--doux);font-weight:400">× ' + l.qte + "</span></div>" +
           '<div class="montant">' + (o ? '<b class="num">' + xpf(o[0] * l.qte) + '</b><small class="num">' + (l.qte > 1 ? l.qte + " × " + xpf(o[0]) : "") + "</small>" : "<b>—</b>") + "</div>" +
           '<div class="produit">' + (o ? (o[1] !== l.i ? "Équivalent : " + esc(D.produits[o[1]][0]) : "Ce produit") +
-            (o[2] ? '<div class="puces"><span class="puce promo">promo</span></div>' : "") : '<span class="puce manque">pas vendu dans ce magasin</span>') + "</div>";
+            (o[2] || (fidSel && remise(PROG[sel.s], o[1], o[2])) ? '<div class="puces">' + (o[2] ? '<span class="puce promo">promo</span>' : "") +
+              (fidSel && remise(PROG[sel.s], o[1], o[2]) ? '<span class="puce fid">' + esc(PROG[sel.s].nom) + " " + Math.round(PROG[sel.s].taux * 100) + " %</span>" : "") + "</div>" : "")
+            : '<span class="puce manque">pas vendu dans ce magasin</span>') + "</div>";
         det.appendChild(div);
       });
       const tot = document.createElement("div");
@@ -960,20 +1087,35 @@ select {
       tot.innerHTML = '<div class="nom">Total</div><div class="montant"><b class="num">' + xpf(sel.total) + "</b><small>" +
         sel.n + " ligne(s) sur " + LISTE.length + "</small></div>";
       det.appendChild(tot);
+      if (fidSel) {
+        const pg = PROG[sel.s], f = document.createElement("div");
+        f.className = "ing total-ligne";
+        f.innerHTML = '<div class="nom">' + (pg.forme === "cagnotte" ? "Cagnotte " : "Bon d'achat ") + esc(pg.nom) +
+          '<div class="produit" style="font-weight:400">' + esc(pg.regle) + "</div></div>" +
+          '<div class="montant"><b class="num">− ' + xpf(sel.gain) + '</b><small class="num">net ' + xpf(sel.net) + "</small></div>";
+        det.appendChild(f);
+        if (pg.type === "tranches" && sel.manque <= 0.3 * pg.tranche) {
+          const inc = document.createElement("p");
+          inc.className = "fid-incite";
+          inc.textContent = "Encore " + xpf(sel.manque) + " d'achats hors promotion et votre cagnotte " + pg.nom + " gagne " + xpf(pg.gain) + " de plus.";
+          det.appendChild(inc);
+        }
+      }
     }
 
     // classement
     const cl = $("liste-classement");
     cl.innerHTML = "";
     if (R.complets.length) {
-      const min = R.complets[0].total, etendue = R.complets[R.complets.length - 1].total - min || 1;
+      const min = R.complets[0].cle, etendue = R.complets[R.complets.length - 1].cle - min || 1;
       (tout ? R.complets : R.complets.slice(0, 8)).forEach((r, i) => {
         const li = document.createElement("li"), b = document.createElement("button");
         b.type = "button"; b.className = "rang";
         b.setAttribute("aria-pressed", sel && r.s === sel.s ? "true" : "false");
         b.innerHTML = '<span class="n">' + (i + 1) + '</span><span class="m">' + esc(nom(r.s)) + "<small>" + esc(com(r.s)) + "</small></span>" +
-          '<span class="p num">' + xpf(r.total) + "<small>" + (i ? "+ " + xpf(r.total - min) : "le moins cher") + "</small></span>" +
-          '<span class="barre" aria-hidden="true"><i style="width:' + (4 + 96 * (r.total - min) / etendue).toFixed(1) + '%"></i></span>';
+          '<span class="p num">' + xpf(r.cle) + "<small>" + (i ? "+ " + xpf(r.cle - min) : "le moins cher") +
+            (r.gain > 0 ? (compter ? " · caisse " + xpf(r.total) : " · cagnotte " + xpf(r.gain)) : "") + "</small></span>" +
+          '<span class="barre" aria-hidden="true"><i style="width:' + (4 + 96 * (r.cle - min) / etendue).toFixed(1) + '%"></i></span>';
         b.onclick = () => { choisi = r.s; rendre(); $("liste-detail-titre").scrollIntoView({ behavior: "smooth", block: "start" }); };
         li.appendChild(b); cl.appendChild(li);
       });
@@ -984,6 +1126,64 @@ select {
   }
   $("liste-plus").addEventListener("click", () => { tout = !tout; rendre(); });
   $("commune-liste").addEventListener("change", (e) => { commune = e.target.value; choisi = null; ecrire("commune-liste", commune); rendre(); });
+
+  /* ---------- Cartes de fidélité ---------- */
+  function sauverCartes() { ecrire("cartes", JSON.stringify([...CARTES])); }
+  function basculerCarte(id, oui) {
+    if (oui) CARTES.add(id); else CARTES.delete(id);
+    sauverCartes(); initCartes(); choisi = null; rendre();
+  }
+  function initCartes() {
+    $("cartes-liste").innerHTML = F.programmes.map((p) =>
+      '<label class="carte-fid"><input type="checkbox" data-carte="' + p.id + '"' + (CARTES.has(p.id) ? " checked" : "") + ">" +
+      "<b>" + esc(p.nom) + " <small>" + esc(p.enseignes) + "</small>" + (p.confirmer ? ' <span class="puce confirmer">à confirmer</span>' : "") + "</b>" +
+      '<span class="regle">' + esc(p.regle) + (p.notes ? " " + esc(p.notes) : "") + (p.confirmer ? " <i>" + esc(p.confirmer) + "</i>" : "") + "</span></label>").join("");
+    const n = F.programmes.filter((p) => CARTES.has(p.id)).length;
+    $("cartes-resume").textContent = n ? n + " carte" + (n > 1 ? "s" : "") : "aucune";
+    $("cartes-compter").checked = compter;
+    $("cartes-maj").textContent = "Règles vérifiées en " + F.verifie + ". Les offres ciblées et les opérations ponctuelles ne sont pas comptées.";
+  }
+  $("cartes-liste").addEventListener("change", (e) => {
+    const c = e.target.closest("input[data-carte]");
+    if (c) basculerCarte(c.dataset.carte, c.checked);
+  });
+  $("cartes-compter").addEventListener("change", (e) => {
+    compter = e.target.checked; ecrire("cartes-compter", compter ? "1" : "0"); choisi = null; rendre();
+  });
+
+  /* Pour la liste en cours : le meilleur magasin de chaque enseigne à carte, cagnotte déduite, face au moins cher sans carte. */
+  function rendreValeurCartes(R) {
+    const P = $("liste-cartes");
+    if (!R.complets.length) { P.hidden = true; return; }
+    const sansCarte = R.complets.reduce((a, r) => (r.totalT < a.totalT ? r : a));
+    const lignes = [];
+    for (const p of F.programmes) {
+      const rs = R.complets.filter((r) => PROG[r.s] === p);
+      if (!rs.length) continue;
+      const r = rs.reduce((a, b) => (b.netE < a.netE ? b : a));
+      if (r.gainE <= 0 && !CARTES.has(p.id)) continue;
+      lignes.push({ p, r });
+    }
+    if (!lignes.length) { P.hidden = true; return; }
+    lignes.sort((a, b) => a.r.netE - b.r.netE);
+    const nom = (s) => D.magasins[s][0];
+    P.innerHTML = "<h3>Quelle carte vaut le coup pour cette liste ?</h3>" +
+      "<p>Le moins cher sans carte : <b>" + esc(nom(sansCarte.s)) + "</b>, " + xpf(sansCarte.totalT) + " en caisse.</p><ol>" +
+      lignes.map(({ p, r }) => {
+        const ecart = r.netE - sansCarte.totalT;
+        return '<li><div class="quoi"><b>' + esc(p.nom) + "</b> chez " + esc(nom(r.s)) +
+          (p.confirmer ? ' <span class="puce confirmer">à confirmer</span>' : "") +
+          "<small>" + xpf(r.totalE) + " en caisse, " + (p.forme === "cagnotte" ? "cagnotte " : "bon d'achat ") + xpf(r.gainE) +
+          (r.gainE > 0 ? " · environ " + xpf(r.gainE * 52) + " par an pour cette liste chaque semaine"
+            : p.type === "tranches" ? " · la cagnotte commence à " + xpf(p.tranche) + " d'achats hors promotion" : "") + "</small></div>" +
+          '<div class="net num">' + xpf(r.netE) + "<small>" + (ecart < 0 ? xpf(-ecart) + " de moins" : ecart > 0 ? xpf(ecart) + " de plus" : "au même prix") +
+          "</small></div>" +
+          '<button type="button" data-carte="' + p.id + '" aria-pressed="' + CARTES.has(p.id) + '">' + (CARTES.has(p.id) ? "J'ai cette carte ✓" : "J'ai cette carte") + "</button></li>";
+      }).join("") + "</ol>" +
+      '<p class="note">Net = prix en caisse moins la cagnotte ou le bon d\'achat gagné, comparé au magasin le moins cher sans carte.</p>';
+    P.querySelectorAll("button[data-carte]").forEach((b) => b.onclick = () => basculerCarte(b.dataset.carte, b.getAttribute("aria-pressed") !== "true"));
+    P.hidden = false;
+  }
 
   /* ---------- Photo de la liste, lue par Claude ---------- */
   let SAMPLE = null, IMAGES = false, ctl = null, lus = [];

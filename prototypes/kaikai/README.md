@@ -5,7 +5,8 @@ Non officielle. Deux onglets :
 
 - **Ma liste de courses** : on ajoute des produits par recherche, ou en lisant la photo d'une liste
   manuscrite (lue par Claude, avec l'accord de l'utilisateur). L'appli donne le magasin le moins cher
-  pour toute la liste, et la meilleure combinaison de deux magasins de la même commune.
+  pour toute la liste, et la meilleure combinaison de deux magasins de la même commune. Les cartes
+  de fidélité cochées par l'utilisateur sont prises en compte (voir plus bas).
 - **Recettes** : le coût de 5 recettes calédoniennes au meilleur prix.
 
 Version en ligne : https://claude.ai/artifact/4rxympDnSY29hFxoCuxe9s (privée, à partager
@@ -47,6 +48,35 @@ les calculs et les recettes fonctionnent ; la lecture de photo est masquée.
   même commune, et n'est proposé que s'il fait gagner au moins 5 % et 200 F.
 - La photo est envoyée à Claude, qui renvoie les articles lus ; chacun est rapproché du catalogue par la
   recherche locale et l'utilisateur valide avant l'ajout.
+
+## Cartes de fidélité
+
+Les règles sont dans le bloc `<script type="application/json" id="fidelite">` de `template.html` :
+on les corrige là, sans toucher au code, puis on relance `construire.py`.
+
+| Carte | Enseignes | Règle appliquée | Statut |
+|---|---|---|---|
+| Mon Club | Géant, Casino | 10 % des produits Casino en cagnotte, hors promotion | site monclub.nc |
+| Cado | Korail, K-Gou | 100 F par tranche de 5 000 F, hors promotion | site cado.nc |
+| CONSO+ | Carrefour Market, Express | 20 points par 2 000 F (+1 ou 2 pour le reste), 1 point = 1 F | à confirmer |
+| Waaoh | Auchan | 5 % des produits Auchan en bon d'achat | à confirmer (2022) |
+| Carte U | Hyper U, Super U | 5 % des produits U | à confirmer (2022) |
+
+Types de règle : `marque` (taux sur une marque propre ; la marque est le 6e champ des produits dans
+`liste-data.json`, calculée par `construire_liste.py`), `tranches` (gain par tranche de ticket),
+`conso` (barème CONSO+). `horsPromo` exclut les produits en promotion. Leader Price et Discount
+n'ont pas de programme connu.
+
+Dans l'appli :
+- « Mes cartes de fidélité » : l'utilisateur coche ses cartes (gardées dans son navigateur).
+- Avec « Déduire mes cagnottes », les magasins sont classés sur le prix net (caisse moins cagnotte),
+  et le « moins cher équivalent » préfère la marque propre quand la remise la rend moins chère.
+  Le prix en caisse reste affiché.
+- « Quelle carte vaut le coup pour cette liste ? » : pour chaque carte, le meilleur magasin de
+  l'enseigne, son prix net et l'écart avec le moins cher sans carte, avec l'estimation sur un an.
+- Le duo de magasins est calculé sur le prix en caisse seul.
+- Non comptés : offres ciblées (Happy Remises…), opérations points × 2, cotisation Mon Club
+  (1 000 F par an après la 1re année).
 
 ## Ajouter ou modifier une recette
 
