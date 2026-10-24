@@ -261,6 +261,24 @@ select {
 .eco.alerte { background: var(--alerte-pale); }
 .eco.alerte b { color: var(--alerte); }
 
+/* Menu de la semaine */
+.menu-form { display: grid; gap: 12px; }
+.menu-form input[type="number"], .menu-form input[type="text"], .menu-form textarea {
+  font: inherit; color: inherit; background: var(--carte); border: 1.5px solid var(--trait); border-radius: 10px; padding: 7px 10px; width: 100%; }
+.menu-form .cases { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.menu-form .cases label { display: flex; gap: 6px; align-items: center; font-size: .92rem; }
+.menu-form .cases input { width: 18px; height: 18px; accent-color: var(--niaouli); }
+.menu-jours { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
+.menu-jour { background: var(--carte); border: 1px solid var(--trait); border-radius: var(--r); padding: 12px 14px; }
+.menu-jour h4 { margin: 0 0 6px; font-family: var(--f-titre); font-size: 1rem; }
+.menu-jour p { margin: 4px 0 0; font-size: .92rem; }
+.menu-jour p small { display: block; color: var(--doux); }
+.menu-jour .moment { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--doux); font-weight: 700; }
+.menu-courses { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.menu-courses li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 12px; background: var(--carte); border: 1px solid var(--trait); border-radius: 10px; font-size: .92rem; }
+.menu-courses li small { grid-column: 1 / -1; color: var(--doux); }
+.menu-attente { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
 /* Pièges du rayon */
 .puce.piege { background: var(--alerte-pale); color: var(--alerte); }
 .puce.vraie { background: var(--niaouli-pale); color: var(--niaouli); }
@@ -329,6 +347,7 @@ select {
 
   <nav class="onglets" role="tablist" aria-label="Rubriques">
     <button type="button" role="tab" id="tab-liste" aria-controls="vue-liste" aria-selected="false">Ma liste de courses</button>
+    <button type="button" role="tab" id="tab-menu" aria-controls="vue-menu" aria-selected="false">Menu de la semaine</button>
     <button type="button" role="tab" id="tab-recettes" aria-controls="vue-recettes" aria-selected="true">Recettes</button>
   </nav>
 
@@ -438,6 +457,60 @@ select {
     </div>
   </section>
 
+  <section id="vue-menu" role="tabpanel" aria-labelledby="tab-menu" hidden>
+    <div class="liste-grille">
+      <div class="liste-saisie">
+        <h2>Menu de la semaine</h2>
+        <p class="note">Claude compose vos repas avec les produits les moins chers de votre commune, dans votre budget, puis Kaïkaï remplit votre liste de courses.</p>
+        <form class="menu-form" id="menu-form">
+          <div class="trajet-chiffres">
+            <label class="reglage" for="menu-personnes"><span>Personnes</span><input id="menu-personnes" type="number" min="1" max="12" value="4" inputmode="numeric"></label>
+            <label class="reglage" for="menu-budget"><span>Budget courses (F)</span><input id="menu-budget" type="number" min="1000" max="200000" step="500" value="12000" inputmode="numeric"></label>
+          </div>
+          <label class="reglage" for="menu-repas"><span>Repas sur 7 jours</span>
+            <select id="menu-repas">
+              <option value="diners">Les dîners</option>
+              <option value="dej-diners">Les déjeuners et les dîners</option>
+              <option value="tous">Petits-déjeuners, déjeuners et dîners</option>
+            </select></label>
+          <div class="reglage"><span>Régime</span>
+            <div class="cases">
+              <label><input type="checkbox" name="regime" value="sans porc"> Sans porc</label>
+              <label><input type="checkbox" name="regime" value="sans bœuf"> Sans bœuf</label>
+              <label><input type="checkbox" name="regime" value="sans poisson ni fruits de mer"> Sans poisson</label>
+              <label><input type="checkbox" name="regime" value="végétarien"> Végétarien</label>
+            </div></div>
+          <label class="reglage" for="menu-placard"><span>J'ai déjà dans le placard</span>
+            <input id="menu-placard" type="text" placeholder="riz, huile, sel, sauce soja…"></label>
+          <label class="reglage" for="menu-envies"><span>Envies ou contraintes</span>
+            <input id="menu-envies" type="text" placeholder="enfants, pas trop épicé, plats rapides…"></label>
+          <button type="submit" class="btn plein" id="menu-go">Composer mon menu</button>
+          <p class="note" id="menu-dispo"></p>
+        </form>
+      </div>
+      <div class="liste-resultat">
+        <p class="chargement" id="menu-chargement" hidden>Chargement des prix…</p>
+        <div id="menu-etat" aria-live="polite"></div>
+        <section class="verdict" id="menu-verdict" hidden></section>
+        <section class="section" id="menu-repas-bloc" hidden>
+          <h3>Les repas</h3>
+          <div class="menu-jours" id="menu-jours"></div>
+          <ul class="note" id="menu-conseils"></ul>
+        </section>
+        <section class="section" id="menu-courses-bloc" hidden>
+          <h3>Les courses</h3>
+          <p class="sous">Prix le plus bas relevé dans votre commune ; le magasin le moins cher pour l'ensemble est calculé dans « Ma liste de courses ».</p>
+          <ul class="menu-courses" id="menu-courses"></ul>
+          <div class="boutons">
+            <button type="button" class="btn plein" id="menu-remplacer">Mettre ces courses dans ma liste</button>
+            <button type="button" class="btn" id="menu-ajouter">Ajouter à ma liste</button>
+            <button type="button" class="btn" id="menu-autre">Un autre menu</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <section id="vue-recettes" role="tabpanel" aria-labelledby="tab-recettes">
   <div class="corps">
     <nav class="recettes" id="recettes" aria-label="Recettes"></nav>
@@ -503,6 +576,8 @@ select {
       (production et combustion du carburant) et, pour l'électricité, la part de renouvelables publiée par Enercal.
       Positions des magasins : prix.nc, complétées par OpenStreetMap ; à défaut, le quartier ou le centre de la commune.
       Votre point de départ reste dans votre navigateur.</p>
+    <p>Menu de la semaine : composé par Claude, avec votre accord et sur votre compte Claude, à partir d'une soixantaine
+      de produits de base au prix le plus bas de votre commune. Vérifiez les quantités avant vos courses.</p>
     <p>Pièges du rayon : une promotion est « trompeuse » quand son prix est égal ou supérieur au prix habituel du produit,
       c'est-à-dire la médiane de ses prix hors promotion dans au moins trois magasins. Un grand format est un « piège » quand,
       dans le même magasin, plusieurs petits formats du même produit (même quantité à ±10 %) coûtent moins cher.</p>
@@ -829,7 +904,7 @@ select {
                    ["3700739200333", 2], ["3034027001013", 6], ["9300605095663", 1], ["9310047010117", 1]];
 
   /* ---------- Onglets ---------- */
-  const onglets = { liste: $("tab-liste"), recettes: $("tab-recettes") };
+  const onglets = { liste: $("tab-liste"), menu: $("tab-menu"), recettes: $("tab-recettes") };
   function montrer(nom) {
     for (const k in onglets) {
       onglets[k].setAttribute("aria-selected", k === nom ? "true" : "false");
@@ -837,9 +912,11 @@ select {
     }
     ecrire("onglet", nom);
     if (nom === "liste") demarrer();
+    if (nom === "menu") { $("menu-chargement").hidden = !!D; demarrer().then(initMenu); }
   }
   onglets.liste.addEventListener("click", () => montrer("liste"));
   onglets.recettes.addEventListener("click", () => montrer("recettes"));
+  onglets.menu.addEventListener("click", () => montrer("menu"));
 
   /* ---------- Données ---------- */
   let D = null, MOTS = [], PAR_VAR = new Map(), CACHE_PRIX = new Map(), CACHE_EQ = new Map();
@@ -1204,15 +1281,20 @@ select {
     });
   }
 
-  /* ---------- Calcul ---------- */
-  function calculer() {
-    const mags = [];
-    const doux = DEPART && TRAJET.vehicule === "doux";
+  /* Magasins pris en compte : commune choisie, rayon autour du point de départ, distance à pied. */
+  function magasinsRetenus() {
+    const mags = [], doux = DEPART && TRAJET.vehicule === "doux";
     D.magasins.forEach((m, s) => {
       if (doux) { const d = versMag(s); if (d == null || d > TC.rayonDoux) return; }
       if (commune === "__proche") { const d = DEPART ? versMag(s) : null; if (d != null && d <= TC.rayonProche) mags.push(s); }
       else if (!commune || m[1] === commune) mags.push(s);
     });
+    return mags;
+  }
+
+  /* ---------- Calcul ---------- */
+  function calculer() {
+    const mags = magasinsRetenus();
     const mb = LISTE.map(meilleurs);
     const somme = (lignes) => lignes.reduce((a, o, k) => a + (o ? o[0] * LISTE[k].qte : 0), 0);
     const parMag = mags.map((s) => {
@@ -1536,6 +1618,143 @@ select {
     P.hidden = false;
   }
 
+  /* ---------- Menu de la semaine, composé par Claude ---------- */
+  const BASES = ["riz", "pâte spaghetti", "pâte coquillette", "vermicelle chinois", "nouille instantanée", "farine de blé", "semoule",
+    "sucre blanc", "huile de tournesol", "lait demi-écrémé", "lait de coco", "lait concentré sucré", "oeuf frais", "beurre", "margarine",
+    "fromage râpé", "yaourt nature", "crème fraîche", "pain de mie", "céréales", "biscuit", "confiture", "café soluble", "thé",
+    "chocolat en poudre", "poulet cuisse surgelé", "aile de poulet", "poulet entier", "steak haché surgelé", "saucisse", "jambon",
+    "corned beef", "thon au naturel", "sardine", "poisson pané", "lentille", "haricot rouge", "petit pois", "maïs", "tomate pelée",
+    "concentré de tomate", "purée", "oignon", "ail", "pomme de terre", "patate douce", "carotte", "chou", "potiron", "tomate", "salade",
+    "banane", "pomme", "haricot vert surgelé", "épinard", "légume surgelé", "sauce soja", "bouillon cube", "curry", "sel", "poivre",
+    "mayonnaise", "ketchup", "vinaigre"];
+  let MENU = null, menuCtl = null, CATALOGUE = [];
+  /* Pour chaque produit de base : la référence la moins chère à l'unité dans les magasins retenus. */
+  function catalogue() {
+    const mags = new Set(magasinsRetenus()), min = mags.size >= 5 ? 2 : 1, vus = new Set(), out = [];
+    for (const terme of BASES) {
+      const cands = [];
+      for (const i of rechercher(terme, 30)) {
+        const t = D.prix[i];
+        let p = Infinity, n = 0;
+        for (let k = 0; k < t.length; k += 2) if (mags.has(t[k] >> 1)) { n++; if (t[k + 1] < p) p = t[k + 1]; }
+        if (n >= min) cands.push({ i, p, u: D.produits[i][3] > 0 ? p / D.produits[i][3] : p });
+      }
+      // le moins cher à l'unité, sans les formats géants (pas plus de 3 fois le prix du plus petit ticket)
+      const plafond = 3 * Math.min(...cands.map((c) => c.p));
+      const meilleur = cands.filter((c) => c.p <= plafond).sort((a, b) => a.u - b.u)[0];
+      if (meilleur && !vus.has(meilleur.i)) { vus.add(meilleur.i); out.push({ i: meilleur.i, p: meilleur.p, base: terme }); }
+    }
+    return out;
+  }
+  let menuInit = false;
+  async function initMenu() {
+    $("menu-chargement").hidden = true;
+    if (menuInit) return;
+    menuInit = true;
+    const s = window.claude && window.claude.use ? await window.claude.use("sample") : null;
+    if (!s) {
+      $("menu-go").disabled = true;
+      $("menu-dispo").textContent = "Le menu est composé par Claude : ouvrez Kaïkaï dans Claude pour l'utiliser. Les recettes et la liste de courses fonctionnent sans.";
+    } else SAMPLE = SAMPLE || s;
+    try { const m = JSON.parse(lire("menu", "null")); if (m && m.repas) { MENU = restaurerMenu(m); rendreMenu(); } } catch (e) {}
+  }
+  const REPAS = { diners: "le dîner", "dej-diners": "le déjeuner et le dîner", tous: "le petit-déjeuner, le déjeuner et le dîner" };
+  function consigneMenu(opts, cat, correction) {
+    return "Tu aides une famille de Nouvelle-Calédonie à manger bien pour pas cher. Compose les repas de 7 jours (lundi à dimanche) pour " +
+      opts.personnes + " personne(s) : " + REPAS[opts.repas] + " de chaque jour. Budget total des courses : " + opts.budget + " F CFP.\n" +
+      (opts.regime.length ? "Régime : " + opts.regime.join(", ") + ".\n" : "") +
+      (opts.placard ? "Déjà dans le placard (ne pas acheter) : " + opts.placard + ".\n" : "") +
+      (opts.envies ? "Envies ou contraintes : " + opts.envies + ".\n" : "") +
+      (correction ? correction + "\n" : "") +
+      "Règles : plats simples, variés et équilibrés, de la cuisine du quotidien calédonien (riz, curry, chop suey, poulet coco, salades, pâtes…) ; " +
+      "réutilise les mêmes produits d'un repas à l'autre pour éviter le gaspillage ; n'achète QUE des produits du catalogue ci-dessous, " +
+      "en nombre entier d'articles, en tenant compte de leur format pour " + opts.personnes + " personne(s) ; " +
+      "le total (prix × quantité) doit rester sous le budget, sinon fais au plus juste et dis-le dans les conseils.\n" +
+      "Catalogue (id | produit et format | prix le plus bas en F) :\n" + cat.map((c, k) => k + " | " + D.produits[c.i][0] + " | " + c.p).join("\n") +
+      '\nRéponds uniquement en JSON : {"repas":[{"jour":"Lundi","moment":"Dîner","plat":"nom du plat","detail":"une phrase"}],' +
+      '"courses":[{"id":numéro du catalogue,"quantite":nombre d\'articles,"pour":"plats concernés, court"}],"conseils":["1 à 3 conseils courts"]}';
+  }
+  function optionsMenu() {
+    return { personnes: Math.max(1, Math.min(12, +$("menu-personnes").value || 4)), budget: Math.max(1000, +$("menu-budget").value || 12000),
+      repas: $("menu-repas").value, regime: [...document.querySelectorAll('input[name="regime"]:checked')].map((c) => c.value),
+      placard: $("menu-placard").value.trim().slice(0, 300), envies: $("menu-envies").value.trim().slice(0, 300) };
+  }
+  const MSG_SAMPLE = { not_granted: "Vous n'avez pas autorisé Kaïkaï à utiliser Claude.", rate_limited: "Limite d'utilisation de Claude atteinte : réessayez plus tard.",
+    invalid_json: "La réponse de Claude était incomplète : réessayez.", cancelled: "Composition annulée." };
+  async function composerMenu(correction) {
+    if (!SAMPLE || !D) return;
+    const opts = optionsMenu(), cat = catalogue();
+    if (cat.length < 15) { $("menu-etat").innerHTML = '<p class="note">Trop peu de produits dans cette commune : choisissez une autre commune dans « Ma liste de courses ».</p>'; return; }
+    menuCtl = new AbortController();
+    const t0 = Date.now();
+    $("menu-go").disabled = true; $("menu-autre").disabled = true;
+    $("menu-etat").innerHTML = '<div class="menu-attente"><span>Claude compose votre menu avec ' + cat.length + ' produits… <b id="menu-chrono">0 s</b></span>' +
+      '<button type="button" class="btn" id="menu-stop">Annuler</button></div>';
+    const chrono = setInterval(() => { const c = $("menu-chrono"); if (c) c.textContent = Math.round((Date.now() - t0) / 1000) + " s"; }, 1000);
+    $("menu-stop").onclick = () => menuCtl.abort();
+    try {
+      const r = await SAMPLE.json(consigneMenu(opts, cat, correction), { signal: menuCtl.signal, cache: false });
+      const courses = (Array.isArray(r.courses) ? r.courses : []).map((c) => ({ c: cat[+c.id], qte: Math.max(1, Math.min(30, Math.round(+c.quantite) || 1)), pour: String(c.pour || "") }))
+        .filter((x) => x.c);
+      if (!Array.isArray(r.repas) || !r.repas.length || !courses.length) throw { code: "invalid_json" };
+      MENU = { opts, repas: r.repas.slice(0, 21).map((x) => ({ jour: String(x.jour || ""), moment: String(x.moment || ""), plat: String(x.plat || ""), detail: String(x.detail || "") })),
+        courses: courses.map((x) => ({ i: x.c.i, p: x.c.p, qte: x.qte, pour: x.pour })), conseils: (Array.isArray(r.conseils) ? r.conseils : []).slice(0, 3).map(String) };
+      ecrire("menu", JSON.stringify({ ...MENU, courses: MENU.courses.map((x) => ({ ...x, ean: D.produits[x.i][4], nom: D.produits[x.i][0] })) }));
+      $("menu-etat").innerHTML = "";
+      rendreMenu();
+    } catch (e) {
+      $("menu-etat").innerHTML = '<p class="note">' + esc(MSG_SAMPLE[e && e.code] || "Le menu n'a pas pu être composé : réessayez.") + "</p>";
+    } finally {
+      clearInterval(chrono); $("menu-go").disabled = false; $("menu-autre").disabled = false;
+    }
+  }
+  function restaurerMenu(m) {
+    m.courses = (m.courses || []).map((x) => ({ ...x, i: trouver(x.ean, x.nom) })).filter((x) => x.i >= 0);
+    return m;
+  }
+  /* Coût réel des courses du menu : même calcul que la liste (magasins retenus, équivalents, fidélité, trajet). */
+  function evaluerMenu() {
+    const garde = LISTE;
+    LISTE = MENU.courses.map((x) => ({ i: x.i, qte: x.qte, exact: false }));
+    try { return calculer(); } finally { LISTE = garde; }
+  }
+  function rendreMenu() {
+    if (!MENU || !D) return;
+    const R = evaluerMenu(), best = R.complets[0], b = MENU.opts.budget;
+    const V = $("menu-verdict");
+    const estime = MENU.courses.reduce((a, x) => a + x.p * x.qte, 0);
+    V.innerHTML = best
+      ? '<div><div class="ou">Les courses de la semaine, au moins cher</div><div class="magasin">' + esc(D.magasins[best.s][0]) + "</div>" +
+        '<div class="total num" style="margin-top:12px">' + xpf(best.caisse) + "</div>" +
+        '<div class="parpers">' + MENU.opts.personnes + " personne(s) · " + MENU.repas.length + " repas · soit " + xpf(best.caisse / MENU.repas.length / MENU.opts.personnes) + " par repas et par personne</div></div>" +
+        '<div class="economies"><div class="eco' + (best.caisse > b ? " alerte" : "") + '"><span>' + (best.caisse > b ? "Dépasse votre budget de " : "Reste sur votre budget de " + xpf(b) + " : ") + "</span><b class=\"num\">" + xpf(Math.abs(b - best.caisse)) + "</b></div>" +
+        (best.caisse > b ? '<button type="button" class="btn" id="menu-ajuster">Refaire un menu moins cher</button>' : "") + "</div>"
+      : '<div class="vide">Aucun magasin de la zone choisie n\'a toutes les courses ; prix estimé en combinant les magasins : ' + xpf(estime) + ".</div>";
+    V.hidden = false;
+    const aj = $("menu-ajuster");
+    if (aj) aj.onclick = () => composerMenu("Le menu précédent coûtait " + Math.round(best.caisse) + " F, soit " + Math.round(best.caisse - b) + " F de trop : choisis des plats et des produits moins chers.");
+    const jours = [];
+    MENU.repas.forEach((r) => { let j = jours.find((x) => x.jour === r.jour); if (!j) jours.push(j = { jour: r.jour, repas: [] }); j.repas.push(r); });
+    $("menu-jours").innerHTML = jours.map((j) => '<div class="menu-jour"><h4>' + esc(j.jour) + "</h4>" +
+      j.repas.map((r) => '<p><span class="moment">' + esc(r.moment) + "</span><br>" + esc(r.plat) + (r.detail ? "<small>" + esc(r.detail) + "</small>" : "") + "</p>").join("") + "</div>").join("");
+    $("menu-conseils").innerHTML = MENU.conseils.map((c) => "<li>" + esc(c) + "</li>").join("");
+    $("menu-courses").innerHTML = MENU.courses.map((x) => "<li><span>" + esc(D.produits[x.i][0]) + " × " + x.qte + '</span><b class="num">' + xpf(x.p * x.qte) + "</b>" +
+      (x.pour ? "<small>" + esc(x.pour) + "</small>" : "") + "</li>").join("");
+    $("menu-repas-bloc").hidden = false; $("menu-courses-bloc").hidden = false;
+  }
+  function versListe(remplacer) {
+    if (!MENU) return;
+    if (remplacer) LISTE = [];
+    MENU.courses.forEach((x) => { const d = LISTE.find((l) => l.i === x.i); if (d) d.qte += x.qte; else LISTE.push({ i: x.i, qte: x.qte, exact: false }); });
+    modifier();
+    montrer("liste");
+    window.scrollTo({ top: 0 });
+  }
+  $("menu-form").addEventListener("submit", (e) => { e.preventDefault(); composerMenu(); });
+  $("menu-autre").addEventListener("click", () => composerMenu("Propose des plats différents du menu précédent."));
+  $("menu-remplacer").addEventListener("click", () => versListe(true));
+  $("menu-ajouter").addEventListener("click", () => versListe(false));
+
   /* ---------- Photo de la liste, lue par Claude ---------- */
   let SAMPLE = null, IMAGES = false, ctl = null, lus = [];
   const CONSIGNE = "Cette image est la photo d'une liste de courses (manuscrite ou imprimée), faite en Nouvelle-Calédonie. " +
@@ -1685,7 +1904,7 @@ select {
   });
   $("photo-annuler").addEventListener("click", () => { $("photo-lignes").hidden = true; $("photo-actions").hidden = true; etatPhoto(""); });
   const h = location.hash.replace("#", "");
-  montrer(h === "liste" || h === "recettes" ? h : lire("onglet", "liste"));
+  montrer(h in onglets ? h : lire("onglet", "liste") in onglets ? lire("onglet", "liste") : "liste");
 })();
 </script>
 </body></html>

@@ -1,13 +1,15 @@
 # Kaïkaï — prototype
 
 Appli consommateur de démonstration, à partir des prix publiés par l'observatoire prix.nc.
-Non officielle. Deux onglets :
+Non officielle. Trois onglets :
 
 - **Ma liste de courses** : on ajoute des produits par recherche, ou en lisant la photo d'une liste
   manuscrite (lue par Claude, avec l'accord de l'utilisateur). L'appli donne le magasin le moins cher
   pour toute la liste, et la meilleure combinaison de deux magasins de la même commune. Les cartes
   de fidélité cochées par l'utilisateur sont prises en compte, et le coût du trajet depuis son
   quartier (carburant, temps, CO2) quand il l'indique (voir plus bas).
+- **Menu de la semaine** : Claude compose les repas de 7 jours dans un budget, avec les produits les
+  moins chers de la commune, puis remplit la liste de courses.
 - **Recettes** : le coût de 5 recettes calédoniennes au meilleur prix.
 
 Version en ligne : https://claude.ai/artifact/4rxympDnSY29hFxoCuxe9s (privée, à partager
@@ -50,6 +52,20 @@ les calculs et les recettes fonctionnent ; la lecture de photo est masquée.
   même commune, et n'est proposé que s'il fait gagner au moins 5 % et 200 F.
 - La photo est envoyée à Claude, qui renvoie les articles lus ; chacun est rapproché du catalogue par la
   recherche locale et l'utilisateur valide avant l'ajout.
+
+## Menu de la semaine
+
+- L'utilisateur indique le nombre de personnes, le budget, les repas (dîners ; déjeuners et dîners ;
+  les trois repas), son régime, ce qu'il a déjà au placard et ses envies.
+- La page construit un catalogue d'une soixantaine de produits de base (liste `BASES` dans
+  `template.html`) : pour chacun, la référence la moins chère à l'unité dans les magasins retenus
+  (commune ou rayon autour du point de départ), sans les formats de plus de 3 fois le prix du plus
+  petit. Claude reçoit ce catalogue avec ses prix et répond en un seul appel (JSON : repas, courses
+  par identifiant du catalogue et quantité, conseils).
+- Le coût réel est recalculé avec le même moteur que la liste (magasin le moins cher, équivalents,
+  fidélité, trajet) et comparé au budget ; « Refaire un menu moins cher » renvoie l'écart à Claude.
+- « Mettre ces courses dans ma liste » / « Ajouter à ma liste » ; le dernier menu reste dans le
+  navigateur. Sans Claude (version autonome), l'onglet l'indique et reste désactivé.
 
 ## Pièges du rayon
 
