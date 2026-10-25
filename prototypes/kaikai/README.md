@@ -21,7 +21,7 @@ depuis le menu « Partager » de la page).
 
 | Fichier | Rôle |
 |---|---|
-| `kaikai.html` | Page à publier, avec les recettes et tous les prix de la liste intégrés (4,5 Mo) |
+| `kaikai.html` | Page à publier, avec les recettes et tous les prix de la liste intégrés, compressés (gzip + base64, ≈ 2 Mo) |
 | `kaikai-autonome.html` | Même page en document complet, à télécharger et ouvrir hors ligne |
 | `liste-data.json` | Tous les prix (24 700 produits, 238 magasins), intégrés dans la page par `construire.py` |
 | `template.html` | Page sans données (le marqueur `__DATA__` reçoit le JSON des recettes) |

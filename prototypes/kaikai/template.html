@@ -1039,11 +1039,22 @@ select {
     // prix intégrés à la page (fonctionne aussi une fois téléchargée) ; sinon fichier publié à côté
     const integre = $("liste-donnees");
     chargement = (integre && integre.textContent.length > 1000
-        ? new Promise((ok) => setTimeout(() => ok(JSON.parse(integre.textContent)), 0))
+        ? new Promise((ok) => setTimeout(ok, 0)).then(() => lireIntegre(integre))
         : fetch("liste-data.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }))
       .then((d) => { D = d; preparer(); restaurer(); $("liste-chargement").hidden = true; rendre(); initPhoto(); })
-      .catch(() => { $("liste-chargement").textContent = "Les prix n'ont pas pu être chargés. Rechargez la page pour réessayer."; });
+      .catch(() => {
+        $("liste-chargement").textContent = typeof DecompressionStream === "undefined"
+          ? "Votre navigateur est trop ancien pour lire les prix : mettez-le à jour, ou ouvrez la page dans Chrome ou Safari."
+          : "Les prix n'ont pas pu être chargés. Rechargez la page pour réessayer.";
+      });
     return chargement;
+  }
+  /* Prix intégrés : JSON compressé (gzip, en base64) pour que la page reste légère (≈ 1,6 Mo au lieu de 5). */
+  function lireIntegre(el) {
+    const t = el.textContent.trim();
+    if (!el.dataset.gzip) return JSON.parse(t);
+    const octets = Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
+    return new Response(new Blob([octets]).stream().pipeThrough(new DecompressionStream("gzip"))).json();
   }
 
   function preparer() {

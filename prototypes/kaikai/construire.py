@@ -7,7 +7,7 @@ Lit l'instantané produit par `.claude/skills/prix-nc/scripts/prix_nc.py collect
 chiffre les recettes définies dans RECETTES et injecte les données dans template.html,
 ainsi que liste-data.json (à produire d'abord avec construire_liste.py) pour l'onglet « Ma liste ».
 """
-import csv, json, statistics, sys
+import base64, csv, gzip, json, statistics, sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -116,11 +116,13 @@ donnees = {"instantane": SNAP.rstrip("/").split("/")[-1],
            "releves_de": manifeste["releve_le_plus_ancien"], "releves_a": manifeste["releve_le_plus_recent"],
            "magasins": magasins, "recettes": sortie_recettes}
 json_donnees = json.dumps(donnees, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
-# prix de la liste de courses, intégrés pour que la page fonctionne aussi une fois téléchargée
+# prix de la liste de courses, intégrés pour que la page fonctionne aussi une fois téléchargée ;
+# compressés (gzip puis base64) pour que la page reste légère : ≈ 1,6 Mo au lieu de 5
 LISTE = Path(__file__).with_name("liste-data.json")
-json_liste = LISTE.read_text(encoding="utf-8").replace("<", "\\u003c") if LISTE.exists() else ""
+liste_gz = base64.b64encode(gzip.compress(LISTE.read_bytes(), 9, mtime=0)).decode("ascii") if LISTE.exists() else ""
 page = TEMPLATE.read_text(encoding="utf-8").replace("__DATA__", json_donnees)
-page = page.replace('id="liste-donnees">__LISTE__<', 'id="liste-donnees">' + json_liste + "<")
+page = page.replace('<script type="application/json" id="liste-donnees">__LISTE__</script>',
+                    '<script type="text/plain" id="liste-donnees" data-gzip="1">' + liste_gz + "</script>")
 Path(OUT).write_text(page, encoding="utf-8")
 # version autonome à télécharger : document complet, ouvrable hors ligne depuis le téléphone ou l'ordinateur
 AUTONOME = Path(OUT).with_name(Path(OUT).stem + "-autonome.html")
