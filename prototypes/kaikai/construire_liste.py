@@ -7,9 +7,10 @@ Format (tableaux parallèles, pour tenir en quelques Mo) :
     magasins  : [[nom, commune, lat, lon, précision], ...]   précision : 0 magasin, 1 quartier, 2 centre de la commune
                 (lat/lon null si inconnus ; voir positions/)
     varietes  : [nom, ...]
-    produits  : [[nom, index variété, unité, taille, ean, marque propre, conservation], ...]   taille = prix / prix unitaire
+    produits  : [[nom, index variété, unité, taille, ean, marque propre, conservation, nutriscore, nova], ...]   taille = prix / prix unitaire
                 marque propre : 0 aucune, 1 Casino, 2 Auchan, 3 U, 4 Carrefour (pour les cartes de fidélité)
                 conservation : 0 frais, 1 congélateur, 2 se garde longtemps (pour les réserves en promo)
+                nutriscore : 0 inconnu, 1 à 5 pour A à E ; nova : 0 inconnu, 1 à 4 (Open Food Facts, nutriscore.csv)
     prix      : [[m1*2+promo1, prix1, m2*2+promo2, prix2, ...], ...]   un tableau par produit
     departs   : [[commune, nom, lat, lon], ...]   points de départ proposés (quartiers, centres des communes)
     promos    : [[produit, magasin, prix, jours], ...]   relevés en promotion ; jours = âge du relevé à la date de l'instantané
@@ -65,6 +66,12 @@ def conservation(secteur, sous_secteur):
         return 0
     return 2
 
+# Nutri-Score et NOVA (Open Food Facts, extraits par nutriscore.py)
+NS = {}
+if (Path(__file__).with_name("nutriscore.csv")).exists():
+    for r in csv.DictReader(open(Path(__file__).with_name("nutriscore.csv"), encoding="utf-8"), delimiter=";"):
+        NS[r["ean"]] = ("abcde".index(r["nutriscore"]) + 1 if r["nutriscore"] else 0, int(r["nova"] or 0))
+
 ref = lire("produits.csv")
 variete = {p["id_produit"]: (p["variete"] or p["sous_secteur"] or p["secteur"] or "").strip() for p in ref}
 famille = {p["id_produit"]: marque_propre(p["marque"]) for p in ref}
@@ -103,7 +110,7 @@ for pid, rs in sorted(par_produit.items(), key=lambda x: x[1][0]["produit"]):
             jours = (date_inst - date.fromisoformat(r["date_releve"][:10])).days if r["date_releve"] else None
             promos.append([len(produits), idx_mag[m], int(r["prix"]), jours])
     produits.append([rs[0]["produit"].strip(), idx_var[v], rs[0]["unite"], round(st.median(tailles), 3) if tailles else 0, rs[0]["ean"],
-                     famille.get(pid, 0), conserv.get(pid, 2)])
+                     famille.get(pid, 0), conserv.get(pid, 2), *NS.get(rs[0]["ean"], (0, 0))])
     prix_tab.append(ligne)
     pids.append(pid)
 
@@ -143,4 +150,4 @@ donnees = dict(instantane=Path(SNAP).name, releves_de=manifeste["releve_le_plus_
 Path(OUT).write_text(json.dumps(donnees, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print(f"{OUT} : {len(produits)} produits, {len(magasins)} magasins ({sum(m[4] == 0 for m in magasins)} situés précisément, "
       f"{sum(m[4] == 1 for m in magasins)} au quartier, {sum(m[4] == 2 for m in magasins)} à la commune, {sum(m[2] is None for m in magasins)} sans position), "
-      f"{sum(len(p) // 2 for p in prix_tab)} prix, {len(formats)} grands formats pièges, {len(promos)} promos, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)
+      f"{sum(len(p) // 2 for p in prix_tab)} prix, {len(formats)} grands formats pièges, {len(promos)} promos, {sum(1 for p in produits if p[7])} Nutri-Scores, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)

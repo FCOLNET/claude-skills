@@ -261,6 +261,11 @@ select {
 .eco.alerte { background: var(--alerte-pale); }
 .eco.alerte b { color: var(--alerte); }
 
+/* Nutri-Score (couleurs officielles) */
+.ns { display: inline-grid; place-items: center; min-width: 1.4em; height: 1.4em; padding: 0 2px; margin-left: 6px; border-radius: 4px;
+  font: 800 .76rem/1 var(--f-titre); color: #fff; vertical-align: .08em; }
+.ns1 { background: #038141; } .ns2 { background: #85bb2f; } .ns3 { background: #fecb02; color: #1f2a24; } .ns4 { background: #ee8100; } .ns5 { background: #e63e11; }
+
 /* Promos */
 .promos-filtres { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; }
 .promos-filtres input[type="search"] { font: inherit; color: inherit; background: var(--carte); border: 1.5px solid var(--trait); border-radius: 99px; padding: 7px 14px; width: 100%; }
@@ -309,6 +314,7 @@ select {
 .puce.vraie { background: var(--niaouli-pale); color: var(--niaouli); }
 .piege-texte { font-size: .85rem; color: var(--alerte); margin-top: 4px; }
 .piege-texte.ok { color: var(--niaouli); }
+.piege-texte.ok button { border-color: var(--niaouli); color: var(--niaouli); }
 .piege-texte button { font: inherit; font-size: .82rem; margin-left: 6px; padding: 2px 10px; border-radius: 99px; border: 1.5px solid var(--alerte); background: transparent; color: var(--alerte); cursor: pointer; }
 .pieges-resume { background: var(--alerte-pale); color: var(--encre); border-radius: 10px; padding: 10px 14px; margin: 0 0 8px; font-size: .92rem; }
 .pieges-resume b { color: var(--alerte); }
@@ -503,6 +509,12 @@ select {
             <option value="1">Congélateur</option>
             <option value="0">Frais</option>
           </select></label>
+        <label class="reglage" for="promos-ns"><span>Nutri-Score</span>
+          <select id="promos-ns">
+            <option value="">Tous</option>
+            <option value="2">A ou B</option>
+            <option value="3">A, B ou C</option>
+          </select></label>
         <label class="reglage" for="promos-tri"><span>Trier par</span>
           <select id="promos-tri">
             <option value="remise">Plus forte remise</option>
@@ -637,6 +649,8 @@ select {
       (production et combustion du carburant) et, pour l'électricité, la part de renouvelables publiée par Enercal.
       Positions des magasins : prix.nc, complétées par OpenStreetMap ; à défaut, le quartier ou le centre de la commune.
       Votre point de départ reste dans votre navigateur.</p>
+    <p>Nutri-Score : données Open Food Facts (licence ODbL), associées par code-barres ; affiché quand il est connu.
+      « Mieux noté » propose, pour un produit noté D ou E, un équivalent noté A, B ou C vendu dans le même magasin à 15 % près.</p>
     <p>Promos : « bon coup » = au moins 30 % sous le prix habituel et prix le plus bas relevé en Nouvelle-Calédonie pour ce produit ;
       « vraie promo » = au moins 5 % sous le prix habituel ; « promo faible » = moins de 5 % ; « trompeuse » = prix égal ou supérieur
       au prix habituel. Les promotions ont une durée limitée : vérifiez celles relevées il y a plus d'une semaine.</p>
@@ -1168,6 +1182,25 @@ select {
     }
     return out;
   }
+  /* Nutri-Score (Open Food Facts) : pastille, et équivalent mieux noté dans le même magasin. */
+  const NS_LETTRES = " ABCDE";
+  function badgeNS(i) {
+    const n = D.produits[i][7];
+    return n ? '<span class="ns ns' + n + '" role="img" aria-label="Nutri-Score ' + NS_LETTRES[n] + '" title="Nutri-Score ' + NS_LETTRES[n] + '">' + NS_LETTRES[n] + "</span>" : "";
+  }
+  function mieuxNote(o, s) {
+    const n = D.produits[o[1]][7];
+    if (n < 4) return null;   // seulement pour D et E
+    let best = null;
+    for (const e of equivalents(o[1])) {
+      const ne = D.produits[e][7];
+      if (!ne || ne > 3) continue;
+      const p = prixA(e, s);
+      if (p == null || p > o[0] * 1.15) continue;
+      if (!best || ne < best.n || (ne === best.n && p < best.p)) best = { i: e, p, n: ne };
+    }
+    return best;
+  }
   const nbMag = (i) => D.prix[i].length / 2;
   const prixMin = (i) => D.prix[i][1];
 
@@ -1263,7 +1296,7 @@ select {
     resultats = rechercher(q.value, 12); actif = -1;
     if (!q.value.trim() || !D) { sugg.hidden = true; return; }
     sugg.innerHTML = resultats.length ? resultats.map((i, k) =>
-      '<li role="option"><button type="button" data-k="' + k + '"><span>' + esc(D.produits[i][0]) + "</span><small>" +
+      '<li role="option"><button type="button" data-k="' + k + '"><span>' + esc(D.produits[i][0]) + badgeNS(i) + "</span><small>" +
       esc(D.varietes[D.produits[i][1]] || "") + " · " + nbMag(i) + " magasin(s) · dès " + xpf(prixMin(i)) + "</small></button></li>").join("")
       : '<li class="rien">Aucun produit trouvé. Essayez un mot plus court ou sans marque.</li>';
     sugg.hidden = false;
@@ -1332,7 +1365,7 @@ select {
       const p = D.produits[l.i];
       const li = document.createElement("li");
       li.className = "ligne";
-      li.innerHTML = '<div class="nom">' + esc(p[0]) + "<small>" + esc(D.varietes[p[1]] || "") +
+      li.innerHTML = '<div class="nom">' + esc(p[0]) + badgeNS(l.i) + "<small>" + esc(D.varietes[p[1]] || "") +
         (l.exact ? "" : " · " + equivalents(l.i).length + " produit(s) équivalent(s)") + "</small></div>" +
         '<button type="button" class="retirer" aria-label="Retirer ' + esc(p[0]) + '">×</button>' +
         '<div class="meta"><span class="qte"><button type="button" data-d="-1" aria-label="Un de moins">−</button><span>' + l.qte +
@@ -1509,16 +1542,19 @@ select {
       const rp = resumePieges(sel, false);
       if (rp) det.insertAdjacentHTML("beforeend", rp);
       LISTE.forEach((l, k) => {
-        const o = sel.lignes[k], div = document.createElement("div"), pg = pieges(o, sel.s, l);
+        const o = sel.lignes[k], div = document.createElement("div"), pg = pieges(o, sel.s, l), mn = o ? mieuxNote(o, sel.s) : null;
         div.className = "ing";
         const ref = D.produits[l.i][0];
         div.innerHTML = '<div class="nom">' + esc(ref) + ' <span class="qte-txt" style="color:var(--doux);font-weight:400">× ' + l.qte + "</span></div>" +
           '<div class="montant">' + (o ? '<b class="num">' + xpf(o[0] * l.qte) + '</b><small class="num">' + (l.qte > 1 ? l.qte + " × " + xpf(o[0]) : "") + "</small>" : "<b>—</b>") + "</div>" +
-          '<div class="produit">' + (o ? (o[1] !== l.i ? "Équivalent : " + esc(D.produits[o[1]][0]) : "Ce produit") +
+          '<div class="produit">' + (o ? (o[1] !== l.i ? "Équivalent : " + esc(D.produits[o[1]][0]) : "Ce produit") + badgeNS(o[1]) +
             (o[2] || pg.length || (fidSel && remise(PROG[sel.s], o[1], o[2])) ? '<div class="puces">' +
               (o[2] && !pg.some((p) => p.type !== "format") ? '<span class="puce promo">promo</span>' : "") +
               pg.map((p) => '<span class="puce ' + (p.type === "vraie" ? "vraie" : p.type === "faible" ? "promo" : "piege") + '">' + esc(p.puce) + "</span>").join("") +
               (fidSel && remise(PROG[sel.s], o[1], o[2]) ? '<span class="puce fid">' + esc(PROG[sel.s].nom) + " " + Math.round(PROG[sel.s].taux * 100) + " %</span>" : "") + "</div>" : "") +
+            (mn ? '<div class="piege-texte ok">Mieux noté : ' + esc(D.produits[mn.i][0]) + badgeNS(mn.i) + " à " + xpf(mn.p) +
+              (mn.p > o[0] ? " (+ " + xpf(mn.p - o[0]) + ")" : mn.p < o[0] ? " (− " + xpf(o[0] - mn.p) + ")" : "") +
+              ' <button type="button" data-k="' + k + '" data-mieux="' + mn.i + '">Prendre celui-ci</button></div>' : "") +
             pg.filter((p) => p.texte).map((p) => '<div class="piege-texte">' + esc(p.texte) +
               (p.type === "format" ? ' <button type="button" data-k="' + k + '" data-petit="' + p.k + '" data-n="' + p.n + '">Prendre ' + p.n + " petits formats</button>" : "") + "</div>").join("")
             : '<span class="puce manque">pas vendu dans ce magasin</span>') + "</div>";
@@ -1545,6 +1581,11 @@ select {
       }
     }
 
+    det.querySelectorAll("button[data-mieux]").forEach((b) => b.onclick = () => {
+      const l = LISTE[+b.dataset.k];
+      l.i = +b.dataset.mieux; l.exact = true;
+      const garde = sel.s; modifier(); choisi = garde; rendre();
+    });
     det.querySelectorAll("button[data-petit]").forEach((b) => b.onclick = () => {
       const l = LISTE[+b.dataset.k], n = +b.dataset.n, petit = +b.dataset.petit;
       const deja = LISTE.find((x) => x.i === petit && x !== l);
@@ -1723,10 +1764,11 @@ select {
     const { mags, items } = promosZone();
     const n = { bon: 0, vraie: 0, faible: 0, trompeuse: 0, inconnu: 0 };
     items.forEach((x) => n[x.c.type]++);
-    const type = $("promos-type").value, garde = $("promos-garde").value, tri = $("promos-tri").value;
+    const type = $("promos-type").value, garde = $("promos-garde").value, tri = $("promos-tri").value, nsMax = +$("promos-ns").value;
     const toks = mots($("promos-q").value).map((t) => SYNONYMES[t] || t).join(" ").split(" ").filter(Boolean);
     const ok = { toutes: null, bons: ["bon"], vraies: ["bon", "vraie"], trompeuses: ["faible", "trompeuse"] }[type];
     let l = items.filter((x) => (!ok || ok.includes(x.c.type)) && (garde === "" || x.g === +garde) &&
+      (!nsMax || (D.produits[x.j][7] && D.produits[x.j][7] <= nsMax)) &&
       (!toks.length || toks.every((t) => MOTS[x.j].some((w) => w.startsWith(t)))));
     const remise = (x) => (x.c.pc == null ? -1e9 : x.c.pc), eco = (x) => (x.c.h ? x.c.h - x.prix : -1e9);
     // les promos trompeuses : les pires d'abord
@@ -1766,7 +1808,7 @@ select {
       '<div class="promo-tete"><b>' + esc(p[0]) + '</b><span class="promo-prix num">' + xpf(x.prix) + (c.h && x.prix < c.h ? "<s>habituel " + xpf(c.h) + "</s>" : "") + "</span></div>" +
       '<div class="promo-ou">' + esc(mg[0]) + (mg[1] ? " · " + esc(mg[1]) : "") + (d != null ? " · " + km1(d) + " km" : "") +
         (x.jours != null ? ' · <span class="' + (x.jours > 7 ? "vieux" : "") + '">relevé ' + (x.jours === 0 ? "le jour de l'instantané" : "il y a " + x.jours + " j") + "</span>" : "") + "</div>" +
-      '<div class="puces">' + tag + '<span class="puce garde">' + GARDE[x.g] + "</span></div>" + texte +
+      '<div class="puces">' + tag + '<span class="puce garde">' + GARDE[x.g] + "</span>" + badgeNS(x.j) + "</div>" + texte +
       '<div class="promo-actions">' +
         (reserve ? '<span class="qte">Réserve <button type="button" data-d="-1" aria-label="Un de moins">−</button><b class="num">1</b><button type="button" data-d="1" aria-label="Un de plus">+</button></span>' +
           '<span class="promo-eco note">économie ' + xpf(c.h - x.prix) + "</span>" : "") +
@@ -1793,7 +1835,7 @@ select {
     modifier();
     a.textContent = "Ajouté ✓"; a.disabled = true;
   });
-  ["promos-type", "promos-garde", "promos-tri"].forEach((id) => $(id).addEventListener("change", () => { promosVues = PAGE_PROMOS; rendrePromos(); }));
+  ["promos-type", "promos-garde", "promos-tri", "promos-ns"].forEach((id) => $(id).addEventListener("change", () => { promosVues = PAGE_PROMOS; rendrePromos(); }));
   let minuteurPromos = null;
   $("promos-q").addEventListener("input", () => { clearTimeout(minuteurPromos); minuteurPromos = setTimeout(() => { promosVues = PAGE_PROMOS; rendrePromos(); }, 200); });
   $("promos-plus").addEventListener("click", () => { promosVues += PAGE_PROMOS; rendrePromos(); });
@@ -1850,7 +1892,8 @@ select {
       "réutilise les mêmes produits d'un repas à l'autre pour éviter le gaspillage ; n'achète QUE des produits du catalogue ci-dessous, " +
       "en nombre entier d'articles, en tenant compte de leur format pour " + opts.personnes + " personne(s) ; " +
       "le total (prix × quantité) doit rester sous le budget, sinon fais au plus juste et dis-le dans les conseils.\n" +
-      "Catalogue (id | produit et format | prix le plus bas en F) :\n" + cat.map((c, k) => k + " | " + D.produits[c.i][0] + " | " + c.p).join("\n") +
+      "Catalogue (id | produit et format | prix le plus bas en F | Nutri-Score si connu) :\n" +
+      cat.map((c, k) => k + " | " + D.produits[c.i][0] + " | " + c.p + (D.produits[c.i][7] ? " | " + NS_LETTRES[D.produits[c.i][7]] : "")).join("\n") +
       '\nRéponds uniquement en JSON : {"repas":[{"jour":"Lundi","moment":"Dîner","plat":"nom du plat","detail":"une phrase"}],' +
       '"courses":[{"id":numéro du catalogue,"quantite":nombre d\'articles,"pour":"plats concernés, court"}],"conseils":["1 à 3 conseils courts"]}';
   }
@@ -1918,7 +1961,7 @@ select {
     $("menu-jours").innerHTML = jours.map((j) => '<div class="menu-jour"><h4>' + esc(j.jour) + "</h4>" +
       j.repas.map((r) => '<p><span class="moment">' + esc(r.moment) + "</span><br>" + esc(r.plat) + (r.detail ? "<small>" + esc(r.detail) + "</small>" : "") + "</p>").join("") + "</div>").join("");
     $("menu-conseils").innerHTML = MENU.conseils.map((c) => "<li>" + esc(c) + "</li>").join("");
-    $("menu-courses").innerHTML = MENU.courses.map((x) => "<li><span>" + esc(D.produits[x.i][0]) + " × " + x.qte + '</span><b class="num">' + xpf(x.p * x.qte) + "</b>" +
+    $("menu-courses").innerHTML = MENU.courses.map((x) => "<li><span>" + esc(D.produits[x.i][0]) + badgeNS(x.i) + " × " + x.qte + '</span><b class="num">' + xpf(x.p * x.qte) + "</b>" +
       (x.pour ? "<small>" + esc(x.pour) + "</small>" : "") + "</li>").join("");
     $("menu-repas-bloc").hidden = false; $("menu-courses-bloc").hidden = false;
   }
