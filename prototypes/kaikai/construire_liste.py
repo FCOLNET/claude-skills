@@ -7,12 +7,16 @@ Format (tableaux parallèles, pour tenir en quelques Mo) :
     magasins  : [[nom, commune, lat, lon, précision], ...]   précision : 0 magasin, 1 quartier, 2 centre de la commune
                 (lat/lon null si inconnus ; voir positions/)
     varietes  : [nom, ...]
-    produits  : [[nom, index variété, unité, taille, ean, marque propre, conservation, nutriscore, nova], ...]   taille = prix / prix unitaire
+    produits  : [[nom, index variété, unité, taille, ean, marque propre, conservation, nutriscore, nova, usages, index usage], ...]
+                taille = prix / prix unitaire
                 marque propre : 0 aucune, 1 Casino, 2 Auchan, 3 U, 4 Carrefour (pour les cartes de fidélité)
                 conservation : 0 frais, 1 congélateur, 2 se garde longtemps (pour les réserves en promo)
                 nutriscore : 0 inconnu, 1 à 5 pour A à E ; nova : 0 inconnu, 1 à 4 (Open Food Facts, nutriscore.csv)
+                usages : nombre d'utilisations dans le paquet (lavages, rouleaux, 100 ml…), 0 si sans objet ;
+                index usage : dans la liste usages (coût par utilisation)
     prix      : [[m1*2+promo1, prix1, m2*2+promo2, prix2, ...], ...]   un tableau par produit
     departs   : [[commune, nom, lat, lon], ...]   points de départ proposés (quartiers, centres des communes)
+    usages    : [libellé, ...]   « lavage », « rouleau », « 100 ml »… (coût par utilisation)
     promos    : [[produit, magasin, prix, jours], ...]   relevés en promotion ; jours = âge du relevé à la date de l'instantané
     formats   : [[grand, magasin, petit, n], ...]   piège du grand format : dans ce magasin, n petits formats
                 (même variété, marque et unité, même quantité à ±10 %) coûtent moins cher que le grand
@@ -72,6 +76,41 @@ if (Path(__file__).with_name("nutriscore.csv")).exists():
     for r in csv.DictReader(open(Path(__file__).with_name("nutriscore.csv"), encoding="utf-8"), delimiter=";"):
         NS[r["ean"]] = ("abcde".index(r["nutriscore"]) + 1 if r["nutriscore"] else 0, int(r["nova"] or 0))
 
+# Coût par utilisation : (motif de variété, libellé de l'usage, comment compter)
+#   "lavages" : nombre de lavages écrit dans le nom ; "nombre" : x24, 24 rouleaux… ; "volume" : par 100 ml ou 100 g
+USAGES_REGLES = [
+    (r"^lessive|^adoucissant", "lavage", "lavages"),
+    (r"lave-vaisselle en tablette", "tablette", "nombre"),
+    (r"^papier : toilette", "rouleau", "nombre"),
+    (r"essuie-tout|^papier : essuie", "rouleau", "nombre"),
+    (r"^couche", "couche", "nombre"),
+    (r"^lingette", "lingette", "nombre"),
+    (r"serviette hygiénique|protège-slip|tampon hygiénique", "protection", "nombre"),
+    (r"^sac poubelle", "sac", "nombre"),
+    (r"coton-tige|disque à démaquiller", "unité", "nombre"),
+    (r"^café.*(capsule|dosette)|^capsule|^dosette", "tasse", "nombre"),
+    (r"gel douche|crème de douche|shampoing|après-shampoing|savon liquide|liquide vaisselle|hydratant corporel|dentifrice", "100 ml", "volume"),
+]
+USAGES = sorted({u for _, u, _ in USAGES_REGLES})
+
+def usage(nom, variete, unite, taille):
+    for motif, lib, mode in USAGES_REGLES:
+        if not re.search(motif, variete or ""):
+            continue
+        n = None
+        if mode == "lavages":
+            m = re.search(r"(\d+)\s*lavages?", nom)
+            n = int(m.group(1)) if m else (taille if unite == "lavages" else None)
+        elif mode == "nombre":
+            m = re.search(r"\bx\s?(\d+)\b", nom) or re.search(r"(\d+)\s*(rouleaux|couches|lingettes|sacs|capsules|dosettes|tablettes|pièces)", nom)
+            n = int(m.group(1)) if m else (taille if unite in ("u", "caps") and taille > 1 else None)
+        elif mode == "volume" and unite in ("l", "kg") and taille > 0:
+            n, lib = taille * 10, "100 ml" if unite == "l" else "100 g"
+        if n and 1 < n <= 1000:
+            return [round(n, 2), USAGES.index(lib) if lib in USAGES else USAGES.append(lib) or len(USAGES) - 1]
+        return [0, 0]
+    return [0, 0]
+
 ref = lire("produits.csv")
 variete = {p["id_produit"]: (p["variete"] or p["sous_secteur"] or p["secteur"] or "").strip() for p in ref}
 famille = {p["id_produit"]: marque_propre(p["marque"]) for p in ref}
@@ -111,6 +150,8 @@ for pid, rs in sorted(par_produit.items(), key=lambda x: x[1][0]["produit"]):
             promos.append([len(produits), idx_mag[m], int(r["prix"]), jours])
     produits.append([rs[0]["produit"].strip(), idx_var[v], rs[0]["unite"], round(st.median(tailles), 3) if tailles else 0, rs[0]["ean"],
                      famille.get(pid, 0), conserv.get(pid, 2), *NS.get(rs[0]["ean"], (0, 0))])
+    taille = produits[-1][3]
+    produits[-1] += usage(produits[-1][0].lower(), v, produits[-1][2], taille)
     prix_tab.append(ligne)
     pids.append(pid)
 
@@ -146,8 +187,8 @@ for (m, *_), l in rayons.items():
 departs = [[q["commune"], q["quartier"], float(q["lat"]), float(q["lon"])] for q in lire_pos("quartiers.csv")]
 departs += [[c, c + " (centre)", lat, lon] for c, (lat, lon) in centres.items() if c not in {d[0] for d in departs}]
 donnees = dict(instantane=Path(SNAP).name, releves_de=manifeste["releve_le_plus_ancien"], releves_a=manifeste["releve_le_plus_recent"],
-               magasins=magasins, varietes=varietes, produits=produits, prix=prix_tab, departs=departs, formats=formats, promos=promos)
+               magasins=magasins, varietes=varietes, produits=produits, prix=prix_tab, departs=departs, formats=formats, promos=promos, usages=USAGES)
 Path(OUT).write_text(json.dumps(donnees, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print(f"{OUT} : {len(produits)} produits, {len(magasins)} magasins ({sum(m[4] == 0 for m in magasins)} situés précisément, "
       f"{sum(m[4] == 1 for m in magasins)} au quartier, {sum(m[4] == 2 for m in magasins)} à la commune, {sum(m[2] is None for m in magasins)} sans position), "
-      f"{sum(len(p) // 2 for p in prix_tab)} prix, {len(formats)} grands formats pièges, {len(promos)} promos, {sum(1 for p in produits if p[7])} Nutri-Scores, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)
+      f"{sum(len(p) // 2 for p in prix_tab)} prix, {len(formats)} grands formats pièges, {len(promos)} promos, {sum(1 for p in produits if p[7])} Nutri-Scores, {sum(1 for p in produits if p[9])} coûts par utilisation, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)

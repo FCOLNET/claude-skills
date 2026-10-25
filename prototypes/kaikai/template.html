@@ -649,6 +649,9 @@ select {
       (production et combustion du carburant) et, pour l'électricité, la part de renouvelables publiée par Enercal.
       Positions des magasins : prix.nc, complétées par OpenStreetMap ; à défaut, le quartier ou le centre de la commune.
       Votre point de départ reste dans votre navigateur.</p>
+    <p>Coût par utilisation : prix divisé par le nombre de lavages, rouleaux, couches, tablettes… écrit sur le produit, ou par 100 ml
+      pour les gels douche, shampoings et liquides vaisselle. « À l'usage, moins cher » propose, dans le même magasin et la même catégorie,
+      un produit qui revient au moins 15 % moins cher par utilisation.</p>
     <p>Nutri-Score : données Open Food Facts (licence ODbL), associées par code-barres ; affiché quand il est connu.
       « Mieux noté » propose, pour un produit noté D ou E, un équivalent noté A, B ou C vendu dans le même magasin à 15 % près.</p>
     <p>Promos : « bon coup » = au moins 30 % sous le prix habituel et prix le plus bas relevé en Nouvelle-Calédonie pour ce produit ;
@@ -1201,6 +1204,31 @@ select {
     }
     return best;
   }
+  /* Coût par utilisation : au lavage, au rouleau, aux 100 ml… (champs 9 et 10 des produits). */
+  const ARTICLE = { lavage: "le lavage", tablette: "la tablette", rouleau: "le rouleau", couche: "la couche", lingette: "la lingette",
+    protection: "la protection", sac: "le sac", tasse: "la tasse", "unité": "l'unité", "100 ml": "les 100 ml", "100 g": "les 100 g" };
+  function coutUsage(i, prix, seul) {   // seul : le montant sans « le lavage »
+    const p = D.produits[i], n = p[9];
+    if (!n || prix == null) return "";
+    const v = prix / n, lib = D.usages[p[10]];
+    return (v < 10 ? v.toFixed(1).replace(".", ",") + " F" : xpf(v)) + (seul ? "" : " " + (ARTICLE[lib] || lib));
+  }
+  /* Dans le même magasin, un produit de la même catégorie qui revient au moins 15 % moins cher à l'usage. */
+  function moinsCherUsage(o, s) {
+    const p = D.produits[o[1]], n = p[9];
+    if (!n) return null;
+    const cur = o[0] / n;
+    let best = null;
+    for (const e of PAR_VAR.get(p[1]) || []) {
+      const q = D.produits[e];
+      if (e === o[1] || !q[9] || q[10] !== p[10]) continue;
+      const pe = prixA(e, s);
+      if (pe == null) continue;
+      const c = pe / q[9];
+      if (c <= 0.85 * cur && (!best || c < best.c)) best = { i: e, p: pe, c };
+    }
+    return best && { ...best, pc: Math.round(100 * (1 - best.c / cur)) };
+  }
   const nbMag = (i) => D.prix[i].length / 2;
   const prixMin = (i) => D.prix[i][1];
 
@@ -1297,7 +1325,8 @@ select {
     if (!q.value.trim() || !D) { sugg.hidden = true; return; }
     sugg.innerHTML = resultats.length ? resultats.map((i, k) =>
       '<li role="option"><button type="button" data-k="' + k + '"><span>' + esc(D.produits[i][0]) + badgeNS(i) + "</span><small>" +
-      esc(D.varietes[D.produits[i][1]] || "") + " · " + nbMag(i) + " magasin(s) · dès " + xpf(prixMin(i)) + "</small></button></li>").join("")
+      esc(D.varietes[D.produits[i][1]] || "") + " · " + nbMag(i) + " magasin(s) · dès " + xpf(prixMin(i)) +
+      (D.produits[i][9] ? ", soit " + coutUsage(i, prixMin(i)) : "") + "</small></button></li>").join("")
       : '<li class="rien">Aucun produit trouvé. Essayez un mot plus court ou sans marque.</li>';
     sugg.hidden = false;
   }
@@ -1542,16 +1571,19 @@ select {
       const rp = resumePieges(sel, false);
       if (rp) det.insertAdjacentHTML("beforeend", rp);
       LISTE.forEach((l, k) => {
-        const o = sel.lignes[k], div = document.createElement("div"), pg = pieges(o, sel.s, l), mn = o ? mieuxNote(o, sel.s) : null;
+        const o = sel.lignes[k], div = document.createElement("div"), pg = pieges(o, sel.s, l), mn = o ? mieuxNote(o, sel.s) : null, mu = o ? moinsCherUsage(o, sel.s) : null;
         div.className = "ing";
         const ref = D.produits[l.i][0];
         div.innerHTML = '<div class="nom">' + esc(ref) + ' <span class="qte-txt" style="color:var(--doux);font-weight:400">× ' + l.qte + "</span></div>" +
           '<div class="montant">' + (o ? '<b class="num">' + xpf(o[0] * l.qte) + '</b><small class="num">' + (l.qte > 1 ? l.qte + " × " + xpf(o[0]) : "") + "</small>" : "<b>—</b>") + "</div>" +
           '<div class="produit">' + (o ? (o[1] !== l.i ? "Équivalent : " + esc(D.produits[o[1]][0]) : "Ce produit") + badgeNS(o[1]) +
+            (D.produits[o[1]][9] ? " · " + coutUsage(o[1], o[0]) : "") +
             (o[2] || pg.length || (fidSel && remise(PROG[sel.s], o[1], o[2])) ? '<div class="puces">' +
               (o[2] && !pg.some((p) => p.type !== "format") ? '<span class="puce promo">promo</span>' : "") +
               pg.map((p) => '<span class="puce ' + (p.type === "vraie" ? "vraie" : p.type === "faible" ? "promo" : "piege") + '">' + esc(p.puce) + "</span>").join("") +
               (fidSel && remise(PROG[sel.s], o[1], o[2]) ? '<span class="puce fid">' + esc(PROG[sel.s].nom) + " " + Math.round(PROG[sel.s].taux * 100) + " %</span>" : "") + "</div>" : "") +
+            (mu ? '<div class="piege-texte ok">À l\'usage, moins cher : ' + esc(D.produits[mu.i][0]) + " à " + xpf(mu.p) + ", soit " + coutUsage(mu.i, mu.p) +
+              " au lieu de " + coutUsage(o[1], o[0], true) + " (−" + mu.pc + ' %) <button type="button" data-k="' + k + '" data-mieux="' + mu.i + '">Prendre celui-ci</button></div>' : "") +
             (mn ? '<div class="piege-texte ok">Mieux noté : ' + esc(D.produits[mn.i][0]) + badgeNS(mn.i) + " à " + xpf(mn.p) +
               (mn.p > o[0] ? " (+ " + xpf(mn.p - o[0]) + ")" : mn.p < o[0] ? " (− " + xpf(o[0] - mn.p) + ")" : "") +
               ' <button type="button" data-k="' + k + '" data-mieux="' + mn.i + '">Prendre celui-ci</button></div>' : "") +
@@ -1808,7 +1840,8 @@ select {
       '<div class="promo-tete"><b>' + esc(p[0]) + '</b><span class="promo-prix num">' + xpf(x.prix) + (c.h && x.prix < c.h ? "<s>habituel " + xpf(c.h) + "</s>" : "") + "</span></div>" +
       '<div class="promo-ou">' + esc(mg[0]) + (mg[1] ? " · " + esc(mg[1]) : "") + (d != null ? " · " + km1(d) + " km" : "") +
         (x.jours != null ? ' · <span class="' + (x.jours > 7 ? "vieux" : "") + '">relevé ' + (x.jours === 0 ? "le jour de l'instantané" : "il y a " + x.jours + " j") + "</span>" : "") + "</div>" +
-      '<div class="puces">' + tag + '<span class="puce garde">' + GARDE[x.g] + "</span>" + badgeNS(x.j) + "</div>" + texte +
+      '<div class="puces">' + tag + '<span class="puce garde">' + GARDE[x.g] + "</span>" + badgeNS(x.j) + "</div>" +
+      (D.produits[x.j][9] ? '<p class="promo-texte">Soit <b>' + coutUsage(x.j, x.prix) + "</b>" + (c.h && x.prix < c.h ? " au lieu de " + coutUsage(x.j, c.h, true) + " habituellement" : "") + ".</p>" : "") + texte +
       '<div class="promo-actions">' +
         (reserve ? '<span class="qte">Réserve <button type="button" data-d="-1" aria-label="Un de moins">−</button><b class="num">1</b><button type="button" data-d="1" aria-label="Un de plus">+</button></span>' +
           '<span class="promo-eco note">économie ' + xpf(c.h - x.prix) + "</span>" : "") +

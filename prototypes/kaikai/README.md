@@ -59,6 +59,19 @@ les calculs et les recettes fonctionnent ; la lecture de photo est masquée.
 - La photo est envoyée à Claude, qui renvoie les articles lus ; chacun est rapproché du catalogue par la
   recherche locale et l'utilisateur valide avant l'ajout.
 
+## Coût par utilisation
+
+Pour 1 677 produits d'entretien, d'hygiène, de puériculture et de café en capsules : prix divisé par le
+nombre d'utilisations écrit sur le produit (règles `USAGES_REGLES` de `construire_liste.py`) :
+au lavage (lessive, adoucissant), à la tablette (lave-vaisselle), au rouleau, à la couche, à la lingette,
+à la protection hygiénique, au sac, à la tasse (capsules, dosettes), à l'unité (cotons-tiges, disques),
+aux 100 ml (gels douche, shampoings, savons liquides, liquide vaisselle, dentifrice).
+
+- Affiché dans la recherche, le détail du magasin et les promos (« soit 23 F le lavage au lieu de 56 F »).
+- « À l'usage, moins cher » : dans le même magasin et la même catégorie, un produit au moins 15 % moins
+  cher par utilisation, avec « Prendre celui-ci » (la quantité de la ligne est gardée).
+- Les produits dont le nombre d'utilisations n'est pas écrit dans le libellé prix.nc ne sont pas comptés.
+
 ## Nutri-Score
 
 Source : Open Food Facts (licence ODbL), associé par code-barres. `nutriscore.py` lit en flux l'export
