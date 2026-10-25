@@ -27,6 +27,8 @@ depuis le menu « Partager » de la page).
 | `template.html` | Page sans données (le marqueur `__DATA__` reçoit le JSON des recettes) |
 | `construire.py` | Chiffre les recettes à partir d'un instantané et produit `kaikai.html` |
 | `construire_liste.py` | Produit `liste-data.json` à partir d'un instantané |
+| `nutriscore.py` | Extrait Nutri-Score et NOVA de l'export Open Food Facts pour nos codes-barres |
+| `nutriscore.csv` | Résultat (ean ; nutriscore ; nova), données Open Food Facts sous licence ODbL |
 | `positions/` | Positions ajoutées aux magasins sans coordonnées prix.nc, centres des communes, quartiers de départ |
 
 ## Mettre à jour les prix
@@ -37,6 +39,8 @@ python3 .claude/skills/prix-nc/scripts/prix_nc.py collecter --dossier donnees/pr
 
 # 2. Reconstruire les données de la liste, puis la page (dans cet ordre)
 python3 prototypes/kaikai/construire_liste.py donnees/prix-nc/AAAA-MM-JJ
+python3 prototypes/kaikai/nutriscore.py           # facultatif, ≈ 10 min : Nutri-Score des nouveaux produits
+python3 prototypes/kaikai/construire_liste.py donnees/prix-nc/AAAA-MM-JJ   # à relancer si nutriscore.py a tourné
 python3 prototypes/kaikai/construire.py donnees/prix-nc/AAAA-MM-JJ
 ```
 
@@ -54,6 +58,20 @@ les calculs et les recettes fonctionnent ; la lecture de photo est masquée.
   même commune, et n'est proposé que s'il fait gagner au moins 5 % et 200 F.
 - La photo est envoyée à Claude, qui renvoie les articles lus ; chacun est rapproché du catalogue par la
   recherche locale et l'utilisateur valide avant l'ajout.
+
+## Nutri-Score
+
+Source : Open Food Facts (licence ODbL), associé par code-barres. `nutriscore.py` lit en flux l'export
+complet (≈ 1,5 Go compressé, rien n'est stocké ; domaines `static.openfoodfacts.org` et
+`openfoodfacts-ds.s3.eu-west-3.amazonaws.com`). Au 25/10/2026 : 8 023 produits notés, soit 59 % des
+produits alimentaires (52 % pondéré par le nombre de magasins). Les produits locaux, australiens et
+néo-zélandais sont les moins couverts.
+
+- Pastille A à E (couleurs officielles) dans la recherche, la liste, le détail du magasin, les promos
+  et les courses du menu ; rien n'est affiché quand le Nutri-Score est inconnu.
+- « Mieux noté » : pour un produit noté D ou E, l'équivalent noté A, B ou C vendu dans le même magasin
+  à 15 % de prix près (5 698 cas produit-magasin au 17/10/2026), avec « Prendre celui-ci ».
+- Promos : filtre « A ou B » / « A, B ou C ». Menu : le Nutri-Score est donné à Claude avec le catalogue.
 
 ## Promos
 
