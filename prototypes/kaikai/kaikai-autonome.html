@@ -210,6 +210,16 @@ select {
   background: var(--sol); border: 1.5px solid var(--trait); border-radius: 10px;
 }
 .bloc-photo textarea:focus { border-color: var(--laterite); outline: none; }
+.zone-texte { position: relative; }
+.zone-texte textarea { display: block; padding-right: 62px; }
+.micro { position: absolute; right: 8px; bottom: 8px; width: 46px; height: 46px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--laterite); color: var(--carte); display: grid; place-items: center; }
+.micro.ecoute { background: var(--alerte); }
+@media (prefers-reduced-motion: no-preference) {
+  .micro.ecoute { animation: pouls 1.2s ease-out infinite; }
+  @keyframes pouls { from { box-shadow: 0 0 0 0 rgba(180, 71, 42, .45); } to { box-shadow: 0 0 0 14px rgba(180, 71, 42, 0); } }
+}
+.bloc-photo p.dictee-etat { color: var(--encre); font-weight: 700; }
 #photo-etat p { margin: 0; font-size: .9rem; color: var(--doux); }
 /* le vrai champ fichier recouvre le bouton : le toucher l'ouvre directement, sans clic simulé */
 .btn-fichier { position: relative; overflow: hidden; }
@@ -402,9 +412,15 @@ select {
         </div>
         <div class="bloc-photo" id="bloc-texte" hidden>
           <label for="texte-liste"><b>Écrire, dicter ou coller ma liste</b></label>
-          <textarea id="texte-liste" rows="4" placeholder="Un article par ligne, par exemple :&#10;2 pq&#10;lait x4&#10;riz jasmin"></textarea>
-          <p>Pour lire une liste manuscrite sans passer par l'appli : sur Android, ouvrez Google Lens sur votre liste, choisissez « Texte », copiez, puis collez ici (appui long, puis Coller) ; sur Samsung, le clavier propose aussi « Extraire le texte ». Sur iPhone, utilisez l'icône « Scanner du texte » du clavier.
-            Vous pouvez aussi dicter avec le micro du clavier.</p>
+          <div class="zone-texte">
+            <textarea id="texte-liste" rows="4" placeholder="Un article par ligne, par exemple :&#10;2 pq&#10;lait x4&#10;riz jasmin"></textarea>
+            <button type="button" class="micro" id="micro" aria-pressed="false" aria-label="Dicter ma liste" title="Dicter ma liste">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>
+            </button>
+          </div>
+          <p class="dictee-etat" id="dictee-etat" aria-live="polite" hidden></p>
+          <p>Touchez le micro et dites vos articles. Pour lire une liste manuscrite sans passer par l'appli : sur Android, ouvrez Google Lens sur votre liste, choisissez « Texte », copiez, puis collez ici (appui long, puis Coller) ; sur Samsung, le clavier propose aussi « Extraire le texte ». Sur iPhone, utilisez l'icône « Scanner du texte » du clavier.</p>
           <button type="button" class="btn plein" id="texte-lire">Trouver les produits</button>
         </div>
         <div id="photo-etat" aria-live="polite"></div>
@@ -643,7 +659,8 @@ select {
       « Ticket de caisse » compte les paquets entiers à acheter, sans les ingrédients marqués « J'en ai déjà ».
       Ces choix restent enregistrés dans votre navigateur. Le sel, le poivre et l'eau ne sont pas comptés.</p>
     <p>« Ma liste de courses » compare les 24 700 produits publiés sur prix.nc. Votre liste reste dans votre navigateur.
-      La lecture d'une photo passe par Claude, avec votre accord, et utilise votre compte Claude.</p>
+      La lecture d'une photo passe par Claude, avec votre accord, et utilise votre compte Claude.
+      La dictée utilise la reconnaissance vocale de votre navigateur ou de votre clavier (souvent un service en ligne de Google ou d'Apple).</p>
     <p>Trajet : distance à vol d'oiseau multipliée par un coefficient de détour, aller et retour ; carburant au prix maximum
       fixé chaque mois par le gouvernement, électricité au tarif domestique ; CO2 selon les facteurs de l'ADEME
       (production et combustion du carburant) et, pour l'électricité, la part de renouvelables publiée par Enercal.
@@ -2076,6 +2093,50 @@ select {
     afficherLus(ok.length ? ok : lireLocal(txt));
     lectureTexte = false; $("texte-lire").disabled = false;
   });
+  /* Dictée : reconnaissance vocale du navigateur ; à défaut, le clavier s'ouvre avec son propre micro. */
+  const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let dictee = null;
+  function etatDictee(t) { $("dictee-etat").textContent = t; $("dictee-etat").hidden = !t; }
+  function viaClavier(msg) { etatDictee(msg); $("texte-liste").focus(); }
+  function finDictee() {
+    dictee = null;
+    $("micro").classList.remove("ecoute");
+    $("micro").setAttribute("aria-pressed", "false");
+    $("micro").setAttribute("aria-label", "Dicter ma liste");
+  }
+  $("micro").addEventListener("click", () => {
+    if (dictee) { dictee.stop(); return; }
+    if (!Reco) return viaClavier("Touchez le micro de votre clavier pour dicter votre liste.");
+    const r = new Reco(), t = $("texte-liste"), avant = t.value.replace(/\s+$/, "");
+    let final = "", erreur = false;
+    r.lang = "fr-FR"; r.interimResults = true; r.continuous = true;
+    r.onresult = (e) => {
+      let enCours = "";
+      for (let k = e.resultIndex; k < e.results.length; k++) {
+        const x = e.results[k][0].transcript.trim();
+        if (!x) continue;
+        if (e.results[k].isFinal) final += (final ? "\n" : "") + x; else enCours += (enCours ? " " : "") + x;
+      }
+      t.value = [avant, final, enCours].filter(Boolean).join("\n");
+    };
+    r.onerror = (e) => {
+      erreur = true;
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") viaClavier("Le micro n'est pas autorisé ici : touchez le micro de votre clavier pour dicter.");
+      else if (e.error === "no-speech") etatDictee("Je n'ai rien entendu : touchez le micro et réessayez.");
+      else if (e.error !== "aborted") viaClavier("Dictée indisponible : touchez le micro de votre clavier.");
+    };
+    r.onend = () => {
+      finDictee();
+      if (!erreur) etatDictee(final ? "C'est noté. Vérifiez la liste, puis touchez « Trouver les produits »." : "");
+    };
+    try { r.start(); } catch (e) { finDictee(); return viaClavier("Dictée indisponible : touchez le micro de votre clavier."); }
+    dictee = r;
+    $("micro").classList.add("ecoute");
+    $("micro").setAttribute("aria-pressed", "true");
+    $("micro").setAttribute("aria-label", "Arrêter la dictée");
+    etatDictee("Je vous écoute… Dites vos articles, par exemple « deux paquets de riz, du lait ». Touchez le micro pour arrêter.");
+  });
+
   $("texte-liste").addEventListener("paste", (e) => {
     const it = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith("image/"));
     if (!it) return;                         // du texte : collage normal
