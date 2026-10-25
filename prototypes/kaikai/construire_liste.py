@@ -7,14 +7,17 @@ Format (tableaux parallèles, pour tenir en quelques Mo) :
     magasins  : [[nom, commune, lat, lon, précision], ...]   précision : 0 magasin, 1 quartier, 2 centre de la commune
                 (lat/lon null si inconnus ; voir positions/)
     varietes  : [nom, ...]
-    produits  : [[nom, index variété, unité, taille, ean, marque propre], ...]   taille = prix / prix unitaire
+    produits  : [[nom, index variété, unité, taille, ean, marque propre, conservation], ...]   taille = prix / prix unitaire
                 marque propre : 0 aucune, 1 Casino, 2 Auchan, 3 U, 4 Carrefour (pour les cartes de fidélité)
+                conservation : 0 frais, 1 congélateur, 2 se garde longtemps (pour les réserves en promo)
     prix      : [[m1*2+promo1, prix1, m2*2+promo2, prix2, ...], ...]   un tableau par produit
     departs   : [[commune, nom, lat, lon], ...]   points de départ proposés (quartiers, centres des communes)
+    promos    : [[produit, magasin, prix, jours], ...]   relevés en promotion ; jours = âge du relevé à la date de l'instantané
     formats   : [[grand, magasin, petit, n], ...]   piège du grand format : dans ce magasin, n petits formats
                 (même variété, marque et unité, même quantité à ±10 %) coûtent moins cher que le grand
 """
 import csv, json, re, statistics as st, sys
+from datetime import date
 from collections import defaultdict
 from pathlib import Path
 
@@ -52,10 +55,22 @@ def position(id_magasin, nom, commune):
         return [*centres[commune], 2]
     return [None, None, None]
 
+def conservation(secteur, sous_secteur):
+    if secteur == "surgelés":
+        return 1
+    if sous_secteur == "saucisson entier : sec, chorizo":
+        return 2
+    if secteur in ("crémerie", "boucherie, volaille, poissonnerie", "charcuterie", "traiteur") or sous_secteur in (
+            "fruit et légume frais", "pain, viennoiserie, pâtisserie", "pain, viennoiserie, pâtisserie fraîche"):
+        return 0
+    return 2
+
 ref = lire("produits.csv")
 variete = {p["id_produit"]: (p["variete"] or p["sous_secteur"] or p["secteur"] or "").strip() for p in ref}
 famille = {p["id_produit"]: marque_propre(p["marque"]) for p in ref}
 marque = {p["id_produit"]: (p["marque"] or "").strip().lower() for p in ref}
+conserv = {p["id_produit"]: conservation(p["secteur"], p["sous_secteur"]) for p in ref}
+date_inst = date.fromisoformat(Path(SNAP).name)
 par_produit = defaultdict(list)
 for r in lire("releves.csv"):
     try:
@@ -66,7 +81,7 @@ for r in lire("releves.csv"):
         par_produit[r["id_produit"]].append(r)
 
 magasins, idx_mag, varietes, idx_var = [], {}, [], {}
-produits, prix_tab, ecartes, pids = [], [], 0, []
+produits, prix_tab, ecartes, pids, promos = [], [], 0, [], []
 for pid, rs in sorted(par_produit.items(), key=lambda x: x[1][0]["produit"]):
     med = st.median(int(r["prix"]) for r in rs)
     if len(rs) >= 3:   # prix aberrants : plus de 3x ou moins de 1/3 de la médiane
@@ -84,8 +99,11 @@ for pid, rs in sorted(par_produit.items(), key=lambda x: x[1][0]["produit"]):
             nom = r["magasin"].strip()
             magasins.append([nom, r["commune"], *[round(x, 5) if isinstance(x, float) else x for x in position(m, nom, r["commune"])]])
         ligne += [idx_mag[m] * 2 + (r["promotion"] == "oui"), int(r["prix"])]
+        if r["promotion"] == "oui":
+            jours = (date_inst - date.fromisoformat(r["date_releve"][:10])).days if r["date_releve"] else None
+            promos.append([len(produits), idx_mag[m], int(r["prix"]), jours])
     produits.append([rs[0]["produit"].strip(), idx_var[v], rs[0]["unite"], round(st.median(tailles), 3) if tailles else 0, rs[0]["ean"],
-                     famille.get(pid, 0)])
+                     famille.get(pid, 0), conserv.get(pid, 2)])
     prix_tab.append(ligne)
     pids.append(pid)
 
@@ -121,8 +139,8 @@ for (m, *_), l in rayons.items():
 departs = [[q["commune"], q["quartier"], float(q["lat"]), float(q["lon"])] for q in lire_pos("quartiers.csv")]
 departs += [[c, c + " (centre)", lat, lon] for c, (lat, lon) in centres.items() if c not in {d[0] for d in departs}]
 donnees = dict(instantane=Path(SNAP).name, releves_de=manifeste["releve_le_plus_ancien"], releves_a=manifeste["releve_le_plus_recent"],
-               magasins=magasins, varietes=varietes, produits=produits, prix=prix_tab, departs=departs, formats=formats)
+               magasins=magasins, varietes=varietes, produits=produits, prix=prix_tab, departs=departs, formats=formats, promos=promos)
 Path(OUT).write_text(json.dumps(donnees, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print(f"{OUT} : {len(produits)} produits, {len(magasins)} magasins ({sum(m[4] == 0 for m in magasins)} situés précisément, "
       f"{sum(m[4] == 1 for m in magasins)} au quartier, {sum(m[4] == 2 for m in magasins)} à la commune, {sum(m[2] is None for m in magasins)} sans position), "
-      f"{sum(len(p) // 2 for p in prix_tab)} prix, {len(formats)} grands formats pièges, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)
+      f"{sum(len(p) // 2 for p in prix_tab)} prix, {len(formats)} grands formats pièges, {len(promos)} promos, {ecartes} prix aberrants écartés, {Path(OUT).stat().st_size / 1e6:.1f} Mo", file=sys.stderr)

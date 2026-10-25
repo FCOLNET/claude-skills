@@ -261,6 +261,31 @@ select {
 .eco.alerte { background: var(--alerte-pale); }
 .eco.alerte b { color: var(--alerte); }
 
+/* Promos */
+.promos-filtres { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; }
+.promos-filtres input[type="search"] { font: inherit; color: inherit; background: var(--carte); border: 1.5px solid var(--trait); border-radius: 99px; padding: 7px 14px; width: 100%; }
+.promos-filtres .reglage { flex: 1 1 150px; }
+.promos-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.promo-carte { background: var(--carte); border: 1px solid var(--trait); border-left: 5px solid var(--trait); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 6px; align-content: start; }
+.promo-carte.bon { border-left-color: var(--bon); }
+.promo-carte.vraie { border-left-color: var(--niaouli); }
+.promo-carte.faible, .promo-carte.trompeuse { border-left-color: var(--alerte); }
+.promo-tete { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.promo-tete b { overflow-wrap: anywhere; }
+.promo-prix { text-align: right; font-family: var(--f-titre); font-weight: 800; font-size: 1.25rem; color: var(--laterite); white-space: nowrap; }
+.promo-prix s { display: block; font-family: var(--f-texte); font-weight: 400; font-size: .8rem; color: var(--doux); }
+.promo-ou { font-size: .85rem; color: var(--doux); }
+.promo-ou .vieux { color: var(--alerte); font-weight: 700; }
+.promo-texte { font-size: .88rem; margin: 0; }
+.promo-texte.ok { color: var(--bon); }
+.promo-texte.alerte { color: var(--alerte); }
+.promo-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.promo-actions .qte { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; }
+.promo-actions .qte button { width: 30px; height: 30px; border-radius: 99px; border: 1.5px solid var(--trait); background: var(--carte); cursor: pointer; font: inherit; }
+.promo-actions .btn { padding: 5px 12px; font-size: .88rem; }
+.puce.bon { background: var(--niaouli-pale); color: var(--bon); }
+.puce.garde { background: var(--sol); color: var(--doux); font-weight: 400; }
+
 /* Menu de la semaine */
 .menu-form { display: grid; gap: 12px; }
 .menu-form input[type="number"], .menu-form input[type="text"], .menu-form textarea {
@@ -347,6 +372,7 @@ select {
 
   <nav class="onglets" role="tablist" aria-label="Rubriques">
     <button type="button" role="tab" id="tab-liste" aria-controls="vue-liste" aria-selected="false">Ma liste de courses</button>
+    <button type="button" role="tab" id="tab-promos" aria-controls="vue-promos" aria-selected="false">Promos</button>
     <button type="button" role="tab" id="tab-menu" aria-controls="vue-menu" aria-selected="false">Menu de la semaine</button>
     <button type="button" role="tab" id="tab-recettes" aria-controls="vue-recettes" aria-selected="true">Recettes</button>
   </nav>
@@ -454,6 +480,41 @@ select {
           <p class="note" id="liste-partiels"></p>
         </section>
       </div>
+    </div>
+  </section>
+
+  <section id="vue-promos" role="tabpanel" aria-labelledby="tab-promos" hidden>
+    <div class="section">
+      <h2 style="font-size:clamp(1.5rem,3.5vw,2rem);font-weight:800;letter-spacing:-0.02em">Les promos</h2>
+      <p class="note">Toutes les promotions relevées, comparées au prix habituel du produit (son prix médian hors promotion). Les bons coups sont repérés pour faire des réserves ; les promos trompeuses sont signalées avec une solution moins chère.</p>
+      <div class="promos-filtres">
+        <label class="reglage" for="commune-promos"><span>Où</span><select id="commune-promos"></select></label>
+        <label class="reglage" for="promos-type"><span>Lesquelles</span>
+          <select id="promos-type">
+            <option value="toutes">Toutes les promos</option>
+            <option value="bons">Les bons coups</option>
+            <option value="vraies">Bons coups et vraies promos</option>
+            <option value="trompeuses">Promos faibles ou trompeuses</option>
+          </select></label>
+        <label class="reglage" for="promos-garde"><span>Conservation</span>
+          <select id="promos-garde">
+            <option value="">Tout</option>
+            <option value="2">Se garde longtemps (réserve)</option>
+            <option value="1">Congélateur</option>
+            <option value="0">Frais</option>
+          </select></label>
+        <label class="reglage" for="promos-tri"><span>Trier par</span>
+          <select id="promos-tri">
+            <option value="remise">Plus forte remise</option>
+            <option value="economie">Plus grosse économie</option>
+            <option value="recentes">Plus récentes</option>
+          </select></label>
+        <label class="reglage" for="promos-q" style="flex-basis:220px"><span>Chercher</span><input id="promos-q" type="search" placeholder="riz, lessive, Nutella…" autocomplete="off"></label>
+      </div>
+      <p class="chargement" id="promos-chargement" hidden>Chargement des prix…</p>
+      <p id="promos-resume" aria-live="polite"></p>
+      <ol class="promos-liste" id="promos-liste"></ol>
+      <button type="button" class="plus" id="promos-plus" hidden>Voir plus de promos</button>
     </div>
   </section>
 
@@ -576,6 +637,9 @@ select {
       (production et combustion du carburant) et, pour l'électricité, la part de renouvelables publiée par Enercal.
       Positions des magasins : prix.nc, complétées par OpenStreetMap ; à défaut, le quartier ou le centre de la commune.
       Votre point de départ reste dans votre navigateur.</p>
+    <p>Promos : « bon coup » = au moins 30 % sous le prix habituel et prix le plus bas relevé en Nouvelle-Calédonie pour ce produit ;
+      « vraie promo » = au moins 5 % sous le prix habituel ; « promo faible » = moins de 5 % ; « trompeuse » = prix égal ou supérieur
+      au prix habituel. Les promotions ont une durée limitée : vérifiez celles relevées il y a plus d'une semaine.</p>
     <p>Menu de la semaine : composé par Claude, avec votre accord et sur votre compte Claude, à partir d'une soixantaine
       de produits de base au prix le plus bas de votre commune. Vérifiez les quantités avant vos courses.</p>
     <p>Pièges du rayon : une promotion est « trompeuse » quand son prix est égal ou supérieur au prix habituel du produit,
@@ -904,7 +968,7 @@ select {
                    ["3700739200333", 2], ["3034027001013", 6], ["9300605095663", 1], ["9310047010117", 1]];
 
   /* ---------- Onglets ---------- */
-  const onglets = { liste: $("tab-liste"), menu: $("tab-menu"), recettes: $("tab-recettes") };
+  const onglets = { liste: $("tab-liste"), promos: $("tab-promos"), menu: $("tab-menu"), recettes: $("tab-recettes") };
   function montrer(nom) {
     for (const k in onglets) {
       onglets[k].setAttribute("aria-selected", k === nom ? "true" : "false");
@@ -912,11 +976,13 @@ select {
     }
     ecrire("onglet", nom);
     if (nom === "liste") demarrer();
+    if (nom === "promos") { $("promos-chargement").hidden = !!D; demarrer().then(() => { $("promos-chargement").hidden = true; rendrePromos(); }); }
     if (nom === "menu") { $("menu-chargement").hidden = !!D; demarrer().then(initMenu); }
   }
   onglets.liste.addEventListener("click", () => montrer("liste"));
   onglets.recettes.addEventListener("click", () => montrer("recettes"));
   onglets.menu.addEventListener("click", () => montrer("menu"));
+  onglets.promos.addEventListener("click", () => montrer("promos"));
 
   /* ---------- Données ---------- */
   let D = null, MOTS = [], PAR_VAR = new Map(), CACHE_PRIX = new Map(), CACHE_EQ = new Map();
@@ -965,7 +1031,7 @@ select {
   let COMMUNES = [];
   function remplirCommunes() {
     if (commune === "__proche" && !DEPART) commune = "";
-    $("commune-liste").innerHTML = (DEPART ? '<option value="__proche"' + (commune === "__proche" ? " selected" : "") + ">À moins de " + TC.rayonProche + " km de mon point de départ</option>" : "") +
+    $("commune-liste").innerHTML = $("commune-promos").innerHTML = (DEPART ? '<option value="__proche"' + (commune === "__proche" ? " selected" : "") + ">À moins de " + TC.rayonProche + " km de mon point de départ</option>" : "") +
       '<option value=""' + (commune === "" ? " selected" : "") + ">Toute la Nouvelle-Calédonie</option>" +
       COMMUNES.map((c) => "<option" + (c === commune ? " selected" : "") + ">" + esc(c) + "</option>").join("");
   }
@@ -1519,7 +1585,8 @@ select {
     $("liste-partiels").textContent = R.partiels.length ? R.partiels.length + " autre(s) magasin(s) n'ont qu'une partie de votre liste." : "";
   }
   $("liste-plus").addEventListener("click", () => { tout = !tout; rendre(); });
-  $("commune-liste").addEventListener("change", (e) => { commune = e.target.value; choisi = null; ecrire("commune-liste", commune); rendre(); });
+  $("commune-liste").addEventListener("change", (e) => { commune = e.target.value; choisi = null; ecrire("commune-liste", commune); remplirCommunes(); rendre(); });
+  $("commune-promos").addEventListener("change", (e) => { commune = e.target.value; choisi = null; ecrire("commune-liste", commune); remplirCommunes(); rendre(); rendrePromos(); });
 
   /* ---------- Cartes de fidélité ---------- */
   function sauverCartes() { ecrire("cartes", JSON.stringify([...CARTES])); }
@@ -1617,6 +1684,119 @@ select {
     P.querySelectorAll("button[data-carte]").forEach((b) => b.onclick = () => basculerCarte(b.dataset.carte, b.getAttribute("aria-pressed") !== "true"));
     P.hidden = false;
   }
+
+  /* ---------- Promos ---------- */
+  const PAGE_PROMOS = 30, BON_COUP = 30;   // bon coup : au moins 30 % sous le prix habituel et prix le plus bas relevé
+  let promosVues = PAGE_PROMOS;
+  const GARDE = ["Frais", "Congélateur", "Se garde"];
+  /* Classe une promo face au prix habituel (médiane hors promotion) et au prix le plus bas de Nouvelle-Calédonie. */
+  function classerPromo(j, prix) {
+    const h = HABITUEL[j];
+    if (!h) return { type: "inconnu", pc: null, h: 0 };
+    const d = prix - h, pc = Math.round(-100 * d / h);
+    if (d >= 0) return { type: "trompeuse", pc, h };
+    if (pc < 5) return { type: "faible", pc, h };
+    if (pc >= BON_COUP && prix <= prixMin(j)) return { type: "bon", pc, h };
+    return { type: "vraie", pc, h };
+  }
+  /* Solutions moins chères : le même produit sans promo ailleurs dans la zone, un équivalent dans le même magasin. */
+  function alternatives(j, m, prix, mags) {
+    let ailleurs = null, equiv = null;
+    const t = D.prix[j];
+    for (let k = 0; k < t.length; k += 2) {
+      const s = t[k] >> 1;
+      if (s !== m && mags.has(s) && !(t[k] & 1) && t[k + 1] < prix && (!ailleurs || t[k + 1] < ailleurs.p)) ailleurs = { s, p: t[k + 1] };
+    }
+    for (const e of equivalents(j)) {
+      if (e === j) continue;
+      const p = prixA(e, m);
+      if (p != null && p < prix && (!equiv || p < equiv.p)) equiv = { i: e, p };
+    }
+    return { ailleurs, equiv };
+  }
+  function promosZone() {
+    const mags = new Set(magasinsRetenus());
+    return { mags, items: (D.promos || []).filter((x) => mags.has(x[1])).map(([j, m, prix, jours]) => ({ j, m, prix, jours, c: classerPromo(j, prix), g: D.produits[j][6] })) };
+  }
+  function rendrePromos() {
+    if (!D || !HABITUEL || $("vue-promos").hidden) return;
+    const { mags, items } = promosZone();
+    const n = { bon: 0, vraie: 0, faible: 0, trompeuse: 0, inconnu: 0 };
+    items.forEach((x) => n[x.c.type]++);
+    const type = $("promos-type").value, garde = $("promos-garde").value, tri = $("promos-tri").value;
+    const toks = mots($("promos-q").value).map((t) => SYNONYMES[t] || t).join(" ").split(" ").filter(Boolean);
+    const ok = { toutes: null, bons: ["bon"], vraies: ["bon", "vraie"], trompeuses: ["faible", "trompeuse"] }[type];
+    let l = items.filter((x) => (!ok || ok.includes(x.c.type)) && (garde === "" || x.g === +garde) &&
+      (!toks.length || toks.every((t) => MOTS[x.j].some((w) => w.startsWith(t)))));
+    const remise = (x) => (x.c.pc == null ? -1e9 : x.c.pc), eco = (x) => (x.c.h ? x.c.h - x.prix : -1e9);
+    // les promos trompeuses : les pires d'abord
+    const sens = type === "trompeuses" ? -1 : 1;
+    l.sort(tri === "economie" ? (a, b) => sens * (eco(b) - eco(a)) : tri === "recentes" ? (a, b) => (a.jours ?? 99) - (b.jours ?? 99) || remise(b) - remise(a) : (a, b) => sens * (remise(b) - remise(a)));
+    const zone = commune === "__proche" ? "à moins de " + TC.rayonProche + " km" : commune ? "à " + commune : "en Nouvelle-Calédonie";
+    $("promos-resume").innerHTML = "<b>" + items.length + " promos " + esc(zone) + "</b> : " +
+      [[n.bon, "bon(s) coup(s)"], [n.vraie, "vraie(s) promo(s)"], [n.faible, "promo(s) faible(s)"], [n.trompeuse, "trompeuse(s)"], [n.inconnu, "sans comparaison possible"]]
+        .filter(([k]) => k).map(([k, t]) => k + " " + t).join(", ") + "." + (l.length !== items.length ? " " + l.length + " affichée(s) avec ces filtres." : "");
+    $("promos-liste").innerHTML = l.slice(0, promosVues).map((x, k) => cartePromo(x, mags, k)).join("") ||
+      '<li class="note">Aucune promo ne correspond à ces filtres.</li>';
+    $("promos-plus").hidden = l.length <= promosVues;
+    PROMOS_AFFICHEES = l.slice(0, promosVues);
+  }
+  let PROMOS_AFFICHEES = [];
+  function cartePromo(x, mags, k) {
+    const p = D.produits[x.j], mg = D.magasins[x.m], c = x.c;
+    const d = DEPART ? versMag(x.m) : null;
+    const tag = { bon: '<span class="puce bon">Bon coup −' + c.pc + " %</span>", vraie: '<span class="puce vraie">Vraie promo −' + c.pc + " %</span>",
+      faible: '<span class="puce piege">Promo faible −' + Math.max(c.pc, 0) + " %</span>", trompeuse: '<span class="puce piege">Promo trompeuse</span>',
+      inconnu: '<span class="puce promo">Promo</span>' }[c.type];
+    let texte = "";
+    if (c.type === "bon") texte = '<p class="promo-texte ok">Prix le plus bas de Nouvelle-Calédonie, ' + c.pc + " % sous le prix habituel." +
+      (x.g === 2 ? " Bon moment pour faire une réserve." : x.g === 1 ? " À stocker au congélateur." : " Produit frais : à consommer vite.") + "</p>";
+    else if (c.type === "trompeuse" || c.type === "faible") {
+      const a = alternatives(x.j, x.m, x.prix, mags);
+      texte = '<p class="promo-texte alerte">' + (c.type === "trompeuse"
+        ? (x.prix > c.h ? xpf(x.prix - c.h) + " de plus que" : "Même prix que") + " le prix habituel sans promotion (" + xpf(c.h) + ")."
+        : "Seulement −" + Math.max(c.pc, 1) + " % sur le prix habituel (" + xpf(c.h) + ").") + "</p>" +
+        (a.ailleurs ? '<p class="promo-texte">Mieux : <b>' + xpf(a.ailleurs.p) + "</b> sans promo chez " + esc(D.magasins[a.ailleurs.s][0]) + ".</p>" : "") +
+        (a.equiv ? '<p class="promo-texte">Ou dans ce magasin : ' + esc(D.produits[a.equiv.i][0]) + " à <b>" + xpf(a.equiv.p) + "</b>.</p>" : "") +
+        (!a.ailleurs && !a.equiv ? '<p class="promo-texte">Pas de solution moins chère relevée dans la zone.</p>' : "");
+      x.alt = a.equiv ? a.equiv.i : null;
+    } else if (c.type === "inconnu") texte = '<p class="promo-texte">Trop peu de magasins vendent ce produit pour juger la remise.</p>';
+    const reserve = (c.type === "bon" || c.type === "vraie") && x.g > 0;
+    return '<li class="promo-carte ' + c.type + '" data-k="' + k + '">' +
+      '<div class="promo-tete"><b>' + esc(p[0]) + '</b><span class="promo-prix num">' + xpf(x.prix) + (c.h && x.prix < c.h ? "<s>habituel " + xpf(c.h) + "</s>" : "") + "</span></div>" +
+      '<div class="promo-ou">' + esc(mg[0]) + (mg[1] ? " · " + esc(mg[1]) : "") + (d != null ? " · " + km1(d) + " km" : "") +
+        (x.jours != null ? ' · <span class="' + (x.jours > 7 ? "vieux" : "") + '">relevé ' + (x.jours === 0 ? "le jour de l'instantané" : "il y a " + x.jours + " j") + "</span>" : "") + "</div>" +
+      '<div class="puces">' + tag + '<span class="puce garde">' + GARDE[x.g] + "</span></div>" + texte +
+      '<div class="promo-actions">' +
+        (reserve ? '<span class="qte">Réserve <button type="button" data-d="-1" aria-label="Un de moins">−</button><b class="num">1</b><button type="button" data-d="1" aria-label="Un de plus">+</button></span>' +
+          '<span class="promo-eco note">économie ' + xpf(c.h - x.prix) + "</span>" : "") +
+        '<button type="button" class="btn" data-ajout="produit">Ajouter à ma liste</button>' +
+        (x.alt != null ? '<button type="button" class="btn" data-ajout="alt">Ajouter l\'équivalent</button>' : "") +
+      "</div></li>";
+  }
+  $("promos-liste").addEventListener("click", (e) => {
+    const li = e.target.closest(".promo-carte");
+    if (!li) return;
+    const x = PROMOS_AFFICHEES[+li.dataset.k], q = li.querySelector(".qte b");
+    const d = e.target.closest("button[data-d]");
+    if (d && q) {
+      const n = Math.max(1, Math.min(48, +q.textContent + +d.dataset.d));
+      q.textContent = n;
+      li.querySelector(".promo-eco").textContent = "économie " + xpf((x.c.h - x.prix) * n);
+      return;
+    }
+    const a = e.target.closest("button[data-ajout]");
+    if (!a) return;
+    const i = a.dataset.ajout === "alt" ? x.alt : x.j, qte = q ? +q.textContent : 1;
+    const deja = LISTE.find((l) => l.i === i);
+    if (deja) deja.qte += qte; else LISTE.push({ i, qte, exact: true });
+    modifier();
+    a.textContent = "Ajouté ✓"; a.disabled = true;
+  });
+  ["promos-type", "promos-garde", "promos-tri"].forEach((id) => $(id).addEventListener("change", () => { promosVues = PAGE_PROMOS; rendrePromos(); }));
+  let minuteurPromos = null;
+  $("promos-q").addEventListener("input", () => { clearTimeout(minuteurPromos); minuteurPromos = setTimeout(() => { promosVues = PAGE_PROMOS; rendrePromos(); }, 200); });
+  $("promos-plus").addEventListener("click", () => { promosVues += PAGE_PROMOS; rendrePromos(); });
 
   /* ---------- Menu de la semaine, composé par Claude ---------- */
   const BASES = ["riz", "pâte spaghetti", "pâte coquillette", "vermicelle chinois", "nouille instantanée", "farine de blé", "semoule",

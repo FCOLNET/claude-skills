@@ -1,13 +1,15 @@
 # Kaïkaï — prototype
 
 Appli consommateur de démonstration, à partir des prix publiés par l'observatoire prix.nc.
-Non officielle. Trois onglets :
+Non officielle. Quatre onglets :
 
 - **Ma liste de courses** : on ajoute des produits par recherche, ou en lisant la photo d'une liste
   manuscrite (lue par Claude, avec l'accord de l'utilisateur). L'appli donne le magasin le moins cher
   pour toute la liste, et la meilleure combinaison de deux magasins de la même commune. Les cartes
   de fidélité cochées par l'utilisateur sont prises en compte, et le coût du trajet depuis son
   quartier (carburant, temps, CO2) quand il l'indique (voir plus bas).
+- **Promos** : toutes les promotions de la zone, classées (bon coup, vraie promo, promo faible,
+  trompeuse), pour faire des réserves ou éviter les fausses bonnes affaires.
 - **Menu de la semaine** : Claude compose les repas de 7 jours dans un budget, avec les produits les
   moins chers de la commune, puis remplit la liste de courses.
 - **Recettes** : le coût de 5 recettes calédoniennes au meilleur prix.
@@ -52,6 +54,30 @@ les calculs et les recettes fonctionnent ; la lecture de photo est masquée.
   même commune, et n'est proposé que s'il fait gagner au moins 5 % et 200 F.
 - La photo est envoyée à Claude, qui renvoie les articles lus ; chacun est rapproché du catalogue par la
   recherche locale et l'utilisateur valide avant l'ajout.
+
+## Promos
+
+Les 9 771 relevés en promotion de l'instantané (champ `promos` de `liste-data.json`, avec l'âge du
+relevé), filtrés sur la zone choisie (même réglage que la liste : commune ou rayon autour du départ).
+
+| Étiquette | Règle |
+|---|---|
+| Bon coup −X % | au moins 30 % sous le prix habituel ET prix le plus bas relevé en Nouvelle-Calédonie pour ce produit |
+| Vraie promo −X % | au moins 5 % sous le prix habituel |
+| Promo faible | moins de 5 % sous le prix habituel |
+| Promo trompeuse | prix égal ou supérieur au prix habituel |
+| Promo | moins de 3 magasins hors promotion : pas de comparaison possible |
+
+Prix habituel = médiane des prix hors promotion du produit (au moins 3 magasins). Au 17/10/2026, à
+Nouméa : 3 544 promos, dont 535 bons coups, 404 trompeuses et 116 faibles.
+
+- Conservation (6e champ des produits, d'après le secteur prix.nc) : « se garde » (épicerie,
+  boissons, entretien, hygiène…), « congélateur » (surgelés), « frais ». Pour les bons coups et vraies
+  promos qui se gardent, un compteur « Réserve » calcule l'économie sur le prix habituel.
+- Pour une promo faible ou trompeuse : le même produit moins cher sans promo ailleurs dans la zone,
+  et l'équivalent moins cher dans le même magasin (bouton « Ajouter l'équivalent »).
+- Filtres : type, conservation, recherche ; tri par remise, économie ou date. Relevé de plus de
+  7 jours signalé (une promo a une durée limitée).
 
 ## Menu de la semaine
 
