@@ -44,7 +44,8 @@ La page génère des `.xlsx` mis en forme avec ExcelJS 4.4.0 (chargé depuis jsD
 - la liste affichée, avec ses filtres ;
 - le magasin complet : un onglet par liste, plus les rayons absents ;
 - « Mes choix » : demandes (bon de demande), cessions, détail ;
-- le réseau : synthèse par magasin, toutes les décisions, motifs de refus, stock disputé.
+- le réseau : synthèse par magasin, toutes les décisions, motifs de refus, stock disputé ;
+- le dossier « stock entrepôt disponible » (bouton dans l'en-tête du magasin, ou pour tous les magasins depuis la vue Réseau) : un `.zip` avec un dossier par magasin, un classeur par liste (À réassortir, Ruptures, Déjà vendus ici, Absents chez moi, Nouveautés, Substitutions) et une synthèse `0 - Synthèse.xlsx`. Seuls les articles en stock à l'entrepôt maintenant y figurent, triés du plus gros stock entrepôt au plus petit ; les lignes refusées ou déjà en préparation sont écartées, « À céder » aussi (ce n'est pas du stock entrepôt). Le zip est fait avec JSZip 3.10.1 (cdnjs), chargé au premier clic.
 
 ## Photos
 

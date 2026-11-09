@@ -404,6 +404,9 @@ function render(){
   var hl=el("div"); hl.appendChild(el("div","lbl","Propositions pour le magasin"));
   hl.appendChild(el("h2",null,nom(code)));
   hl.appendChild(el("p",null,"Tout ce que l’île peut vous fournir aujourd’hui et que vous n’avez pas en rayon. À vous de choisir : chaque ligne dit pourquoi elle est là, d’où viendrait la marchandise et ce qu’elle peut rapporter."));
+  if(dlCap){ var dos=el("button","btn small","Dossier Excel : stock entrepôt disponible"); dos.type="button"; dos.style.marginTop="10px"; dos.style.marginRight="6px";
+    dos.title="Un fichier Excel par liste, limité aux articles en stock à l’entrepôt, triés par stock entrepôt";
+    dos.onclick=function(){ exportDossiers([code],dos); }; hl.appendChild(dos); }
   if(dlCap){ var all=el("button","btn small","Tout le magasin en Excel"); all.type="button"; all.style.marginTop="10px";
     all.onclick=function(){ exportStore(code,all); }; hl.appendChild(all); }
   head.appendChild(hl);
@@ -822,6 +825,8 @@ function renderNetwork(app){
   var k=el("div","kpis");
   [[nf.format(T.n),"propositions",""],[MF(T.mg),"de marge HT possible",""],[nf.format(T.ok),"acceptées · "+MF(T.mgOk),"ok"],[nf.format(T.ref),"refusées","bad"]].forEach(function(x){ var c=el("div","kpi "+x[2]); c.appendChild(el("b",null,x[0])); c.appendChild(el("small",null,x[1])); k.appendChild(c); });
   head.appendChild(k); app.appendChild(head);
+  if(dlCap){ var nd=el("button","btn","Dossiers Excel par magasin : stock entrepôt"); nd.type="button"; nd.style.marginTop="12px"; nd.style.marginRight="6px";
+    nd.onclick=function(){ exportDossiers(D.magasins.slice(),nd); }; hl.appendChild(nd); }
   if(dlCap){ var nb=el("button","btn","Exporter le réseau en Excel"); nb.type="button"; nb.style.marginTop="12px";
     nb.onclick=function(){ exportNetwork(per,motifs,demand,nb); }; hl.appendChild(nb); }
 
@@ -970,6 +975,64 @@ function feuille(X,wb,sh){
       var id=wb.addImage({base64:u,extension:"jpeg"});
       ws.addImage(id,{tl:{col:0.12,row:top+i+0.08},ext:{width:50,height:50},editAs:"oneCell"}); });
   });
+}
+function classeur(X,sheets){
+  var wb=new X.Workbook(); wb.creator="Réassort proposé"; wb.created=new Date();
+  return sheets.reduce(function(p,sh){ return p.then(function(){ return feuille(X,wb,sh); }); },Promise.resolve())
+    .then(function(){ return wb.xlsx.writeBuffer(); });
+}
+function loadJSZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  if(loadJSZip.p) return loadJSZip.p;
+  loadJSZip.p=new Promise(function(res,rej){ var sc=document.createElement("script");
+    sc.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+    sc.onload=function(){ window.JSZip?res(window.JSZip):rej({code:"load"}); };
+    sc.onerror=function(){ loadJSZip.p=null; rej({code:"load"}); }; document.head.appendChild(sc); });
+  return loadJSZip.p;
+}
+/* Le dossier d'un magasin : un classeur par liste, limité aux articles qui ont
+   du stock à l'entrepôt maintenant, triés du plus gros stock au plus petit. Les
+   lignes refusées ou déjà couvertes par une préparation n'y figurent pas. */
+var LISTES_DOSSIER=["BAS","RUP","DEJ","ABS","NOU","SUB"];
+function dossierMagasin(code){
+  var L=D.lignes[code], fin=dateTxt(), out=[], syn=[];
+  LISTES_DOSSIER.forEach(function(id,k){
+    var t=TABS.filter(function(x){ return x.id===id; })[0];
+    var rows=L.filter(function(l){ var g=l.g==="NVD"?"NOU":l.g; if(g!==id) return false;
+        var st=statusOf(code,l).s; return st!=="ref" && st!=="prep" && stockEnt(art(l.a))>0; })
+      .sort(function(x,y){ return stockEnt(art(y.a))-stockEnt(art(x.a)) || y.sc-x.sc; });
+    var mg=0; rows.forEach(function(l){ mg+=l.mg||0; });
+    syn.push([t.l,rows.length,Math.round(mg)]);
+    if(!rows.length) return;
+    out.push({nom:(k+1)+" - "+t.l+".xlsx", sheets:[{n:t.l, title:t.l+" · "+nom(code),
+      sub:"Données au "+fin+" · "+nf.format(rows.length)+" article"+(rows.length>1?"s":"")+" en stock à l’entrepôt maintenant · du plus gros stock entrepôt au plus petit",
+      h:PH, r:rows.map(function(l){ return propRow(code,l); }), w:PW, freeze:4, tot:TOT_PROP}]});
+  });
+  out.unshift({nom:"0 - Synthèse.xlsx", sheets:[{n:"Synthèse", title:"Stock entrepôt disponible · "+nom(code),
+    sub:"Données au "+fin+" · un fichier par liste dans ce dossier", h:["Liste","Articles en stock à l’entrepôt","Marge estimée 3 mois (F HT)"],
+    r:syn, w:[24,16,22], tot:["Articles en stock à l’entrepôt","Marge estimée 3 mois (F HT)"]}]});
+  return out;
+}
+function exportDossiers(codes,btn){
+  if(!dlCap) return;
+  var old=btn.textContent; btn.disabled=true; btn.textContent="Préparation…";
+  var un=codes.length===1, nomZip="reassort-"+(un?token(codes[0])+"-":"")+"stock-entrepot-"+D.meta.fin+".zip";
+  Promise.all([loadXlsx(),loadJSZip()]).then(function(L){
+    var X=L[0], zip=new L[1]();
+    var travaux=[];
+    codes.forEach(function(c){ dossierMagasin(c).forEach(function(f){ travaux.push({dir:nom(c), f:f}); }); });
+    return travaux.reduce(function(p,t,k){ return p.then(function(){
+        btn.textContent="Préparation… "+(k+1)+"/"+travaux.length;
+        return classeur(X,t.f.sheets).then(function(buf){ zip.file(t.dir+"/"+t.f.nom, buf); }); }); },Promise.resolve())
+      .then(function(){ return zip.generateAsync({type:"blob"}); });
+  }).then(function(blob){
+    return dlCap.save({filename:nomZip,data:blob}).then(function(){ if(LOCAL) toast("Dossier enregistré : "+nomZip+" (dossier Téléchargements)."); });
+  }).catch(function(e){
+    if(e && e.code==="declined") return;
+    var t = e && e.code==="apercu" ? APERCU : e && e.code==="load" ? "Un module n’a pas pu être chargé. Vérifiez la connexion et réessayez."
+          : "Le dossier n’a pas pu être créé ("+((e&&(e.code||e.message))||"erreur")+").";
+    notice(t); toast(t,true);
+  }).then(function(){ btn.disabled=false; btn.textContent=old; });
 }
 function saveXlsx(name,sheets,btn){
   if(!dlCap) return;
