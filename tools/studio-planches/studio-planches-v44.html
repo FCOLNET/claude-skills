@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V43)</title>
+<title>Studio Planches Contacts — NPC (V44)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -93,6 +93,15 @@
   .card-prix-init:empty { display:none; }
   .card-prix-init[contenteditable]:focus, .card-remise[contenteditable]:focus { outline:2px solid #C8A951; border-radius:3px; }
   .card-remise { display:inline-block; background:#8B1A2B; color:#fff; font-size:.6rem; font-weight:700; padding:2px 6px; border-radius:10px; margin-top:3px; line-height:1.1; }
+  /* V44 — quantité disponible. Donnée de gestion, pas de maquette : discrète, jamais
+     en concurrence visuelle avec le prix, et masquée tant qu'elle n'est pas renseignée. */
+  .card-qte { display:none; align-items:baseline; gap:5px; margin-top:5px; padding-top:5px; border-top:1px solid #EFEAE1; }
+  .card-qte.on { display:flex; }
+  .card-qte b { font-size:.76rem; font-weight:800; color:#1B4332; font-variant-numeric:tabular-nums; }
+  .card-qte span { font-size:.54rem; color:#9a9a9a; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+  .card-qte.bas b, .wt-qte.bas { color:#8A6100; }
+  .card-qte.nul b, .wt-qte.nul { color:#B00020; }
+  .wt-qte { font-size:.58rem; font-weight:800; color:#1B4332; font-variant-numeric:tabular-nums; margin-top:1px; }
   .card-remise:empty, .card-remise.hidden { display:none; }
   .promo-toggle { display:flex; align-items:center; gap:6px; }
   .promo-toggle label { font-size:.75rem; font-weight:700; color:#444; }
@@ -218,6 +227,7 @@
     <div class="maprow"><span>Prix initial (barré)</span><select id="mapPrixInit"></select></div>
     <div class="maprow"><span>Prix soldé / promo</span><select id="mapPrixPromo"></select></div>
     <div class="maprow"><span>Remise</span><select id="mapRemise"></select></div>
+    <div class="maprow"><span>Quantité dispo</span><select id="mapQte"></select></div>
     <div class="maprow"><span>Chemin photo</span><select id="mapPhoto"></select></div>
     <div class="btnrow"><button class="btn red" id="buildFromExcel">Construire les planches →</button></div>
     <p class="subhint">* seul le code est obligatoire. Sans colonne page, tout va sur une planche unique.</p>
@@ -295,6 +305,7 @@
     <div class="maprow"><span>Réf. fournisseur</span><select id="refFourn"></select></div>
     <div class="maprow"><span>Libellé</span><select id="refLib"></select></div>
     <div class="maprow"><span>Prix</span><select id="refPrix"></select></div>
+    <div class="maprow"><span>Quantité dispo</span><select id="refQte"></select></div>
     <div class="btnrow">
       <button class="btn ghost" id="refCancel">Annuler</button>
       <button class="btn red" id="refApply">Activer l'auto-remplissage</button>
@@ -453,7 +464,46 @@ function fillMapping(){
   $('mapPrixInit').innerHTML = opts;  $('mapPrixInit').value = guess(['prix initial','prix_initial','prix barre','prix barré','ancien prix','prix avant','prix normal','avant remise']);
   $('mapPrixPromo').innerHTML = opts; $('mapPrixPromo').value = guess(['prix solde','prix soldé','prix promo','solde','promo','prix remise','apres remise','après remise','nouveau prix']);
   $('mapRemise').innerHTML = opts;    $('mapRemise').value = guess(['remise','reduction','réduction','rabais','discount','ristourne']);
+  // V44 — quantité disponible. « conso » est le nom de la colonne consolidée dans
+  // l'export caisse : elle vaut la somme des stocks des huit sites (vérifié ligne à
+  // ligne sur l'export complet). Les autres noms couvrent les exports usuels.
+  $('mapQte').innerHTML = opts;       $('mapQte').value = guess(QTE_NOMS);
   $('mapPhoto').innerHTML = opts;     $('mapPhoto').value = guess(['photo','chemin','image','fichier','visuel','path','url']);
+}
+
+// V44 — noms de colonne reconnus pour la quantité disponible, du plus précis au plus
+// large. « conso » vient en tête : c'est la colonne consolidée de l'export caisse NPC,
+// égale à la somme des stocks des huit sites.
+const QTE_NOMS = ['conso','stock total','stock dispo','quantite dispo','quantité dispo',
+                  'qte dispo','qté dispo','disponible','dispo','stock','quantite',
+                  'quantité','qte','qté'];
+// Une quantité est un entier. Un champ vide, un tiret ou un texte ne valent pas zéro :
+// ils valent « pas renseigné », et rien ne doit s'afficher dans ce cas.
+function fmtQte(v){
+  if (v===null||v===undefined) return '';
+  const s=String(v).trim();
+  if (s==='') return '';
+  const n=parseFloat(s.replace(/\s| /g,'').replace(',','.'));
+  if (!isFinite(n)) return '';
+  return String(Math.round(n));
+}
+
+// classe de seuil commune à la planche, à la table de travail et aux exports
+function qteClasse(q){
+  const n=parseInt(String(q==null?'':q).trim(),10);
+  if (!isFinite(n)) return '';
+  return n===0 ? 'nul' : (n<10 ? 'bas' : '');
+}
+function qteVignette(q){
+  const t=fmtQte(q); if (t==='') return '';
+  const c=qteClasse(t);
+  return '<div class="wt-qte'+(c?' '+c:'')+'" title="Quantité disponible">'+esc(t)+' dispo</div>';
+}
+function qteExport(q){
+  const t=fmtQte(q); if (t==='') return '';
+  const c=qteClasse(t);
+  return '<div class="x-qte'+(c?' '+c:'')+'" title="Quantité disponible, telle que lue dans le fichier source">'
+        +'<b>'+esc(t)+'</b><span>dispo</span></div>';
 }
 
 function fmtPrix(v){
@@ -488,7 +538,7 @@ function resetWorkspace(){
 $('buildFromExcel').addEventListener('click', () => {
   const iP=+$('mapPage').value, iC=+$('mapCode').value, iL=+$('mapLib').value, iX=+$('mapPrix').value;
   const iPi=+$('mapPrixInit').value, iPp=+$('mapPrixPromo').value, iR=+$('mapRemise').value;
-  const iPh=+$('mapPhoto').value;
+  const iPh=+$('mapPhoto').value, iQ=+$('mapQte').value;
   if (iC<0) { alert('Choisis la colonne du code article.'); return; }
   // V12 — remise à zéro complète avant reconstruction.
   // Sans ça, les produits, photos et copies locales du catalogue précédent survivaient et
@@ -512,6 +562,8 @@ $('buildFromExcel').addEventListener('click', () => {
       prixInit: iPi>=0 ? fmtPrix(r[iPi]) : '',
       prixPromo: iPp>=0 ? fmtPrix(r[iPp]) : '',
       remise: iR>=0 ? String(r[iR]).trim() : '',
+      // V44 : quantité disponible, telle quelle depuis le fichier source
+      qte: iQ>=0 ? fmtQte(r[iQ]) : '',
       // V17 : chemin de la photo indiqué par le fichier source
       // (\\10.10.101.52\SMRC_photo\105143.jpg). Le navigateur n'a PAS le droit de lire
       // ce fichier — voir photoPathNote() — mais le chemin donne le nom de fichier exact
@@ -564,6 +616,7 @@ function buildCard(sec, code, grid){
         <span class="card-prix" contenteditable data-role="prix">${esc(p.prixPromo||p.prix||'')}</span>
       </div>
       <span class="card-remise" contenteditable data-role="remise" data-raw="${escA(p.remise||'')}"></span>
+      <div class="card-qte" title="Quantité disponible, telle que lue dans le fichier source"><b></b><span>dispo</span></div>
       <button class="niv-btn" title="Niveau de mise en avant dans la maquette — clic pour changer : standard → héros → petit">standard</button>
     </div>`;
   // édition code -> résout (article OU réf fournisseur) + auto-remplissage base
@@ -706,6 +759,7 @@ function buildCard(sec, code, grid){
   grid.appendChild(card);
   applyNiv(card, nivOf(sec, code));
   renderRemise(card);
+  majQteCarte(code, card);
   return card;
 }
 
@@ -1011,17 +1065,19 @@ function fillRefMap(){
   $('refFourn').innerHTML=opts; $('refFourn').value=guess(['reference fournisseur','ref fournisseur','ref_fourn','reference','référence','code fournisseur','fournisseur','ref']);
   $('refLib').innerHTML=opts;  $('refLib').value=guess(['libel','design','produit','nom']);
   $('refPrix').innerHTML=opts; $('refPrix').value=guess(['prix_vente','prix de vente','pv','tarif','prix']);
+  $('refQte').innerHTML=opts;  $('refQte').value=guess(QTE_NOMS);
 }
 $('refCancel').addEventListener('click',()=>$('refModal').classList.add('hidden'));
 $('refApply').addEventListener('click', async ()=>{
   const iC=+$('refCode').value,iL=+$('refLib').value,iX=+$('refPrix').value,iF=+$('refFourn').value;
+  const iQ=+$('refQte').value;
   if(iC<0){alert('Choisis la colonne code.');return;}
   let nNew=0, nUpd=0, nFourn=0;
   for (const r of window._refRows){
     const c=normCode(r[iC]); if(!c) continue;
     // prix robuste : gère les nombres bruts ET les prix déjà formatés ("2 490", "2 490 F", "2490,00"…)
     const prix = iX>=0 ? fmtPrix(r[iX]) : '';
-    const rec = {lib: iL>=0?String(r[iL]).slice(0,60):'', prix};
+    const rec = {lib: iL>=0?String(r[iL]).slice(0,60):'', prix, qte: iQ>=0?fmtQte(r[iQ]):''};
     if (REF[c]) nUpd++; else nNew++;
     REF[c]=rec;   // mise à jour : le nouveau fichier fait foi (prix actualisés)
     // index code fournisseur -> code article (pour le matching photo de repli)
@@ -1092,12 +1148,40 @@ function flagCard(card, kind){
     : "Ce code n'existe pas dans la base articles chargée.";
   card.classList.add('nobase');
 }
+// V44 — pose la quantité sur toutes les vignettes d'un code, dans la planche.
+// Seuils : 0 en rouge (plus rien à vendre), moins de 10 en ambre (une page ne tiendra
+// pas la semaine). Au-delà, la couleur de l'outil.
+// `carte` est facultatif, mais indispensable depuis buildCard : la vignette n'est pas
+// encore rattachée au document à ce moment-là (elle est posée dans une grille détachée,
+// insérée seulement à la fin du rendu), donc une recherche par code ne la trouverait pas.
+// C'est ce qui faisait que la quantité n'apparaissait qu'après une seconde action.
+function majQteCarte(code, carte){
+  const t=fmtQte((PRODUCTS[code]||{}).qte);
+  const cl=qteClasse(t);
+  // `carte` doit être un élément : passer autre chose (un index, via
+  // codes.forEach(majQteCarte)) ne doit pas faire tomber le rendu.
+  const cibles = (carte && carte.querySelector) ? [carte] : cardsOf(code);
+  cibles.forEach(card=>{
+    const box=card.querySelector('.card-qte'); if(!box) return;
+    box.classList.toggle('on', t!=='');
+    box.classList.toggle('nul', cl==='nul');
+    box.classList.toggle('bas', cl==='bas');
+    const b=box.querySelector('b'); if(b) b.textContent=t;
+  });
+}
+
 function applyRefToCard(code){
   const info=REF[code]; if(!info) return;
   cardsOf(code).forEach(card=>{
     const libEl=card.querySelector('.card-lib'), prixEl=card.querySelector('.card-prix');
     if (libEl && !libEl.textContent.trim() && info.lib){ libEl.textContent=info.lib; (PRODUCTS[code]||(PRODUCTS[code]={})).lib=info.lib; }
     if (prixEl && !prixEl.textContent.trim() && info.prix){ prixEl.textContent=info.prix; (PRODUCTS[code]||(PRODUCTS[code]={})).prix=info.prix; }
+    // V44 — la quantité vient de la base, jamais de la saisie : elle n'est pas éditable
+    // sur la carte. Un rechargement de la base l'actualise sur toutes les planches.
+    if (info.qte!==undefined && info.qte!=='' && !(PRODUCTS[code]||{}).qte){
+      (PRODUCTS[code]||(PRODUCTS[code]={})).qte=info.qte;
+      majQteCarte(code);
+    }
   });
 }
 
@@ -1667,7 +1751,8 @@ function wtItem(code, sec){
     +'<div class="wt-img">'+vis+'</div>'
     +'<div class="wt-txt"><div class="wt-code">'+esc(String(code).startsWith('SLOT')?'':code)+'</div>'
     +'<div class="wt-lib" contenteditable>'+esc(p.lib||'')+'</div>'
-    +'<div class="wt-prix" contenteditable>'+esc(p.prixPromo||p.prix||'')+'</div></div>';
+    +'<div class="wt-prix" contenteditable>'+esc(p.prixPromo||p.prix||'')+'</div>'
+    +qteVignette(p.qte)+'</div>';
   el.querySelector('.wt-move').addEventListener('click', ev=>{
     ev.stopPropagation();
     choisirDestination(code);
@@ -2002,7 +2087,7 @@ function diagnosticGlisser(){
     l.push('— État de la sélection —');
     l.push('planches : '+PAGES.length+'   références : '+allCodes().length
           +'   vivier : '+POOL.length+'   réserve : '+RESERVE.length);
-    l.push('version  : V43   projet : '+(PROJET_NOM||'—'));
+    l.push('version  : V44   projet : '+(PROJET_NOM||'—'));
     return l.join('\n');
   };
   const verdict=()=>{
@@ -2195,6 +2280,7 @@ function ajouterArticle(sec, pageIdx){
   if (info){
     if (!PRODUCTS[code].lib)  PRODUCTS[code].lib=info.lib||'';
     if (!PRODUCTS[code].prix) PRODUCTS[code].prix=info.prix||'';
+    if (!PRODUCTS[code].qte)  PRODUCTS[code].qte=info.qte||'';
   }
   sec.pagesContenu=pagesDe(sec).map(x=>x.slice());
   while (sec.pagesContenu.length<=pageIdx) sec.pagesContenu.push([]);
@@ -3326,6 +3412,19 @@ $('makePdf').addEventListener('click', async ()=>{
       }catch(e){}}
       else{pdf.setTextColor(180,69,63);pdf.setFontSize(8);pdf.text('PHOTO MANQUANTE',x+(cw-4)/2,y+(chh-24)/2,{align:'center'});}
       pdf.setTextColor(120,120,120);pdf.setFont('courier','normal');pdf.setFontSize(6.5);pdf.text(code.startsWith('SLOT')?'':code,x+3,y+chh-16);
+      // V44 — quantité disponible, alignée à droite sur la ligne du code : c'est la seule
+      // ligne courte de la carte, donc la seule où rien ne peut la chevaucher.
+      {
+        const qTxt=fmtQte(p.qte);
+        if (qTxt!==''){
+          const cl=qteClasse(qTxt);
+          if (cl==='nul') pdf.setTextColor(176,0,32);
+          else if (cl==='bas') pdf.setTextColor(138,97,0);
+          else pdf.setTextColor(27,67,50);
+          pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);
+          pdf.text(qTxt+' dispo', x+cw-7, y+chh-16, {align:'right'});
+        }
+      }
       pdf.setTextColor(26,26,26);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.text(String(p.lib||'').slice(0,34),x+3,y+chh-12);
       // prix : soit promo (avec prix initial barré + remise), soit prix normal
       const fmt=($('remiseFormat')&&$('remiseFormat').value)||'pct';
@@ -3484,7 +3583,7 @@ function buildMergeFile(dossier, relatif){
   const lignes=[[
     'Planche','PagesPlanche','PageCatalogue','PageDansPlanche','PositionDansPage',
     'Position','Niveau','Code','RefFournisseur','Designation',
-    'Prix','PrixInitial','PrixPromo','Remise','PhotoPresente','@Photo'
+    'Prix','PrixInitial','PrixPromo','Remise','QuantiteDispo','PhotoPresente','@Photo'
   ].join('\t')];
   let avecPhoto=0;
   // parcours dans l'ordre de composition : les lignes sortent page par page
@@ -3512,6 +3611,7 @@ function buildMergeFile(dossier, relatif){
         champ(isSlot?'':code), champ(codeToFourn[code]||''), champ(p.lib||''),
         champ(p.prix||''), champ(hasInit?p.prixInit:''), champ(hasInit?(p.prixPromo||p.prix):''),
         champ(hasInit?fmtRemiseText(rem,fmt).replace(/\u00a0|\u202f/g,' '):''),
+        champ(fmtQte(p.qte)),
         dispo?'Oui':'Non',
         champ(chemin)
       ].join('\t'));
@@ -3572,6 +3672,7 @@ function lisezMoi(nb, avecPhoto, mode){
     '  PrixInitial     prix barre (vide hors promotion)',
     '  PrixPromo       prix remise (vide hors promotion)',
     '  Remise          remise mise en forme',
+    '  QuantiteDispo   quantite disponible a la date du fichier source (vide si non renseignee)',
     '  PhotoPresente   Oui / Non',
     '  @Photo          image liee (le prefixe @ est ce qui en fait un champ image)',
     '',
@@ -3739,7 +3840,8 @@ $('makeXlsx').addEventListener('click', ()=>{
     const rows=[[
       'Planche','Pages attribuées','Page catalogue','Page dans planche','Rang dans page',
       'N° dans planche','Niveau','Code article','Réf. fournisseur','Libellé',
-      'Prix','Prix initial','Prix promo','Remise %','Remise (F)','Remise (affichée)','Photo'
+      'Prix','Prix initial','Prix promo','Remise %','Remise (F)','Remise (affichée)',
+      'Quantité dispo','Photo'
     ]];
     let secCourante=null, pos=0;
     for (const it of parcoursCompose()){
@@ -3772,6 +3874,7 @@ $('makeXlsx').addEventListener('click', ()=>{
           (rem.pct!=null)?Math.round(rem.pct):'',
           (rem.val!=null)?Math.round(rem.val):'',
           remAff,
+          (fmtQte(p.qte)==='' ? '' : parseInt(fmtQte(p.qte),10)),
           matchedFiles[code]?'Oui':'Manquante'
         ]);
       }
@@ -3779,9 +3882,9 @@ $('makeXlsx').addEventListener('click', ()=>{
     const ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=[
       {wch:22},{wch:14},{wch:13},{wch:15},{wch:12},{wch:14},{wch:10},{wch:14},{wch:16},{wch:40},
-      {wch:10},{wch:11},{wch:11},{wch:9},{wch:11},{wch:18},{wch:11}
+      {wch:10},{wch:11},{wch:11},{wch:9},{wch:11},{wch:18},{wch:13},{wch:11}
     ];
-    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:16}})};
+    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:17}})};
     ws['!freeze']={xSplit:0,ySplit:1};
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Catalogue');
@@ -4113,7 +4216,7 @@ $('makeHtml').addEventListener('click', async ()=>{
       cards+='<div class="x-card">'
         +'<div class="x-slot">'+imgHtml+'</div>'
         +'<div class="x-body"><div class="x-code">'+esc(codeTxt)+'</div>'
-        +'<div class="x-lib">'+esc(p.lib||'')+'</div>'+priceHtml+'</div></div>';
+        +'<div class="x-lib">'+esc(p.lib||'')+'</div>'+priceHtml+qteExport(p.qte)+'</div></div>';
     }
     sections+='<section class="x-planche"><div class="x-head"><h2>'+esc(sec.pg)+'</h2>'
       +'<span class="x-count">'+sec.codes.length+' réf.</span></div>'
@@ -4144,7 +4247,11 @@ $('makeHtml').addEventListener('click', async ()=>{
     +'.x-init{font-size:.68rem;color:#999;text-decoration:line-through;text-decoration-color:#B02A3C;font-weight:600}'
     +'.x-promo{font-weight:700;font-size:.8rem;color:#8B1A2B}'
     +'.x-rem{display:inline-block;background:#8B1A2B;color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:10px;margin-top:3px;line-height:1.1}'
-    +'@media print{body{background:#fff}.x-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.x-planche{page-break-after:always}.x-card{box-shadow:none;border:1px solid #ddd}}'
+    +'.x-qte{display:flex;align-items:baseline;gap:5px;margin-top:5px;padding-top:5px;border-top:1px solid #EFEAE1}'
+    +'.x-qte b{font-size:.78rem;font-weight:800;color:#1B4332;font-variant-numeric:tabular-nums}'
+    +'.x-qte span{font-size:.55rem;color:#9a9a9a;font-weight:700;letter-spacing:.04em;text-transform:uppercase}'
+    +'.x-qte.bas b{color:#8A6100}.x-qte.nul b{color:#B00020}'
+    +'@media print{.x-qte{border-top:1px solid #ddd}body{background:#fff}.x-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.x-planche{page-break-after:always}.x-card{box-shadow:none;border:1px solid #ddd}}'
     +'</style></head><body>'
     +'<div class="x-header"><h1>Planches <em>Contacts</em></h1><p>Nouméa Pas Cher · '+new Date().toLocaleDateString('fr-FR')+'</p></div>'
     +sections
@@ -4183,6 +4290,9 @@ function syncProductsFromDOM(){
       // le chemin photo n'est pas affiché sur la carte : sans cette ligne, il disparaissait
       // à la première sauvegarde (syncProductsFromDOM reconstruit l'objet depuis le DOM)
       photo: prev.photo||'',
+      // la quantité n'est pas saisissable : comme le chemin photo, elle se perdrait
+      // à la première relecture du DOM si on ne la reportait pas ici
+      qte: prev.qte||'',
       lib: g('.card-lib') || prev.lib || '',
       // si un prix barré est présent, le prix affiché est le prix promo ; sinon c'est le prix normal
       prix: (initTxt!=='' ? (prev.prix||prixTxt) : prixTxt) || '',
@@ -4238,7 +4348,7 @@ async function buildProject(includePhotos, opts){
     }
   }
   return {
-    _type:'studio-planches-projet', _version:PROJET_VERSION, _outil:'V37',
+    _type:'studio-planches-projet', _version:PROJET_VERSION, _outil:'V44',
     nom: PROJET_NOM,
     date:new Date().toISOString(),
     // V26 : nb de pages de catalogue et niveaux de mise en avant appartiennent à la planche

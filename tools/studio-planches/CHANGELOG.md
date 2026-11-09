@@ -1,5 +1,40 @@
 # Studio Planches Contacts — journal des versions
 
+## V44 — la quantité disponible sur la planche
+
+La planche contact disait quoi et à quel prix, jamais **combien il en reste**. Or c'est
+ce qui décide si une référence mérite une pleine page, une vignette, ou pas de place du
+tout. La quantité disponible est maintenant lue dans le fichier source et portée de la
+vignette jusqu'aux livrables.
+
+**D'où vient le chiffre.** Une ligne « Quantité dispo » s'ajoute aux deux écrans de
+correspondance des colonnes — celui des planches et celui de la base articles. La
+détection propose d'abord **`conso`**, la colonne consolidée de l'export caisse NPC :
+vérifié ligne à ligne sur l'export complet (43 411 références), elle vaut exactement la
+somme des stocks des huit sites. Suivent les noms usuels : *stock dispo*, *quantité*,
+*qté*, *disponible*. Une colonne vide, un tiret ou un texte ne valent pas zéro : ils
+valent « non renseigné », et rien ne s'affiche.
+
+**Où il apparaît.** Sur la vignette de la planche et sur celle de la table de travail,
+sous le prix, séparé par un filet — une donnée de gestion ne doit jamais concurrencer le
+prix à l'œil. Trois états : au-delà de 10, la couleur de l'outil ; **moins de 10 en
+ambre** (une page ne tiendra pas la semaine) ; **zéro en rouge**.
+
+**Où il part.** Planches HTML, PDF (aligné à droite sur la ligne du code, la seule ligne
+courte de la carte), Excel — colonne *Quantité dispo* en **nombre**, donc triable et
+filtrable — et fusion InDesign, colonne `QuantiteDispo`, documentée dans le LISEZ-MOI.
+**Pas dans le catalogue web** : c'est la pièce que voit le client, un stock n'y a pas sa
+place. Un contrôle le vérifie.
+
+La quantité n'est pas saisissable sur la vignette : elle vient de la base et nulle part
+ailleurs. Recharger la base l'actualise sur toutes les planches d'un coup.
+
+Un défaut trouvé en vérifiant : `buildCard` posait la quantité alors que la vignette
+n'était pas encore rattachée au document — la recherche par code ne la trouvait pas et
+le chiffre n'apparaissait qu'après une seconde action. La vignette est désormais passée
+directement.
+
+
 ## V43 — mesurer chez l'utilisateur au lieu de supposer
 
 Le navigateur en cause est **Genspark Browser**, un dérivé de Chromium sous Windows —

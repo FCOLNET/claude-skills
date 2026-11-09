@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v43.html` | **version courante**, à utiliser |
+| `studio-planches-v44.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -23,7 +23,11 @@ l'historique git.
    « Réf. fournisseur » si elle existe. Mémorisée entre les sessions ; la recharger
    pour actualiser les prix.
 2. **Structure** — téléverser le fichier de définition des planches. Vérifier la
-   correspondance des colonnes, dont « Chemin photo » si le fichier la contient.
+   correspondance des colonnes, dont « Chemin photo » et « Quantité dispo » si le
+   fichier les contient. Pour l'export caisse NPC, la quantité est la colonne
+   **`conso`** : elle vaut la somme des stocks des huit sites. Elle s'affiche sur la
+   vignette sous le prix — ambre sous 10, rouge à zéro — et part dans les planches
+   HTML, le PDF, l'Excel et la fusion InDesign, mais jamais dans le catalogue web.
 3. **Photos** — si elles sont sur un partage réseau, utiliser
    « 📋 Copier les N photos en local » : le navigateur se fige à lister un dossier de
    plusieurs milliers de fichiers, il faut donc lui présenter un petit dossier local.
@@ -81,7 +85,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v43.mjs ../studio-planches-v43.html node_modules/jszip/dist/jszip.min.js
+node verif-v44.mjs ../studio-planches-v44.html node_modules/xlsx/dist/xlsx.full.min.js node_modules/jszip/dist/jszip.min.js
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et
