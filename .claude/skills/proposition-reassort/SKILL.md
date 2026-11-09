@@ -32,6 +32,12 @@ cp templates/page.html <scratchpad>/reassort/index.html
 
 Puis publier `index.html` avec l'outil Artifact, `files: {"data.json": ...}` et `capabilities: {db: {}, user: {scopes: ["profile"]}, downloads: true, sample: {}}`. Pour une mise à jour, republier sur la même URL : les décisions restent (elles sont dans la base de l'artefact, clé = magasin + code article). Ne jamais committer les exports ni `data.json` : ce sont des données d'entreprise.
 
+## Mise à jour depuis la page (vue « Données »)
+
+La page publiée embarque le moteur de calcul (`scripts/moteur.js`, même calcul que `build_data.py`, vérifié ligne à ligne : 24 104 lignes identiques sur les exports du 26/10). Un éditeur de la page (droit de publier) ouvre « Données », dépose les exports (reconnus à leur en-tête ; le `.xls` d'écart de préparation est lu avec SheetJS chargé depuis cdnjs), lance le calcul, compare avec les données en ligne et publie : la page remplace seulement `data.json` (publication par fichiers), photos et décisions des magasins sont conservées. Sans droit de publier, le nouveau `data.json` est proposé au téléchargement. « Télécharger les données actuelles » donne le `data.json` en ligne.
+
+Construire la page : `python3 scripts/assemble_page.py --out <scratchpad>/reassort/index.html` (insère le moteur dans le gabarit au repère `<!--MOTEUR-->`), puis publier avec `capabilities: {db: {}, user: {scopes: ["profile"]}, downloads: true, sample: {}, artifact: {}}`. La version fichier par magasin (`build_autonome.py`) n'embarque pas le moteur.
+
 ## Exports Excel
 
 La page génère des `.xlsx` mis en forme avec ExcelJS 4.4.0 (chargé depuis jsDelivr au premier clic, intégré dans la version fichier) : bandeau titre et date, en-têtes colorés, volets figés, filtres, montants en F, couleurs de confiance et de statut, totaux (SOUS.TOTAL, qui suivent les filtres), photos dans le bon de demande. Classeurs :

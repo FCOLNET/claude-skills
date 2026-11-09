@@ -87,6 +87,7 @@ def main():
     titre = re.search(r"<title>(.*?)</title>", page).group(1)
     corps = re.sub(r"<title>.*?</title>\n?", "", page, count=1)
     corps = re.sub(r'<meta name="claude:viewport-fit-sides"[^>]*>\n?', "", corps, count=1)
+    corps = corps.replace("<!--MOTEUR-->", "")  # pas de recalcul dans la version fichier
     xlsx = ""
     if a.excel:
         xlsx = "<script>" + open(a.excel, encoding="utf-8").read().replace("</script", "<\\/script") + "</script>\n"

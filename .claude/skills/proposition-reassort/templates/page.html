@@ -136,6 +136,15 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
 .notice{margin-top:12px;border-radius:var(--r);padding:9px 12px;background:var(--warn-soft);color:var(--ink);font-size:13px}
 .notice[hidden]{display:none}
+.drop{display:block;border:2px dashed var(--accent);background:var(--accent-soft);border-radius:var(--r);padding:26px 18px;text-align:center;cursor:pointer;margin-top:14px}
+.drop.sur{background:var(--accent);color:var(--accent-ink)}
+.drop b{font-size:16px;font-stretch:var(--w-cond)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.slots{margin-top:14px}
+.slots td.ok{color:var(--ok);font-weight:650} .slots td.manque{color:var(--muted)} .slots td.oblig{color:var(--bad);font-weight:650}
+.maj-msg{margin-top:12px;border-radius:var(--r);padding:10px 12px;background:var(--ok-soft)}
+.maj-msg.ko{background:var(--bad-soft)}
+.maj-act{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;max-width:min(92vw,640px);
   background:var(--ink);color:var(--bg);border-radius:var(--r);padding:10px 14px;font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .toast.mal{background:var(--bad);color:#fff}
@@ -186,6 +195,7 @@ details.method li{margin:4px 0}
   <p class="loading" id="loading">Chargement des propositions…</p>
 </main>
 
+<!--MOTEUR-->
 <script>
 (function(){
 "use strict";
@@ -208,6 +218,7 @@ var PAGE=50;
 
 var D=null, state={store:null, tab:"BAS", dept:"", dispo:"", q:"", statut:"todo", tri:"sc", nouv:"all", sub:"all", unit:null, limit:PAGE, openRefus:null};
 var decisions={}; // store -> key -> body
+var editeur=false, maj={fich:{}, res:null, msg:"", ko:false, calc:false};
 var db=null, user=null, canWrite=null, myId=null, profiles={}, dlCap=null, sampleCap=null, claudeRes={};
 var nf=new Intl.NumberFormat("fr-FR"), nf1=new Intl.NumberFormat("fr-FR",{maximumFractionDigits:1,minimumFractionDigits:1});
 function F(v){ return nf.format(Math.round(v))+" F"; }
@@ -267,9 +278,9 @@ function init(){
   var fin=new Date(D.meta.fin+"T12:00:00");
   document.getElementById("dataDate").textContent="données au "+fin.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
   var h=(location.hash||"").slice(1).toLowerCase(), saved=try_(function(){ return localStorage.getItem("reassort-store"); });
-  var byTok={}; D.magasins.forEach(function(s){ byTok[token(s)]=s; }); byTok.reseau="RES";
+  var byTok={}; D.magasins.forEach(function(s){ byTok[token(s)]=s; }); byTok.reseau="RES"; byTok.donnees="MAJ";
   state.store=D.seul||byTok[h]||saved||D.magasins[0];
-  if(state.store!=="RES" && D.magasins.indexOf(state.store)<0) state.store=D.magasins[0];
+  if(state.store!=="RES" && state.store!=="MAJ" && D.magasins.indexOf(state.store)<0) state.store=D.magasins[0];
   buildStores(); render(); connect();
   if(D.seul) return;
   window.addEventListener("hashchange",function(){ var s=byTok[(location.hash||"").slice(1).toLowerCase()]; if(s && s!==state.store){ setStore(s); } });
@@ -280,13 +291,15 @@ function buildStores(){
   D.magasins.forEach(function(s){ var b=el("button",null,nom(s)); b.type="button"; b.dataset.s=s; b.onclick=function(){ setStore(s); }; nav.appendChild(b); });
   nav.appendChild(el("span","sep"));
   var r=el("button",null,"Réseau"); r.type="button"; r.dataset.s="RES"; r.onclick=function(){ setStore("RES"); }; nav.appendChild(r);
+  /* La mise à jour des données n'est proposée qu'à qui peut publier la page. */
+  if(editeur || state.store==="MAJ"){ var mj=el("button",null,"Données"); mj.type="button"; mj.dataset.s="MAJ"; mj.title="Mettre à jour les données"; mj.onclick=function(){ setStore("MAJ"); }; nav.appendChild(mj); }
   syncStores();
 }
 function syncStores(){ document.querySelectorAll("#stores button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.s===state.store?"true":"false"); }); }
 function setStore(s){
   state.store=s; state.limit=PAGE; state.unit=null; state.openRefus=null;
   try_(function(){ localStorage.setItem("reassort-store",s); });
-  var t=s==="RES"?"reseau":token(s); if((location.hash||"").slice(1)!==t) location.hash=t;
+  var t=s==="RES"?"reseau":s==="MAJ"?"donnees":token(s); if((location.hash||"").slice(1)!==t) location.hash=t;
   syncStores(); render();
 }
 
@@ -325,6 +338,7 @@ function connect(){
   if(LOCAL){ connectLocal(); return; }
   if(!window.claude || !window.claude.use){ notice("Les décisions ne s’enregistrent que dans la page publiée sur claude.ai."); return; }
   window.claude.use("user").then(function(u){ user=u; if(!u) return null;
+    u.canEdit().then(function(v){ if(v && !editeur){ editeur=true; buildStores(); render(); } });
     return Promise.all([u.id(), u.can("data.write")]).then(function(r){ myId=r[0]; canWrite=r[1]; if(canWrite===false) notice("Vous consultez en lecture seule : pour accepter ou refuser, il faut un accès Contributeur à cette page."); render(); });
   });
   window.claude.use("downloads").then(function(d){ dlCap=d; render(); });
@@ -372,6 +386,7 @@ function render(){
   if(!D) return;
   var app=document.getElementById("app"); app.textContent="";
   var n=el("p","notice"); n.id="notice"; n.textContent=noticeTxt; n.hidden=!noticeTxt;
+  if(state.store==="MAJ"){ renderMaj(app); app.appendChild(n); return; }
   if(state.store==="RES"){ renderNetwork(app); app.appendChild(n); app.appendChild(method()); return; }
   var code=state.store, L=D.lignes[code];
   var cnt={}, todo=0, ok=0, ref=0, mgTodo=0, mgOk=0;
@@ -1015,6 +1030,172 @@ function exportNetwork(per,motifs,demand,btn){
     {n:"Décisions",title:"Décisions des magasins",h:PH,r:decs,w:PW,freeze:4,tot:TOT_PROP},
     {n:"Motifs de refus",title:"Pourquoi les magasins refusent",h:["Motif","Refus"],r:mo,w:[30,10],tot:["Refus"]},
     {n:"Stock disputé",title:"Stock disputé",sub:"Plus accepté par les magasins que disponible à l’entrepôt et en réception",h:["Code","Article","Accepté","Stock entrepôt","Écart","Magasins"],r:di,w:[9,40,10,12,10,40],freeze:2}],btn);
+}
+
+/* ---------- mise à jour des données ---------- */
+/* Comme pour le Pilotage : on dépose les exports, la page refait le calcul
+   (même moteur que la version Python, vérifié ligne à ligne) et publie le
+   nouveau data.json pour tout le monde. Les photos et les décisions des
+   magasins sont conservées : elles ne dépendent que des codes articles. */
+var CRENEAUX=[
+  {k:"base",l:"Base article",f:"art_superviseur.CSV",o:true},
+  {k:"analyse",l:"Analyse stock / vente 12 mois",f:"ANALYSE_STOCK_VENTE_SUR_12_MOIS….CSV",o:true},
+  {k:"glissant",l:"Suivi tout 12 mois glissants",f:"suivi_tout_12_glissants.csv",o:true},
+  {k:"exercice",l:"Suivi tout depuis le début de l’exercice",f:"suivi_tout_DDEXF.csv",o:false},
+  {k:"prepa",l:"Écart de préparation (réassort sous 48 h)",f:"ecart_prepa.xls",o:false,reco:true}
+];
+function loadSheetJS(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(loadSheetJS.p) return loadSheetJS.p;
+  loadSheetJS.p=new Promise(function(res,rej){ var sc=document.createElement("script");
+    sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    sc.onload=function(){ window.XLSX?res(window.XLSX):rej(new Error("module .xls indisponible")); };
+    sc.onerror=function(){ loadSheetJS.p=null; rej(new Error("module .xls indisponible (connexion)")); }; document.head.appendChild(sc); });
+  return loadSheetJS.p;
+}
+function periodeDe(txt){ var m=/Du (\d\d\/\d\d\/\d{4}) au (\d\d\/\d\d\/\d{4})/.exec(txt.slice(0,3000)); return m?m[1]+" → "+m[2]:""; }
+function lireFichiers(files){
+  maj.msg="Lecture de "+files.length+" fichier"+(files.length>1?"s":"")+"…"; maj.ko=false; maj.res=null; render();
+  var tous=Array.prototype.map.call(files,function(f){
+    var nom=f.name, ext=(nom.split(".").pop()||"").toLowerCase();
+    return f.arrayBuffer().then(function(buf){
+      if(ext==="xls"||ext==="xlsx"){
+        return loadSheetJS().then(function(X){
+          var wb=X.read(new Uint8Array(buf),{type:"array",cellDates:true}), ws=wb.Sheets[wb.SheetNames[0]];
+          var rows=X.utils.sheet_to_json(ws,{defval:"",raw:true});
+          if(!rows.length || !("qte_demande" in rows[0])) return {nom:nom, err:"ce classeur n’a pas la colonne qte_demande"};
+          var dates=rows.map(function(r){ return r.date instanceof Date ? r.date : null; }).filter(Boolean);
+          var dmax=dates.length?new Date(Math.max.apply(null,dates)).toLocaleDateString("fr-FR"):"";
+          return {nom:nom, genre:"prepa", rows:rows, info:rows.length+" lignes"+(dmax?" · préparations jusqu’au "+dmax:"")};
+        });
+      }
+      var txt=new TextDecoder("windows-1252").decode(buf), g=Reassort.genre(nom,txt);
+      if(!g) return {nom:nom, err:"fichier non reconnu (en-tête inattendu)"};
+      if(g==="mois") return {nom:nom, err:"suivi du mois en cours : inutile au calcul, ignoré"};
+      if(g==="prepa") return {nom:nom, genre:"prepa", rows:Reassort.lireDict(txt), info:"CSV"};
+      return {nom:nom, genre:g, txt:txt, info:periodeDe(txt)||(Math.round(buf.byteLength/1e5)/10+" Mo")};
+    }).catch(function(e){ return {nom:nom, err:e.message||"illisible"}; });
+  });
+  Promise.all(tous).then(function(L){
+    var ign=[];
+    L.forEach(function(x){ if(x.err) ign.push(x.nom+" : "+x.err); else maj.fich[x.genre]=x; });
+    maj.msg=ign.length?"Non retenu — "+ign.join(" ; "):""; maj.ko=!!ign.length; render();
+  });
+}
+function calculer(){
+  var F=maj.fich; maj.calc=true; maj.msg="Calcul en cours… (quelques secondes)"; maj.ko=false; render();
+  setTimeout(function(){
+    try{
+      var d=Reassort.construire({base:F.base.txt, analyse:F.analyse.txt, glissant:F.glissant.txt,
+        exercice:F.exercice?F.exercice.txt:null, prepa:F.prepa?F.prepa.rows:null,
+        noms:{base:F.base.nom, analyse:F.analyse.nom, glissant:F.glissant.nom, prepa:F.prepa?F.prepa.nom:null}});
+      maj.res={data:d, json:JSON.stringify(d)}; maj.msg=""; 
+    }catch(e){ maj.res=null; maj.msg="Calcul impossible : "+(e.message||e); maj.ko=true; }
+    maj.calc=false; render();
+  },60);
+}
+function comptes(d){
+  var r={}; d.magasins.forEach(function(s){ var c={}; d.lignes[s].forEach(function(l){ var g=l.couv?"PREP":(l.g==="NVD"?"NOU":l.g==="RRS"?"SUB":l.g); c[g]=(c[g]||0)+1; }); r[s]=c; }); return r;
+}
+function telechargerJSON(json,nom,btn){
+  if(!dlCap){ notice("Le téléchargement n’est pas disponible dans cette vue."); return; }
+  dlCap.save({filename:nom,data:new Blob([json],{type:"application/json"})}).then(function(){ toast("Données enregistrées : "+nom); },
+    function(e){ if(!e||e.code!=="declined") notice("Le fichier n’a pas pu être proposé ("+((e&&e.code)||"erreur")+")."); });
+}
+function publier(btn){
+  var res=maj.res; if(!res) return;
+  btn.disabled=true; btn.textContent="Publication…";
+  var nomJ="reassort-donnees-"+res.data.meta.fin+".json";
+  function repli(pourquoi){
+    maj.msg="Le calcul a réussi, mais la page ne peut pas se republier ici ("+pourquoi+"). Les données viennent d’être proposées au téléchargement ("+nomJ+") : déposez ce fichier dans notre conversation et je le publierai."; maj.ko=true;
+    telechargerJSON(res.json,nomJ); render();
+  }
+  (window.claude&&window.claude.use?window.claude.use("artifact"):Promise.resolve(null)).then(function(ar){
+    if(!ar) return repli("autorisation absente");
+    return ar.publish({"data.json":{content:res.json,contentType:"application/json"}}).then(function(){
+      var ancien=D.meta.fin; D=res.data; D.idx={}; D.arts.forEach(function(a,i){ D.idx[a[0]]=i; });
+      maj={fich:{}, res:null, msg:"Publié : données au "+new Date(D.meta.fin+"T12:00:00").toLocaleDateString("fr-FR")+" (précédentes : "+new Date(ancien+"T12:00:00").toLocaleDateString("fr-FR")+"). Les autres pages ouvertes se rechargent ; les décisions des magasins sont conservées.", ko:false, calc:false};
+      document.getElementById("dataDate").textContent="données au "+new Date(D.meta.fin+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+      render();
+    });
+  }).catch(function(e){
+    var c=e&&e.code;
+    if(c==="conflict"){ maj.msg="Une autre version vient d’être publiée : la page se recharge. Redéposez vos fichiers si besoin."; maj.ko=true; render(); return; }
+    repli(c==="not_writer"?"vous n’avez pas le droit de modifier cette page":c||"refus de la plateforme");
+  });
+}
+function renderMaj(app){
+  var head=el("section","head"), hl=el("div");
+  hl.appendChild(el("div","lbl","Réservé aux éditeurs de la page"));
+  hl.appendChild(el("h2",null,"Mettre à jour les données"));
+  hl.appendChild(el("p",null,"Déposez les exports du jour : la page refait tout le calcul et publie les nouvelles propositions pour tous les magasins. Les photos et les décisions déjà prises sont conservées."));
+  head.appendChild(hl);
+  var cur=el("div","panel"); cur.appendChild(el("h3",null,"Données en ligne"));
+  var M=D.meta, f=M.fichiers||{};
+  cur.appendChild(el("p","tabdesc","Au "+new Date(M.fin+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+(M.calcule?" · calculées le "+new Date(M.calcule).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"}):"")+" · "+[f.base,f.analyse,f.glissant].filter(Boolean).join(", ")+(M.prepa?", "+M.prepa.fichier:"")));
+  if(dlCap){ var dc=el("button","btn","Télécharger les données actuelles (JSON)"); dc.type="button"; dc.onclick=function(){ telechargerJSON(JSON.stringify(D,function(k,v){ return k==="idx"?undefined:v; }),"reassort-donnees-"+M.fin+".json",dc); }; cur.appendChild(dc); }
+  head.appendChild(cur); app.appendChild(head);
+
+  var drop=el("label","drop"); drop.htmlFor="fFichiers";
+  drop.appendChild(el("b",null,"Déposez ici les exports, ou cliquez pour les choisir"));
+  drop.appendChild(el("div","meta","Vous pouvez les déposer tous ensemble : chacun est reconnu à son contenu."));
+  var inp=el("input"); inp.type="file"; inp.id="fFichiers"; inp.multiple=true; inp.accept=".csv,.CSV,.xls,.xlsx";
+  inp.onchange=function(){ if(inp.files.length) lireFichiers(inp.files); };
+  drop.appendChild(inp);
+  ["dragenter","dragover"].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add("sur"); }); });
+  ["dragleave","drop"].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove("sur"); }); });
+  drop.addEventListener("drop",function(e){ if(e.dataTransfer&&e.dataTransfer.files.length) lireFichiers(e.dataTransfer.files); });
+  app.appendChild(drop);
+
+  var w=el("div","tablewrap slots"), t=el("table"), tb=el("tbody");
+  var hr=el("tr"); ["Fichier","Attendu","Reçu",""].forEach(function(h){ hr.appendChild(el("th",null,h)); }); var th=el("thead"); th.appendChild(hr); t.appendChild(th);
+  CRENEAUX.forEach(function(c){
+    var x=maj.fich[c.k], tr=el("tr");
+    tr.appendChild(el("td",null,c.l+(c.o?"":c.reco?" (recommandé)":" (facultatif)")));
+    tr.appendChild(el("td","meta",c.f));
+    tr.appendChild(el("td",x?"ok":(c.o?"oblig":"manque"), x?x.nom+(x.info?" · "+x.info:""):(c.o?"manquant":"—")));
+    var td=el("td"); if(x){ var rm=el("button","btn small","Retirer"); rm.type="button"; rm.onclick=function(){ delete maj.fich[c.k]; maj.res=null; render(); }; td.appendChild(rm); } tr.appendChild(td);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); w.appendChild(t); app.appendChild(w);
+
+  var F=maj.fich, pret=F.base&&F.analyse&&F.glissant, avert=[];
+  if(F.analyse&&F.glissant){ var a1=periodeDe(F.analyse.txt).split(" → ")[1], g1=periodeDe(F.glissant.txt).split(" → ")[1]; if(a1&&g1&&a1!==g1) avert.push("l’analyse s’arrête au "+a1+" et le suivi 12 mois au "+g1); }
+  if(pret && !F.prepa) avert.push("sans écart de préparation, des articles déjà en route risquent d’être proposés une seconde fois");
+  if(avert.length) app.appendChild(el("p","notice","À vérifier : "+avert.join(" ; ")+"."));
+
+  var act=el("div","maj-act");
+  var bc=el("button","btn yes",maj.calc?"Calcul en cours…":"Calculer les propositions"); bc.type="button"; bc.disabled=!pret||maj.calc; bc.onclick=calculer; act.appendChild(bc);
+  app.appendChild(act);
+  if(maj.msg){ var m=el("div","maj-msg"+(maj.ko?" ko":""),maj.msg); app.appendChild(m); }
+
+  if(maj.res){
+    var d=maj.res.data, avant=comptes(D), apres=comptes(d);
+    var p2=el("div","panel"); p2.style.marginTop="18px";
+    p2.appendChild(el("h3",null,"Résultat : données au "+new Date(d.meta.fin+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+nf.format(d.arts.length)+" références"));
+    var w2=el("div","tablewrap"), t2=el("table"), h2=el("tr"), cols=[["BAS","À réassortir"],["RUP","Ruptures"],["DEJ","Déjà vendus"],["ABS","Absents"],["NOU","Nouveautés"],["SUB","Substitutions"],["CED","À céder"],["PREP","En préparation"]];
+    h2.appendChild(el("th",null,"Magasin")); cols.forEach(function(c){ h2.appendChild(el("th","n",c[1])); });
+    var th2=el("thead"); th2.appendChild(h2); t2.appendChild(th2); var b2=el("tbody");
+    d.magasins.forEach(function(s){ var tr=el("tr"); tr.appendChild(el("td",null,nom(s)));
+      cols.forEach(function(c){ var x=apres[s][c[0]]||0, y=(avant[s]||{})[c[0]]||0; tr.appendChild(el("td","n",nf.format(x)+(x!==y?" ("+(x>y?"+":"")+nf.format(x-y)+")":""))); });
+      b2.appendChild(tr); });
+    t2.appendChild(b2); w2.appendChild(t2); p2.appendChild(w2);
+    p2.appendChild(el("p","tabdesc","Entre parenthèses : l’écart avec les données en ligne. Lignes illisibles écartées : "+Object.keys(d.meta.rejets).map(function(k){ return k+" "+d.meta.rejets[k]; }).join(", ")+"."));
+    var a2=el("div","maj-act");
+    var bp=el("button","btn yes","Publier pour tous les magasins"); bp.type="button"; bp.onclick=function(){ publier(bp); }; a2.appendChild(bp);
+    if(dlCap){ var bj=el("button","btn","Télécharger ces données (JSON)"); bj.type="button"; bj.onclick=function(){ telechargerJSON(maj.res.json,"reassort-donnees-"+d.meta.fin+".json",bj); }; a2.appendChild(bj); }
+    p2.appendChild(a2); app.appendChild(p2);
+  }
+  var aide=el("details","method"); aide.appendChild(el("summary",null,"Quels fichiers, et d’où ?"));
+  var ul=el("ul");
+  ["Base article (art_superviseur.CSV) : stocks de tous les sites, réception, flottant, commandes, prix, sous-colis, capacité de rayon.",
+   "Analyse stock / vente sur 12 mois : ventes mois par mois de chaque magasin. C’est sa date de fin qui date les propositions.",
+   "Suivi tout 12 mois glissants : ventes de l’an dernier (nouveautés) et taux de TGC pour la marge.",
+   "Suivi tout depuis le début de l’exercice (facultatif) : complète les taux de TGC.",
+   "Écart de préparation (.xls) : les réassorts déjà en route, pour ne rien proposer deux fois. À extraire le même jour que la base article.",
+   "Les photos ne se mettent pas à jour ici : les nouvelles références restent sans vignette jusqu’à la prochaine extraction de photos."
+  ].forEach(function(x){ ul.appendChild(el("li",null,x)); });
+  aide.appendChild(ul); app.appendChild(aide);
 }
 
 /* ---------- méthode ---------- */
