@@ -8,7 +8,7 @@ PDF / HTML / Excel / dossier prod HD.
 
 | Fichier | Rôle |
 |---|---|
-| `studio-planches-v42.html` | **version courante**, à utiliser |
+| `studio-planches-v43.html` | **version courante**, à utiliser |
 | `studio-planches-v11.html` | version d'origine, conservée comme référence |
 | `CHANGELOG.md` | ce qui a changé et pourquoi, version par version |
 | `test/` | vérifications automatisées (Chromium headless) |
@@ -42,6 +42,8 @@ l'historique git.
    une page hors écran reste atteignable. Et quand le départ et l'arrivée sont trop
    éloignés pour un geste, **⇄** sur la vignette — ou sur l'en-tête d'une page — nomme la
    destination dans une liste : un clic suffit.
+   **🧪 Test du glisser** sert quand le geste ne répond pas : il compte ce que le
+   navigateur transmet réellement, rend un verdict en clair et copie le compte rendu.
    Le nombre de produits par page est un **repère**, pas une limite : une page peut en
    compter 10 pour un repère de 9, le compteur passe en ambre. « ⇢ Caler la pagination »
    attribue à la planche le nombre de pages réellement composées.
@@ -79,7 +81,7 @@ l'historique git.
 ```bash
 cd test
 npm i playwright-core
-node verif-v42.mjs ../studio-planches-v42.html node_modules/jszip/dist/jszip.min.js
+node verif-v43.mjs ../studio-planches-v43.html node_modules/jszip/dist/jszip.min.js
 ```
 
 Chaque fichier `verif-*.mjs` couvre les correctifs de la version correspondante et
@@ -126,3 +128,7 @@ Pour une mise de côté longue, ou un changement de machine, doubler par un
   dans le fichier si l'outil doit tourner en magasin.
 - **`parseRemise` devine** : un nombre ≤ 100 sans devise est lu comme un pourcentage.
   Une remise saisie « 50 F » s'imprime « -50 % ».
+- **Navigateurs qui s'interposent.** Un navigateur « agent » ou une extension qui pilote
+  la page peut retenir les événements d'entrée. La prise est posée en phase de capture et
+  double d'un filet souris, mais si le navigateur ne transmet rien, aucune page n'y peut
+  rien : « 🧪 Test du glisser » le dit, et Chrome ou Edge résout le cas.

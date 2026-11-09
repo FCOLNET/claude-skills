@@ -1,5 +1,43 @@
 # Studio Planches Contacts — journal des versions
 
+## V43 — mesurer chez l'utilisateur au lieu de supposer
+
+Le navigateur en cause est **Genspark Browser**, un dérivé de Chromium sous Windows —
+identifié par son journal d'installation. Ce journal n'enregistre que les lancements du
+navigateur, une ligne chacun, aucune erreur : il ne pouvait rien dire de la page. Or
+c'est bien là que se joue la panne, et on ne peut ni l'installer ici ni la reproduire.
+D'où cette version : rendre l'outil capable de **dire ce qu'il reçoit**.
+
+**Nouveau bouton 🧪 Test du glisser**, dans la barre de la table de travail. Il ouvre un
+bac d'essai de deux vignettes, avec exactement la même prise que les vraies, et compte en
+direct ce que le navigateur transmet : `pointerdown`, `pointermove`, `pointerup`,
+`pointercancel`, leurs équivalents souris, et tout glisser natif lancé par-dessus. Avec
+l'environnement (navigateur, marque déclarée, PointerEvent, zoom, points tactiles, accès
+au choix de dossier) et un verdict en clair :
+
+- *le geste est reçu et traité de bout en bout* ;
+- *l'appui arrive mais aucun mouvement n'est transmis* — le navigateur ou une extension
+  les retient, à essayer dans Chrome ou Edge ;
+- *le geste est interrompu par le navigateur avant d'aboutir* ;
+- *le navigateur lance son propre glisser par-dessus*.
+
+Un bouton copie le compte rendu : il suffit de le coller dans la conversation.
+
+**Et la prise elle-même est durcie**, contre ce que ce genre de navigateur fait à une
+page :
+
+- les écouteurs du geste sont posés en **phase de capture**. Ils passent donc avant tout
+  écouteur en phase de bulle, y compris celui d'une couche qui appellerait
+  `stopPropagation` sur les mouvements ;
+- **filet souris** : si les événements de pointeur n'arrivent jamais, le geste repasse par
+  `mousedown`/`mousemove`/`mouseup`. Une seule famille sert à la fois — la première reçue
+  gagne — donc aucun risque de déplacement compté deux fois.
+
+Les deux cas sont vérifiés par simulation, puisqu'on ne peut pas installer le navigateur :
+une couche qui retient les événements en phase de bulle, et un environnement privé de
+`PointerEvent`. Dans les deux, le produit arrive à destination.
+
+
 ## V42 — le déplacement ne dépend plus du navigateur
 
 Signalé en V41 : impossible de faire glisser les vignettes entre elles ni d'une page à

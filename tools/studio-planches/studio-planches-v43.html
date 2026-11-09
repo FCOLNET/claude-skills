@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio Planches Contacts — NPC (V42)</title>
+<title>Studio Planches Contacts — NPC (V43)</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1747,37 +1747,75 @@ function wtZoneDepotMarque(el){ el.dataset.zone='item'; return el; }
 
 let wtGeste=null;   // { type:'item'|'page', el }
 
+// V43 — journal du geste, lu par le diagnostic « 🧪 Test du glisser ».
+// L'outil tourne dans des navigateurs qu'on ne peut pas reproduire ici. Plutôt que de
+// supposer ce qui se passe chez l'utilisateur, on compte ce qui arrive réellement.
+const WT_JOURNAL={prises:0, pointerdown:0, mousedown:0, pointermove:0, mousemove:0,
+                 pointerup:0, mouseup:0, pointercancel:0, dragstartNatif:0,
+                 gestesDemarres:0, gestesFinis:0, dernier:''};
+document.addEventListener('dragstart', ()=>{ WT_JOURNAL.dragstartNatif++; }, true);
+
 // Attache une prise à `prise` ; le bloc réellement déplacé est `cible`.
+//
+// Deux précautions pour les navigateurs qui s'interposent entre la page et le pointeur
+// (navigateurs « agent », extensions qui pilotent la page, webviews intégrées) :
+//  - les écouteurs de fenêtre sont posés en phase de CAPTURE. Ils passent donc avant
+//    tout écouteur en phase de bulle, y compris celui qui appellerait stopPropagation.
+//  - si les événements de pointeur n'arrivent jamais, on retombe sur les événements de
+//    souris. Un seul geste à la fois : le premier type reçu gagne, l'autre est ignoré.
 function wtPrise(prise, cible, type){
-  prise.addEventListener('pointerdown', ev=>{
+  const demarrer = (ev, viaSouris)=>{
     if (ev.button!==0) return;
     // un bouton, un champ éditable : ce n'est pas une prise
     if (ev.target.closest && ev.target.closest('button,[contenteditable],input,select,textarea')) return;
+    if (wtGeste) return;                     // un geste déjà en cours
+    WT_JOURNAL.prises++;
+    if (viaSouris) WT_JOURNAL.mousedown++; else WT_JOURNAL.pointerdown++;
     const x0=ev.clientX, y0=ev.clientY;
-    let parti=false;
-    const bouger=e=>{
+    let parti=false, source=null;            // 'pointeur' ou 'souris' : le premier reçu gagne
+    const bouger=(e, quoi)=>{
+      if (source && source!==quoi) return;   // on ne mélange pas les deux familles
+      source=quoi;
+      if (quoi==='pointeur') WT_JOURNAL.pointermove++; else WT_JOURNAL.mousemove++;
       if (!parti){
         if (Math.hypot(e.clientX-x0, e.clientY-y0) < 5) return;   // seuil : un clic reste un clic
         parti=true;
+        WT_JOURNAL.gestesDemarres++;
+        WT_JOURNAL.dernier='geste démarré via '+quoi;
         wtGeste={type, el:cible};
         wtBord={haut:false, bas:false};
         if (type==='item'){ wtDragged=cible; cible.classList.add('dragging'); }
         else { wtPageDragged=cible; cible.classList.add('pagedrag'); }
         document.body.classList.add('wt-glisse');
       }
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       wtSurvol(e.clientX, e.clientY);
     };
-    const lacher=()=>{
-      window.removeEventListener('pointermove', bouger);
-      window.removeEventListener('pointerup', lacher);
-      window.removeEventListener('pointercancel', lacher);
-      if (parti) wtFinGeste();
+    const bougerP=e=>bouger(e,'pointeur');
+    const bougerS=e=>bouger(e,'souris');
+    const lacher=(e, quoi)=>{
+      if (quoi==='annule') WT_JOURNAL.pointercancel++;
+      else if (quoi==='pointeur') WT_JOURNAL.pointerup++; else WT_JOURNAL.mouseup++;
+      window.removeEventListener('pointermove', bougerP, true);
+      window.removeEventListener('mousemove', bougerS, true);
+      window.removeEventListener('pointerup', lacherP, true);
+      window.removeEventListener('pointercancel', lacherA, true);
+      window.removeEventListener('mouseup', lacherS, true);
+      if (parti){ WT_JOURNAL.gestesFinis++; wtFinGeste(); }
     };
-    window.addEventListener('pointermove', bouger);
-    window.addEventListener('pointerup', lacher);
-    window.addEventListener('pointercancel', lacher);
-  });
+    const lacherP=e=>lacher(e,'pointeur');
+    const lacherS=e=>lacher(e,'souris');
+    const lacherA=e=>lacher(e,'annule');
+    window.addEventListener('pointermove', bougerP, true);
+    window.addEventListener('mousemove', bougerS, true);
+    window.addEventListener('pointerup', lacherP, true);
+    window.addEventListener('pointercancel', lacherA, true);
+    window.addEventListener('mouseup', lacherS, true);
+  };
+  prise.addEventListener('pointerdown', ev=>demarrer(ev,false));
+  // filet : dans un navigateur où les événements de pointeur n'arrivent pas, mousedown
+  // prend le relais. Si pointerdown a déjà servi, wtGeste ou la prise en cours l'écarte.
+  prise.addEventListener('mousedown', ev=>{ if (!WT_JOURNAL.pointerdown) demarrer(ev,true); });
 }
 
 // Défilement automatique quand le pointeur approche le haut ou le bas de la fenêtre :
@@ -1892,6 +1930,118 @@ function retirerDeTout(code){
     sc.codes=sc.codes.filter(c=>c!==code);
     aplatir(sc);
   }
+}
+
+// ============ TEST DU GLISSER (V43) ============
+// Le glisser a cessé de fonctionner chez un utilisateur sans qu'on puisse le reproduire :
+// code identique d'une version à l'autre, vrais glissers passants en test. Dans ce cas,
+// supposer ne mène à rien — il faut mesurer là où ça se passe. Ce panneau compte ce que
+// le navigateur transmet vraiment pendant un geste, et le rend copiable.
+function diagnosticGlisser(){
+  let ov=document.getElementById('diagOverlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='diagOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:10001;background:rgba(13,27,42,.82);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#FAF8F5;border-radius:16px;padding:22px 24px;max-width:700px;width:100%;max-height:88vh;overflow:auto';
+  box.innerHTML='<h3 style="font-size:1.05rem;font-weight:800;margin-bottom:4px">🧪 Test du glisser</h3>'
+    +'<p style="font-size:.76rem;color:#666;margin-bottom:14px">Attrape la vignette grise ci-dessous et fais-la glisser sur la vignette dorée, '
+    +'comme tu le ferais dans la table de travail. Le compte rendu se remplit tout seul.</p>';
+
+  // bac d'essai : deux vignettes, la même prise que dans la table de travail
+  const bac=document.createElement('div');
+  bac.style.cssText='display:flex;gap:14px;align-items:center;padding:14px;border:2px dashed #C8A951;border-radius:12px;background:#fff;margin-bottom:14px;min-height:120px';
+  bac.dataset.zone='item';
+  const faire=(nom,fond)=>{
+    const d=document.createElement('div');
+    d.className='wt-item'; d.dataset.code=nom;
+    d.style.cssText='width:96px;flex:0 0 96px;background:'+fond;
+    d.innerHTML='<div class="wt-img" style="background:'+fond+'"></div>'
+      +'<div class="wt-txt"><div class="wt-code">'+esc(nom)+'</div></div>';
+    return d;
+  };
+  const a=faire('ESSAI','#E5E0D8'), b=faire('CIBLE','#C8A951');
+  wtPrise(a,a,'item'); wtPrise(b,b,'item');
+  bac.appendChild(a); bac.appendChild(b);
+  box.appendChild(bac);
+
+  const zone=document.createElement('pre');
+  zone.style.cssText='font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.7rem;line-height:1.5;background:#1A1A1A;color:#E8E8E8;border-radius:10px;padding:13px 15px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto';
+  box.appendChild(zone);
+
+  const verdictEl=document.createElement('p');
+  verdictEl.id='diagVerdict';
+  verdictEl.style.cssText='font-size:.8rem;font-weight:700;margin-top:12px';
+  box.appendChild(verdictEl);
+
+  const rapport=()=>{
+    const j=WT_JOURNAL;
+    const nav=navigator;
+    const l=[];
+    l.push('— Environnement —');
+    l.push('navigateur      : '+nav.userAgent);
+    l.push('marque          : '+((nav.userAgentData&&nav.userAgentData.brands||[]).map(x=>x.brand+' '+x.version).join(' / ')||'non déclarée'));
+    l.push('plateforme      : '+(nav.platform||'?')+'   langue : '+(nav.language||'?'));
+    l.push('PointerEvent    : '+(typeof PointerEvent==='function'?'oui':'NON'));
+    l.push('points tactiles : '+(nav.maxTouchPoints||0));
+    l.push('zoom page       : '+(window.visualViewport?Math.round(window.visualViewport.scale*100)+' %':'?')
+                               +'   densité : '+(window.devicePixelRatio||1));
+    l.push('fenêtre         : '+window.innerWidth+' × '+window.innerHeight);
+    l.push('choix de dossier: '+(typeof window.showDirectoryPicker==='function'?'disponible':'absent'));
+    l.push('presse-papier   : '+(nav.clipboard&&nav.clipboard.write?'disponible':'absent'));
+    l.push('');
+    l.push('— Ce que le navigateur a transmis —');
+    l.push('prises engagées     : '+j.prises);
+    l.push('pointerdown         : '+j.pointerdown+'        mousedown : '+j.mousedown);
+    l.push('pointermove         : '+j.pointermove+'        mousemove : '+j.mousemove);
+    l.push('pointerup           : '+j.pointerup+'        mouseup   : '+j.mouseup);
+    l.push('pointercancel       : '+j.pointercancel);
+    l.push('glisser natif (HTML5): '+j.dragstartNatif);
+    l.push('gestes démarrés     : '+j.gestesDemarres+'   terminés : '+j.gestesFinis);
+    l.push('dernier            : '+(j.dernier||'—'));
+    l.push('');
+    l.push('— État de la sélection —');
+    l.push('planches : '+PAGES.length+'   références : '+allCodes().length
+          +'   vivier : '+POOL.length+'   réserve : '+RESERVE.length);
+    l.push('version  : V43   projet : '+(PROJET_NOM||'—'));
+    return l.join('\n');
+  };
+  const verdict=()=>{
+    const j=WT_JOURNAL;
+    if (!j.prises) return ['⏳ En attente : attrape la vignette grise et fais-la glisser.', '#666'];
+    if (!j.pointerdown && !j.mousedown) return ['❌ Le navigateur ne transmet même pas l\'appui. Rien de la page ne peut y remédier.', '#B00020'];
+    if (!j.pointermove && !j.mousemove) return ['❌ L\'appui arrive, mais AUCUN mouvement n\'est transmis : le navigateur ou une extension les retient. À essayer dans Chrome ou Edge.', '#B00020'];
+    if (j.pointercancel && !j.gestesFinis) return ['⚠️ Le geste est interrompu par le navigateur (pointercancel) avant d\'aboutir.', '#8A6100'];
+    if (j.dragstartNatif) return ['⚠️ Le navigateur lance son propre glisser par-dessus le geste. Signale-le : il y a un correctif à faire.', '#8A6100'];
+    if (!j.gestesDemarres) return ['⚠️ Mouvements reçus mais trop courts : le geste n\'a pas franchi le seuil de 5 px.', '#8A6100'];
+    if (j.gestesFinis) return ['✅ Le geste est reçu et traité de bout en bout. Le glisser fonctionne dans ce navigateur.', '#1B4332'];
+    return ['⏳ Geste en cours…', '#666'];
+  };
+  const majr=()=>{ zone.textContent=rapport(); const [t,c]=verdict(); verdictEl.textContent=t; verdictEl.style.color=c; };
+  majr();
+  const minuteur=setInterval(majr, 400);
+
+  const pied=document.createElement('div');
+  pied.style.cssText='display:flex;gap:8px;margin-top:12px;flex-wrap:wrap';
+  const bCopie=document.createElement('button');
+  bCopie.className='btn gold'; bCopie.textContent='⧉ Copier le compte rendu';
+  bCopie.onclick=async ()=>{
+    const ok=await copyText(rapport());
+    bCopie.textContent = ok ? '✓ Copié' : '✕ Copie refusée';
+    setTimeout(()=>{ bCopie.textContent='⧉ Copier le compte rendu'; }, 2000);
+  };
+  const bRaz=document.createElement('button');
+  bRaz.className='btn ghost'; bRaz.textContent='↺ Remettre les compteurs à zéro';
+  bRaz.onclick=()=>{ for (const k of Object.keys(WT_JOURNAL)) WT_JOURNAL[k]=(typeof WT_JOURNAL[k]==='number')?0:''; majr(); };
+  const bFermer=document.createElement('button');
+  bFermer.className='btn ghost'; bFermer.textContent='Fermer';
+  bFermer.onclick=()=>{ clearInterval(minuteur); ov.remove(); };
+  pied.appendChild(bCopie); pied.appendChild(bRaz); pied.appendChild(bFermer);
+  box.appendChild(pied);
+
+  ov.appendChild(box);
+  ov.addEventListener('click',e=>{ if(e.target===ov){ clearInterval(minuteur); ov.remove(); } });
+  document.body.appendChild(ov);
+  return ov;
 }
 
 function choisirDestination(code){
@@ -2099,8 +2249,13 @@ function renderWorktable(){
   bLivrer.textContent='✅ Valider et livrer';
   bLivrer.title='Enregistrer la sélection telle qu\'elle est composée et produire les livrables';
   bLivrer.onclick=()=>{ wtSync(); fermerWorktable(); scheduleAutosave(); montrerLivraison(); };
+  const bDiag=document.createElement('button');
+  bDiag.className='btn ghost'; bDiag.id='wtDiagBtn'; bDiag.style.cssText='padding:8px 14px;font-size:.72rem';
+  bDiag.textContent='🧪 Test du glisser';
+  bDiag.title='Vérifier ce que ce navigateur transmet pendant un geste, et me l\'envoyer';
+  bDiag.onclick=diagnosticGlisser;
   bar.appendChild(retour); bar.appendChild(seg); bar.appendChild(taille); bar.appendChild(bPlanche);
-  bar.appendChild(bLivrer); bar.appendChild(tot);
+  bar.appendChild(bLivrer); bar.appendChild(bDiag); bar.appendChild(tot);
   wt.appendChild(bar);
   wt.style.setProperty('--wt', WT_SIZE+'px');
 
